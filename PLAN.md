@@ -54,8 +54,6 @@ Each blocks nothing today and has a default that applies if nothing is said.
 
 ## Backlog
 
-- Port the `.claude/agents/` personas from `../Fonnus-Admin` once this repo has the
-  documents their pointers name.
 - A token-copy test, in the shape of `../Fonnus-Admin/src/styles/tokens.test.ts`, asserting
   the six token files are byte-identical to their source in `../Fonnus-Web-UI`.
 - An SSR regression test: import `src/api/index.ts` in a Node environment with no `window`

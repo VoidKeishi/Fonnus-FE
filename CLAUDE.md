@@ -19,11 +19,19 @@ to resolve:
 
 | Situation | Command |
 |---|---|
-| All product work | plain `claude` |
+| ALL product work, any size (requirement → port or design → build → acceptance) | `claude --agent pm` |
+| Bug investigation, toolchain hand-work, a review or audit the user asks for | plain `claude` |
 
-This repo has no `.claude/agents/` yet. `../Fonnus-Admin/.claude/` is the template when the
-personas are worth porting; they are not copied yet because three of their pointers name
-documents this repo does not have.
+The personas in `.claude/agents/` (`pm`, `ux-builder`, `code-reviewer`, `explore`) and the
+`requirement` skill follow the pipeline repo's orchestrator/executor shape, rewired to this
+repo's spine: the frozen prototype `../Fonnus-Web-UI` is the design authority, so there is
+no designer persona and no architect — the pm decides what a faithful port is and writes
+the rare ADR itself; `ux-builder` ports screens onto the architecture in `docs/adr/`;
+`code-reviewer` reviews blackbox; `explore` reads all three sibling trees. Never call
+`ux-builder` or `code-reviewer` directly — they are the pm persona's executors and refuse
+prompts without their input contracts. Sizing is the pm's: S edits directly · M states the
+port and its deltas, one approval, then builds · L writes the decision down in `docs/adr/`
+before code.
 
 ## Read first, every session
 
@@ -135,6 +143,7 @@ Three more that Next.js adds:
 | `docs/ui-ux-principles.md` | Nine rules distilled from real mistakes. Living document — read before, extend after |
 | `docs/visual-language.md` | Colour, icons, shapes, patterns, and the `--icon-accent` rule |
 | `README.md` | How to run it, including with no backend at all |
+| `.claude/agents/`, `.claude/skills/` | The pm persona, its executors and the requirement skill — the working method, versioned with the repo |
 
 ## Commands
 
