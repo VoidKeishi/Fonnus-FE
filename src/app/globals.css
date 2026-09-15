@@ -1,0 +1,270 @@
+@import "tailwindcss";
+
+/*
+ * The product's design system, copied from ../Fonnus-Web-UI (ADR 0002). The
+ * order is that repo's own src/styles/global.css: colours, type, spacing,
+ * shape, motion, base. `fonts.css` is deliberately not copied — it is a Google
+ * Fonts @import, and here the three faces load through next/font in layout.tsx.
+ *
+ * Imported into Tailwind's `base` layer, not unlayered: an unlayered rule beats
+ * every layered one, so an unlayered `h1 { font-size: 44px }` from base.css
+ * would win against a `text-[24px]` utility. In the base layer it still
+ * overrides Tailwind's preflight (it is imported after it) and still loses to
+ * utilities, which is the order a screen expects.
+ */
+@import "../styles/tokens/colors.css" layer(base);
+@import "../styles/tokens/typography.css" layer(base);
+@import "../styles/tokens/spacing.css" layer(base);
+@import "../styles/tokens/shape.css" layer(base);
+@import "../styles/tokens/motion.css" layer(base);
+@import "../styles/tokens/base.css" layer(base);
+
+/*
+ * next/font hashes each family's real name and publishes it as a variable
+ * (layout.tsx). The copied typography.css names the three families literally,
+ * which only resolves if the reader happens to have them installed; these three
+ * lines point the same tokens at the loaded faces instead. The override lives
+ * here rather than in the copy so the copy stays byte-identical to its source
+ * and a re-copy is a straight overwrite.
+ */
+:root {
+  --font-display: var(--font-baloo), "Be Vietnam Pro", system-ui, sans-serif;
+  --font-ui: var(--font-be-vietnam), system-ui, -apple-system, sans-serif;
+  --font-num: var(--font-plex), var(--font-be-vietnam), system-ui, sans-serif;
+}
+
+/*
+ * The guide's alias layer, published as Tailwind theme names so a screen writes
+ * `bg-surface-card` / `text-text-muted` / `border-border-hairline` and every
+ * value still comes from one of the copied token files. `inline` so a utility
+ * emits `var(--surface-card)` and the alias keeps resolving through the
+ * cascade; the entries whose Tailwind name equals the alias name (the fonts,
+ * the radii, the shadows) are therefore fed by the token files' own unlayered
+ * declarations, which sit above this block's layer.
+ *
+ * Base palette names (--terracotta, --milk, --ink …) are never written in a
+ * component: only these aliases are (ADR 0002 point 1).
+ */
+@theme inline {
+  --color-surface-page: var(--surface-page);
+  --color-surface-card: var(--surface-card);
+  --color-surface-warm: var(--surface-warm);
+  --color-surface-sage: var(--surface-sage);
+  --color-surface-rose: var(--surface-rose);
+  --color-surface-inverse: var(--surface-inverse);
+
+  --color-text-body: var(--text-body);
+  --color-text-heading: var(--text-heading);
+  --color-text-muted: var(--text-muted);
+  --color-text-eyebrow: var(--text-eyebrow);
+  --color-text-link: var(--text-link);
+  --color-text-accent: var(--text-accent);
+  --color-text-on-accent: var(--text-on-accent);
+
+  --color-border-hairline: var(--border-hairline);
+  --color-border-strong: var(--border-strong);
+  --color-border-dashed: var(--border-dashed);
+
+  --color-action-primary: var(--action-primary);
+  --color-action-primary-hover: var(--action-primary-hover);
+  --color-action-primary-active: var(--action-primary-active);
+
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-error: var(--error);
+  --color-info: var(--info);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+
+  --font-display: var(--font-display);
+  --font-ui: var(--font-ui);
+  --font-num: var(--font-num);
+
+  --radius-xs: var(--radius-xs);
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+  --radius-2xl: var(--radius-2xl);
+  --radius-pill: var(--radius-pill);
+
+  --shadow-raise: var(--shadow-raise);
+  --shadow-overlay: var(--shadow-overlay);
+
+  --ease-arc: var(--ease-arc);
+  --ease-out: var(--ease-out);
+
+  /*
+   * The type scale, published as Tailwind names with the line-height the guide
+   * pairs with each size — `text-body-sm` carries 1.6 without a second class.
+   * The Vietnamese rule behind those numbers: line-height never drops below
+   * 1.2, headings included, because the diacritics need the room.
+   */
+  --text-hero: var(--size-hero);
+  --text-hero--line-height: var(--leading-hero);
+  --text-display: var(--size-display);
+  --text-display--line-height: var(--leading-display);
+  --text-heading: var(--size-heading);
+  --text-heading--line-height: var(--leading-heading);
+  --text-subheading: var(--size-subheading);
+  --text-subheading--line-height: var(--leading-subheading);
+  --text-body-lg: var(--size-body-lg);
+  --text-body-lg--line-height: var(--leading-body-lg);
+  --text-body: var(--size-body);
+  --text-body--line-height: var(--leading-body);
+  --text-body-sm: var(--size-body-sm);
+  --text-body-sm--line-height: var(--leading-body-sm);
+  --text-ui: var(--size-ui);
+  --text-ui--line-height: var(--leading-ui);
+  --text-eyebrow: var(--size-eyebrow);
+  --text-eyebrow--line-height: var(--leading-eyebrow);
+  --text-num: var(--size-num);
+  --text-num--line-height: var(--leading-num);
+
+  /* No weight entries: `--font-weight-ui` would collide with the `--font-ui`
+     family on the same `font-ui` utility name. The guide's four weights are
+     400 / 500 / 600, which are Tailwind's own `font-normal`, `font-medium` and
+     `font-semibold`. */
+
+  /*
+   * Two breakpoints of our own, on top of Tailwind's, because the app shell has
+   * three shapes and the middle one has no default name: `rail` is where the
+   * bottom tab bar gives way to the icon rail, `wide` where the rail opens into
+   * the 216px sidebar. Written in rem so they follow the reader's text size.
+   */
+  --breakpoint-rail: 40rem;
+  --breakpoint-wide: 56.25rem;
+
+  --tracking-eyebrow: var(--tracking-eyebrow);
+  --tracking-display: var(--tracking-display);
+}
+
+/*
+ * Page-level rules, from ../Fonnus-Web-UI/src/styles/global.css. Unlayered on
+ * purpose: `scrollbar-gutter` and the body ground are the page itself, not
+ * something a utility class should ever be able to win against by accident.
+ */
+html {
+  scroll-behavior: smooth;
+  /*
+   * Always reserve the scrollbar's column. Without this a page that scrolls
+   * (a section form) is ~15px narrower than one that does not (its hub), and
+   * a centred content column drifts sideways between the two — the margins
+   * of Hồ sơ and its sub-pages visibly disagreed.
+   */
+  scrollbar-gutter: stable;
+}
+
+body {
+  margin: 0;
+  background: var(--surface-page);
+  color: var(--text-body);
+  font-family: var(--font-ui);
+}
+
+/*
+ * ---------------------------------------------------------------------------
+ * Scroll reveal
+ * ---------------------------------------------------------------------------
+ * Blocks lift and settle as they come into view. The hidden state lives here,
+ * in CSS, so it is already in place on the first paint — setting it from JS
+ * after mount is what made the top of the page flash on load.
+ *
+ * `data-reveal-armed` is written on <html> by `useReveal` in a layout effect,
+ * before the browser paints. Nothing is hidden unless that ran, so a page with
+ * no JS (or with reduced motion asked for) renders settled instead of blank.
+ * Under Next.js that matters twice over: the server-rendered HTML arrives
+ * before any hook does, and it has to be readable as it stands.
+ *
+ * Elements opt in with `data-reveal`; `data-reveal-from="left|right"` brings
+ * one in from that edge instead of lifting it — only on wide viewports, where
+ * a row genuinely has two sides.
+ */
+:root {
+  --reveal-shift: 26px;
+  --reveal-slide: 40px;
+  --reveal-duration: 760ms;
+  --reveal-stagger: 110ms;
+}
+
+[data-reveal-armed] [data-reveal] {
+  opacity: 0;
+  transform: translate3d(var(--reveal-x, 0px), var(--reveal-y, var(--reveal-shift)), 0);
+  /* --ease-arc is the brand's rising arc: it keeps moving through the middle of
+     the run instead of racing to the end, which is what makes the reveal
+     something you can actually watch rather than a flicker. */
+  transition:
+    opacity var(--reveal-duration) var(--ease-arc) var(--reveal-delay, 0ms),
+    transform var(--reveal-duration) var(--ease-arc) var(--reveal-delay, 0ms);
+}
+
+[data-reveal-armed] [data-reveal][data-revealed] {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+}
+
+@media (min-width: 900px) {
+  [data-reveal-armed] [data-reveal][data-reveal-from='left'] {
+    --reveal-x: calc(var(--reveal-slide) * -1);
+    --reveal-y: 0px;
+  }
+
+  [data-reveal-armed] [data-reveal][data-reveal-from='right'] {
+    --reveal-x: var(--reveal-slide);
+    --reveal-y: 0px;
+  }
+}
+
+/* Belt and braces: the hook already declines to arm under reduced motion. */
+@media (prefers-reduced-motion: reduce) {
+  [data-reveal-armed] [data-reveal] {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+/* Shared keyframes, same source. Named `fn*` so a component's own animation
+   never collides with one of these. */
+@keyframes fnWave {
+  0% { transform: scale(1); opacity: 0.85; }
+  100% { transform: scale(1.55); opacity: 0; }
+}
+
+@keyframes fnFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fnRise {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* A bottom sheet comes up from off-screen, not from 16px away: it is the
+   whole surface arriving, and a short hop reads as a jitter instead. */
+@keyframes fnSheetUp {
+  from { transform: translateY(100%); }
+  to { transform: none; }
+}
+
+/* The OTP boxes hide the real input and its caret, so the active box draws one
+   of its own (src/auth/otp-field.tsx). Steps, not a fade: a blinking caret is
+   the one place the guide's soft easing would read as a pulse. */
+@keyframes fnCaret {
+  0%, 50% { opacity: 1; }
+  50.01%, 100% { opacity: 0; }
+}

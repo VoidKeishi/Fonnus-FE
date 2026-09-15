@@ -1,0 +1,82 @@
+// ADR 0001: the same lint spine as the pipeline (../Fonnus/eslint.config.js) —
+// `js.configs.recommended` plus typescript-eslint's `strictTypeChecked` — with
+// eslint-config-next's Next.js and React layers on top, because this repo also
+// ships JSX and Next.js route conventions the pipeline has no equivalent of.
+// `eslint-config-next/core-web-vitals` already carries the `next/typescript`
+// layer, which registers the same `@typescript-eslint` plugin instance we do,
+// so the plugin is defined once and there is nothing to deduplicate here.
+//
+// ESLint is pinned to 9.x, not the pipeline's 10.x: eslint-config-next depends
+// on eslint-plugin-react, whose newest release (7.37.5) declares `eslint ^9.7`
+// and crashes on ESLint 10 (`scopeManager.addGlobals is not a function`). Raise
+// the pin the moment that plugin ships ESLint 10 support.
+import js from '@eslint/js';
+import tseslint from 'typescript-eslint';
+import nextVitals from 'eslint-config-next/core-web-vitals';
+
+export default tseslint.config(
+  js.configs.recommended,
+  ...tseslint.configs.strictTypeChecked,
+  ...nextVitals,
+  {
+    languageOptions: {
+      parserOptions: {
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'error',
+      '@typescript-eslint/switch-exhaustiveness-check': [
+        'error',
+        { considerDefaultExhaustiveForUnions: true },
+      ],
+      '@typescript-eslint/no-floating-promises': 'error',
+      'no-fallthrough': 'error',
+      // In ESLint 10's `recommended` set, which the pipeline runs; on the 9.x
+      // pin they exist but are off, so they are switched on by hand to keep the
+      // rule set equal to the pipeline's. Drop these three lines with the pin.
+      'no-useless-assignment': 'error',
+      'no-unassigned-vars': 'error',
+      'preserve-caught-error': 'error',
+    },
+  },
+  {
+    // CLAUDE.md §Ground rules: one file reads the environment. Enforced here so
+    // a new `process.env.X` fails lint instead of quietly bypassing
+    // `src/api/env.ts` — the same gate the pipeline puts on `app/src/config/`.
+    // It also protects a Next.js-specific trap: only a literal
+    // `process.env.NEXT_PUBLIC_X` is inlined into the client bundle, so a value
+    // read through a computed key is `undefined` in the browser and defined on
+    // the server, which is the worst kind of bug to find later.
+    files: ['src/**/*.ts', 'src/**/*.tsx'],
+    ignores: ['src/api/env.ts'],
+    rules: {
+      'no-restricted-properties': [
+        'error',
+        { object: 'process', property: 'env', message: 'only src/api/env.ts reads process.env' },
+      ],
+    },
+  },
+  {
+    // eslint-config-next installs its own parser for every extension it claims,
+    // including `.mts`, and that parser does not forward the TypeScript project
+    // the type-aware rules need. Only `vitest.config.mts` is affected; hand it
+    // back to typescript-eslint's parser.
+    files: ['**/*.mts'],
+    languageOptions: { parser: tseslint.parser },
+  },
+  {
+    files: ['**/*.test.ts'],
+    rules: {
+      '@typescript-eslint/no-non-null-assertion': 'off',
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+    },
+  },
+  {
+    // Config files are plain ESM with no place in the TypeScript program.
+    files: ['**/*.mjs'],
+    extends: [tseslint.configs.disableTypeChecked],
+  },
+  { ignores: ['.next/', 'out/', 'next-env.d.ts', 'node_modules/'] },
+);

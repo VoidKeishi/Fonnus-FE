@@ -1,0 +1,31 @@
+/* Copied verbatim from ../Fonnus-Web-UI/src/styles/tokens/typography.css @ 302e3e8 (ADR 0002). Do not edit here — re-copy. */
+:root{
+--font-display:"Baloo 2","Be Vietnam Pro",system-ui,sans-serif;
+--font-ui:"Be Vietnam Pro",system-ui,-apple-system,sans-serif;
+--font-num:"IBM Plex Sans","Be Vietnam Pro",system-ui,sans-serif;
+
+/* Type scale — "Thang chữ". Vietnamese rule: line-height never below 1.2, headings included. */
+--size-hero:64px;      --leading-hero:1.2;
+--size-display:44px;   --leading-display:1.2;
+--size-heading:28px;   --leading-heading:1.3;
+--size-subheading:24px;--leading-subheading:1.3;
+--size-body-lg:18px;   --leading-body-lg:1.6;
+--size-body:16px;      --leading-body:1.65;
+--size-body-sm:14px;   --leading-body-sm:1.6;
+--size-ui:13.5px;      --leading-ui:1.4;
+--size-eyebrow:12px;   --leading-eyebrow:1.4;
+--size-num:16px;       --leading-num:1.4;
+--size-num-lg:20px;
+
+--weight-display:600;
+--weight-strong:600;
+--weight-ui:500;
+--weight-body:400;
+
+--tracking-eyebrow:.16em;
+--tracking-display:-.01em;
+--tracking-wordmark:-.03em;  /* the "nn" pair in the wordmark */
+--tracking-num:0;
+
+--numeric-tabular:tabular-nums; /* @kind other */
+}

@@ -1,0 +1,6 @@
+# Both are native-binary postinstalls we do not want running on every machine.
+# `unrs-resolver` is eslint-config-next's resolver and works from its prebuilt
+# binary; `sharp` is Next.js's image optimizer, which next.config.ts turns off.
+allowBuilds:
+  sharp: false
+  unrs-resolver: false

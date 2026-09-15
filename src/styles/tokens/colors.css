@@ -1,0 +1,96 @@
+/* Copied verbatim from ../Fonnus-Web-UI/src/styles/tokens/colors.css @ 302e3e8 (ADR 0002). Do not edit here — re-copy. */
+:root{
+/* --- Base palette (identity deck, "Bảng màu") --- */
+--paper:#F7EFE1;            /* Giấy — page ground */
+--milk:#FFFBF2;             /* Sữa — card ground */
+--blush:#F3DCC9;            /* warm tint, section grounds & assistant speech */
+--sage:#E2E7D4;             /* lemongrass tint, resolution / handoff */
+--rose:#F8E3DF;             /* error tint, "red zone" callouts */
+--terracotta:#B85C2B;       /* Đất nung — 4.0:1, UI + text ≥24px only */
+--terracotta-deep:#8A4118;  /* Đậm — 6.5:1, links & emphasis at reading size */
+--terracotta-button:#A04E1F;/* Nút — 5.4:1, primary button ground */
+--cream:#FFF6E8;            /* Kem — text on terracotta-button */
+--lemongrass:#6E7F53;       /* Lá sả — second voice: charts, states */
+--ink:#261F18;              /* Mực — 14.2:1, body + headings + logo circle */
+--ink-soft:#5C5248;         /* Mực nhạt — 6.7:1, secondary text, captions */
+
+/* --- Semantic status --- */
+--success:#3E7B47;
+--warning:#8F6300;
+--error:#B23A2E;
+--info:#2F6D7E;
+
+/* --- Dark ("Giao diện tối" — warm night brown, never blue-grey) --- */
+--night:#221B14;
+--night-surface:#2D251C;
+--cream-night:#F3E9DA;      /* 14.2:1 on night */
+--terracotta-night:#E08A50; /* 6.4:1 — logo arc, accents, buttons */
+--terracotta-night-hover:#EC9A61;
+--lemongrass-night:#AFBE93; /* 8.6:1 — charts, states */
+
+/* --- Semantic aliases: surfaces --- */
+--surface-page:var(--paper);
+--surface-card:var(--milk);
+--surface-warm:var(--blush);
+--surface-sage:var(--sage);
+--surface-rose:var(--rose);
+--surface-inverse:var(--night);
+--surface-inverse-card:var(--night-surface);
+
+/* --- Semantic aliases: text --- */
+--text-heading:var(--ink);
+--text-body:var(--ink);
+--text-muted:var(--ink-soft);
+--text-eyebrow:var(--terracotta);
+--text-accent:var(--terracotta-deep);
+--text-link:var(--terracotta-deep);
+--text-on-accent:var(--cream);
+--text-on-inverse:var(--cream-night);
+--text-muted-on-inverse:rgba(243,233,218,.66);
+
+/* --- Semantic aliases: lines & actions --- */
+--border-hairline:rgba(38,31,24,.10);
+--border-strong:rgba(38,31,24,.22);
+--border-dashed:rgba(184,92,43,.40);
+--border-on-inverse:rgba(243,233,218,.10);
+--action-primary:var(--terracotta-button);
+--action-primary-hover:var(--terracotta-deep);
+--action-primary-active:#7A3813;
+--action-secondary:var(--milk);
+--action-secondary-hover:#FBF3E4;
+--action-ghost-hover:rgba(184,92,43,.08);
+--focus-ring:var(--terracotta);
+/* The one terracotta part of every icon, shape and pattern (see design-system/icons.ts).
+   Night surfaces switch it to --terracotta-night; a terracotta surface sets it to currentColor. */
+--icon-accent:var(--terracotta);
+--chart-1:var(--terracotta);
+--chart-2:var(--lemongrass);
+--chart-3:var(--ink-soft);
+}
+
+[data-theme="dark"]{
+--surface-page:var(--night);
+--surface-card:var(--night-surface);
+--surface-warm:#33291F;
+--surface-sage:#2C3327;
+--surface-rose:#3A2620;
+--text-heading:var(--cream-night);
+--text-body:var(--cream-night);
+--text-muted:rgba(243,233,218,.66);
+--text-eyebrow:var(--terracotta-night);
+--text-accent:var(--terracotta-night);
+--text-link:var(--terracotta-night);
+--text-on-accent:var(--night);
+--border-hairline:rgba(243,233,218,.10);
+--border-strong:rgba(243,233,218,.22);
+--action-primary:var(--terracotta-night);
+--action-primary-hover:var(--terracotta-night-hover);
+--action-primary-active:#C9773F;
+--action-secondary:var(--night-surface);
+--action-secondary-hover:#372D22;
+--action-ghost-hover:rgba(224,138,80,.12);
+--icon-accent:var(--terracotta-night);
+--chart-1:var(--terracotta-night);
+--chart-2:var(--lemongrass-night);
+--chart-3:rgba(243,233,218,.5);
+}
