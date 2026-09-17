@@ -1,11 +1,11 @@
 # Field catalogue ↔ frontend model
 
-How `src/letan/model.ts` relates to the Fonnus context field catalogue, which field
+How `src/features/receptionist/model.ts` relates to the Fonnus context field catalogue, which field
 names differ, and what to do when the two disagree.
 
 Read this before changing either side.
 
-**`src/letan/` does not exist yet in this repo.** The Lễ tân configuration screens, and the
+**`src/features/receptionist/` does not exist yet in this repo.** The Lễ tân configuration screens, and the
 model this document maps, arrive with roadmap step F3 in `PLAN.md`; the mapping was written
 against the prototype `../Fonnus-Web-UI` and is carried here so the field names are settled
 before the screens are rebuilt.
@@ -19,7 +19,7 @@ Two documents, two jobs. Neither is a superset of the other.
 | | Normative for |
 |---|---|
 | **The catalogue** (backend repo, `docs/context-field-catalogue.md`) | Field **names**, **types**, **origin** (TE/SW/SD) and **gate** (R1/R2/O). If the catalogue says `pricing_disclosure_policy`, the frontend does not get to call it `priceMode`. |
-| **`src/letan/model.ts`** | What the **UI lets a tenant edit**, and how it is grouped into screens. The catalogue does not know about tabs, sections, or save boundaries. |
+| **`src/features/receptionist/model.ts`** | What the **UI lets a tenant edit**, and how it is grouped into screens. The catalogue does not know about tabs, sections, or save boundaries. |
 
 Consequences, stated once so nobody has to re-derive them:
 
@@ -41,8 +41,8 @@ verified without checking out the backend repo. Update both in the same commit, 
 
 | Catalogue origin | Lives in | Rendered as |
 |---|---|---|
-| **TE** — tenant-entered | `src/letan/model.ts` → `ReceptionistConfig` | An editable field in a section form |
-| **SW** — system-written by Fonnus | `src/letan/system.ts` | Read-only, with a "Hệ thống" tag |
+| **TE** — tenant-entered | `src/features/receptionist/model.ts` → `ReceptionistConfig` | An editable field in a section form |
+| **SW** — system-written by Fonnus | `src/features/receptionist/system.ts` | Read-only, with a "Hệ thống" tag |
 | **SD** — system-derived at runtime | Computed, or absent — see *Derived fields* | Not editable anywhere |
 
 ---

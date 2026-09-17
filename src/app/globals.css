@@ -68,6 +68,8 @@
   --color-action-primary: var(--action-primary);
   --color-action-primary-hover: var(--action-primary-hover);
   --color-action-primary-active: var(--action-primary-active);
+  --color-action-secondary: var(--action-secondary);
+  --color-action-secondary-hover: var(--action-secondary-hover);
 
   --color-success: var(--success);
   --color-warning: var(--warning);

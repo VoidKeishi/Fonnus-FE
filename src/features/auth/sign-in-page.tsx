@@ -14,7 +14,7 @@ import { Field, LastUsedBadge, PhoneField } from './field'
 import { OtpField, OtpFooter } from './otp-field'
 import { readLastMethod, rememberMethod } from './last-method'
 import { formatPhone, isValidEmail, normalizePhone, phoneError } from './phone'
-import { useCountdown } from './useCountdown'
+import { useCountdown } from './use-countdown'
 
 /*
  * Sign-in. Two ways in, because an owner will not remember which one they used:

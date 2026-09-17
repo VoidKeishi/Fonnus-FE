@@ -10,12 +10,12 @@ Status: ⬜ not started · 🔨 in progress · ✅ done, with the date.
 | **F0 · Scaffold** — Next.js 16 App Router, pnpm, strict TypeScript, ESLint, Tailwind v4 over the copied tokens, the three fonts through `next/font`, assets moved, docs written, `src/api/` seam with the `auth` group | ✅ 2026-09-15 | Every route in the design exists; the ones that are not built say so through `src/ui/placeholder.tsx` |
 | **F1 · Sign-in** — `/dang-nhap` with the phone and email code flows, `SessionProvider`, the demo login as the acceptance test | ✅ 2026-09-15 | Two of the three doors. Google sign-in and the whole of `/dang-ky` are F1b below |
 | **F1b · Sign-up and Google** — `/dang-ky` (clinic name, the Terms line, an existing number turning a sign-up into a sign-in) and Google on both doors: the in-page chooser for mock mode, the OAuth redirect for live | ⬜ | `/dang-ky` is a placeholder today. Google needs `googleAuthUrl()` pointed at a real endpoint, so it waits on `../Fonnus-BE` |
-| **F2 · The app shell** — `/app` layout: 216px sidebar, icon rail at ≤900px, bottom tab bar on phones; the session and toast providers | 🔨 | The frame, the nav and the session gate are in place; the toast provider and the readiness dot on Lễ tân are not. Everything under `/app` is client-rendered by design (CLAUDE.md) |
-| **F3 · Lễ tân** — the hub and the three tabs (Hồ sơ, Kiến thức, Kỹ năng), the shared section frame, the save stack, the try-out panel. Brings `src/letan/model.ts` and `docs/field-catalogue-mapping.md` into force | ⬜ | The largest single step: ~60 fields across 13 forms |
-| **F4 · Landing page** — header, hero with the voice orb, the section stack, pricing, footer, the contact form against `POST /leads` | ⬜ | Server-rendered; this is the acquisition surface |
+| **F2 · The app shell** — `/app` layout: 216px sidebar, icon rail at ≤900px, bottom tab bar on phones; the session and toast providers | 🔨 | The frame, the nav and the session gate are in place (`src/shell/`, `src/session/`); the toast provider and the readiness dot on Lễ tân are not. Everything under `/app` is client-rendered by design (CLAUDE.md) |
+| **F3 · Lễ tân** — the hub and the three tabs (Hồ sơ, Kiến thức, Kỹ năng), the shared section frame, the save stack, the try-out panel. Brings `src/features/receptionist/model.ts` and `docs/field-catalogue-mapping.md` into force | ⬜ | The largest single step: ~60 fields across 13 forms |
+| **F4 · Landing page** — header, hero with the voice orb, the section stack, pricing, footer, the contact form against `POST /leads` | ⬜ | Server-rendered; this is the acquisition surface. Carries two layout items from `docs/architecture.md`: `src/app/page.tsx` moves into a `(marketing)/` route group with its own layout holding the orb, and `SessionProvider` stops probing `GET /me` outside `/app`, `/dang-nhap`, `/dang-ky` (the landing page reads the localStorage hint instead — its "Vào ứng dụng" button is the first thing that needs it). The probe change touches the session gate, so the demo login is re-checked in the same task |
 | **F5 · Cuộc gọi** — the clinic's own call history | ⬜ | Blocked: `GET /calls` is "specified later" in `docs/api-contract.md` §7 and has no agreed shape |
 | **F6 · Lịch hẹn, Số điện thoại, Cài đặt** | ⬜ | |
-| **F7 · Deployment** — an ADR on where this runs, then the container, the proxy and CI | ⬜ | Deliberately undecided: this is a public site and Fonnus-Admin's posture (same VPS as the pipeline, behind basic auth) does not transfer |
+| **F7 · Deployment** — an ADR on where this runs, then the container, the proxy and CI | ⬜ | Deliberately undecided: this is a public site and Fonnus-Admin's posture (same VPS as the pipeline, behind basic auth) does not transfer. `output: 'standalone'` in `next.config.ts` (as Fonnus-Admin) and the build SHA on `/api/healthz` wait here: both are deployment posture, not layout |
 
 ## Waiting on ../Fonnus-BE
 
@@ -51,9 +51,42 @@ Each blocks nothing today and has a default that applies if nothing is said.
    subdomain posture stands as written in ADR 0003.
 2. **Where Fonnus-FE is deployed** — see roadmap row F7. **Default if undecided:** nothing
    is decided and `CONTEXT.md` §Deployment keeps saying so.
+3. **Whether Cài đặt is a sidebar destination.** The prototype keeps it out of the nav list:
+   on a wide screen it sits under the user block at the bottom of the sidebar, beside sign
+   out, and on a phone it is reached through "Thêm". This repo's `src/shell/nav.ts` lists it
+   as the sixth destination, so it shows as a regular tab beside Số điện thoại. Keeping it
+   in the nav makes settings one tap from anywhere, at the cost of a sixth tab competing
+   with the five the owner opens daily; following the prototype keeps the nav to the
+   screens that change day to day and puts settings with the account, where the owner
+   looks for their plan and sign-out. **Recommendation: follow the prototype**, decided
+   when F6 builds Cài đặt, so the placement and the screen land together. **Default if
+   undecided:** the prototype's placement, since it is the design authority.
 
 ## Backlog
 
+Layout items are the gap between today's tree and `docs/architecture.md` (ADR 0004); the
+ones sized S landed with the ADR on 2026-09-17.
+
+- **Error boundaries** (M): `error.tsx` in `(auth)/` and `app/`, later `(marketing)/`, plus
+  `global-error.tsx` at the root in plain HTML. The prototype never drew a render-failure
+  screen, so today it is Next.js's white English page; the copy is new and follows
+  `docs/ui-ux-principles.md` §9, with a retry button. One approval on the copy, then a
+  build.
+- **Base-palette names in components** (M): about twelve uses of `--milk`, `--blush`,
+  `--terracotta`, `--night` in `src/features/auth/sign-in-panel.tsx`, `field.tsx`,
+  `otp-field.tsx` and `src/design-system/button.tsx`. Each needs an alias line in
+  `globals.css` `@theme` and then the class; ADR 0002 point 2 forbids the base names.
+- **`api/auth.mock.ts` imports `features/auth/phone.ts`** (S): the mock normalises the
+  typed phone number to match the demo account, and reaches into a feature to do it —
+  the one import today that breaks `docs/architecture.md` §2.1 (`api/` imports nothing
+  outside itself). Move `normalizePhone` and `isValidEmail` next to the mock, or into
+  `mock-support.ts`, with the feature importing from there; decide with the lint gate
+  below, which would flag it.
+- **The import-direction lint gate** (S): one `no-restricted-imports` glob in
+  `eslint.config.mjs` — `features/X` never imports `@/features/Y`; `ui/`, `design-system/`
+  and `api/` never import `@/features`, `@/session`, `@/shell`. Added with the first task
+  that gives `features/` its second directory (F3 or F4), because before that the rule has
+  nothing to catch.
 - A token-copy test, in the shape of `../Fonnus-Admin/src/styles/tokens.test.ts`, asserting
   the six token files are byte-identical to their source in `../Fonnus-Web-UI`.
 - An SSR regression test: import `src/api/index.ts` in a Node environment with no `window`

@@ -5,7 +5,7 @@ import type { ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button, Logo } from '@/design-system'
 import { messageFor } from '@/api'
-import { useSession } from '@/session/session-provider'
+import { useSession } from './session-provider'
 
 /**
  * The gate on everything under `/app`.
