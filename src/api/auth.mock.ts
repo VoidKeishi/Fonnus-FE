@@ -9,7 +9,7 @@
  * database — in live mode the session is an httpOnly cookie the browser holds
  * and this file is not loaded.
  */
-import { isValidEmail, normalizePhone } from '../auth/phone'
+import { isValidEmail, normalizePhone } from '../features/auth/phone'
 import type { AuthApi, GoogleAccount, Me, Signal } from './contracts'
 import { ApiError } from './errors'
 import { DEMO_ACCOUNT, GOOGLE_ACCOUNTS, REGISTERED_PHONES, delay, maybeFail, storage } from './mock-support'

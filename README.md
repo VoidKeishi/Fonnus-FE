@@ -54,17 +54,19 @@ satisfy is `docs/api-contract.md`; the reasoning is `docs/adr/0003-backend-bound
 
 ```
 src/
-  app/            App Router: root layout, globals.css, the route tree
-    (auth)/       Sign-in and sign-up, server-rendered around a client form
-    app/          The signed-in application: session gate, shell, the six sections
-    api/healthz/  Liveness for this server — it says nothing about Fonnus-BE
+  app/            The route tree only: Next.js convention files, each page returning one feature component
+  features/       One directory per product surface: auth today; receptionist, marketing, calls, … as the roadmap lands them
   api/            The one door to the network: contracts, the mock/live switch, errors
-  auth/           The sign-in screen, the OTP field, phone normalisation
-  session/        Who is signed in, for the whole app
-  design-system/  Drawn icons, logo, buttons, inputs
-  ui/             App-level pieces that are not brand primitives
-  data/           Copy: the words on a screen, with no markup around them
+  session/        Who is signed in, and the gate on /app
+  shell/          What every signed-in page shares: the frame and the nav
+  design-system/  Brand primitives: drawn icons, logo, button, input
+  ui/             The signed-in app's kit, which marketing never imports
+  data/           Copy with no markup around it
   styles/tokens/  The design tokens, copied verbatim from ../Fonnus-Web-UI
 docs/             The API contract, the field catalogue mapping, the UI rules, the ADRs
 public/           Logo assets and the greeting clip the landing page plays
 ```
+
+The rules behind this tree — which directory imports which, how files are named, where a
+new thing goes — are in `docs/architecture.md`; the reasoning is
+`docs/adr/0004-source-layout.md`.

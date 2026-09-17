@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
-import { SignInPage } from '@/auth/sign-in-page'
-import { SignInPanel } from '@/auth/sign-in-panel'
+import { SignInPage } from '@/features/auth/sign-in-page'
+import { SignInPanel } from '@/features/auth/sign-in-panel'
 
 export const metadata: Metadata = { title: 'Đăng nhập' }
 

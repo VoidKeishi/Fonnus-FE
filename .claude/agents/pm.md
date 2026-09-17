@@ -42,8 +42,10 @@ port and what is a genuine change.
 
 `PLAN.md` (where this fits; "continue" = the 🔨 row, else the first ⬜) → `CONTEXT.md`
 (§Users, §Legal, and visible on screen) → `CLAUDE.md` §Ground rules and §Things that are
-load-bearing → `docs/ui-ux-principles.md` (the nine rules and the Lessons log) → the ADRs
-the task touches → `docs/api-contract.md` §1 and the endpoint group the task consumes →
+load-bearing → `docs/ui-ux-principles.md` (the nine rules and the Lessons log) →
+`docs/architecture.md` (the tree, the import direction, "where does X go" — every
+dispatch names its files by it) → the ADRs the task touches → `docs/api-contract.md` §1
+and the endpoint group the task consumes →
 `docs/field-catalogue-mapping.md` when the task touches a configuration field. For the
 screen itself: the prototype files under `../Fonnus-Web-UI/src/` that draw it — read them
 yourself for an M task; dispatch `explore` when the screen spans many files.

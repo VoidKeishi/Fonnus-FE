@@ -14,7 +14,7 @@ Format: **Q** — the question · *Why it matters* · **Recommendation** where t
 
 ### Q1 · Is the request body literally catalogue `snake_case`, at the top level, unwrapped?
 
-*Why:* `src/letan/model.ts` already names every field exactly as catalogue v1 does. If the
+*Why:* `src/features/receptionist/model.ts` already names every field exactly as catalogue v1 does. If the
 wire format matches, **there is no mapping layer to build, ever** — the record the UI edits is
 the record the backend stores. If it does not, every field needs a translation function on
 both sides, forever, and each new field is two edits instead of one.
@@ -168,7 +168,7 @@ is a decision rather than an accident.
 
 ### Q11 · Where does the vertical template live once the backend owns it?
 
-*Why:* `src/letan/defaults.ts` currently holds the 12 dental service rows, the Vietnamese
+*Why:* `src/features/receptionist/defaults.ts` currently holds the 12 dental service rows, the Vietnamese
 holiday seed including Tết, and the keyterm pack — 359 lines of "what a dental clinic looks
 like" sitting in the frontend. If the backend also seeds new tenants, both repos encode it and
 they will drift.
@@ -183,7 +183,7 @@ fallback. Follow-on: what do `from_template` and `seeded` mean once the server s
 
 ### Q12 · Are the compliance scripts server-served or a frontend constant?
 
-*Why:* `src/letan/system.ts` holds the AI-disclosure and recording-consent block, the
+*Why:* `src/features/receptionist/system.ts` holds the AI-disclosure and recording-consent block, the
 medical-advice refusal script, the red-flag pack and the PDPL data-minimisation rule. They
 render read-only. **If any of it is legally required disclosure, a legal change must not
 require a frontend deploy** — Law 134/2025 and Law 91/2025 are both young and both moving.

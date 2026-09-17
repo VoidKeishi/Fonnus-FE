@@ -216,7 +216,7 @@ prototype's hash-routing trap, and Q18 which recorded it, no longer apply.
 ## 3. Tenant configuration
 
 The whole Lễ tân tab reads and writes one record. Its full shape is
-`ReceptionistConfig` in `src/letan/model.ts` — ~60 fields, named 1:1 with catalogue v1.
+`ReceptionistConfig` in `src/features/receptionist/model.ts` — ~60 fields, named 1:1 with catalogue v1.
 That file is the authoritative schema; this document does not duplicate it, because a copy
 would drift.
 
@@ -237,7 +237,7 @@ would drift.
 
 **A brand-new tenant must come back fully seeded**, with the vertical template already
 applied: the dental service rows, the Vietnamese holiday seed including Tết, and the keyterm
-pack. Those currently live in `src/letan/defaults.ts`, which is the wrong repo for them —
+pack. Those currently live in `src/features/receptionist/defaults.ts`, which is the wrong repo for them —
 if the frontend seeds a new tenant, both repos encode "what a dental clinic looks like" and
 they will disagree. See Q11.
 

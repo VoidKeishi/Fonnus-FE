@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { AuthHeading, AuthShell } from '@/auth/auth-shell'
+import { AuthHeading, AuthShell } from '@/features/auth/auth-shell'
 import { Placeholder } from '@/ui/placeholder'
 
 export const metadata: Metadata = { title: 'Dùng thử miễn phí' }

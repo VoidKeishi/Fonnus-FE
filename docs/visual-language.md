@@ -8,7 +8,7 @@ when it was implemented. The code is the source of truth for what ships:
 | What                | Where                                                     |
 | ------------------- | --------------------------------------------------------- |
 | Icons (glyph data)  | `src/design-system/icons.ts`                              |
-| Icon renderer       | `src/design-system/Icon.tsx`                              |
+| Icon renderer       | `src/design-system/icon.tsx`                              |
 | Shapes              | `src/design-system/Shape.tsx`                             |
 | Patterns            | `src/design-system/Pattern.tsx`                           |
 | The accent colour   | `--icon-accent` in `src/styles/tokens/colors.css`         |

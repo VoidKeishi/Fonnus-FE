@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
-import { AppShell } from './app-shell'
-import { RequireSession } from './require-session'
+import { AppShell } from '@/shell/app-shell'
+import { RequireSession } from '@/session/require-session'
 
 /**
  * Everything under `/app` is behind the session gate and inside the shell.

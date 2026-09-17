@@ -30,6 +30,9 @@ that is what the input contract guarantees; hold it to that.
    work adds a route or a server component.
 5. `docs/api-contract.md` for the endpoint group and `docs/field-catalogue-mapping.md` for
    any configuration field the screen edits.
+6. `docs/architecture.md` — the tree, the import direction (§2.1), the naming rules
+   (§2.2), the rules of the directories you touch (§3) and "where does X go" (§4). A file
+   that lands outside that map is a fork, not a placement.
 
 ## Input contract — refuse if missing, naming the gap
 
@@ -38,10 +41,11 @@ that is what the input contract guarantees; hold it to that.
    ADR(s) that govern it.
 2. Deltas from the prototype, stated one by one, with the reason each (a principle, a
    Next.js constraint, a user decision). "No deltas" is a valid value; silence is not.
-3. Scope: the routes, modules or files to touch, and the contract sketch when the work
-   crosses the API seam (the `src/api/contracts.ts` group, its mock and live modules, the
-   error codes rendered) or adds a shared primitive under `src/ui/` or
-   `src/design-system/`.
+3. Scope: the routes, modules or files to touch, placed by `docs/architecture.md` (the
+   feature directory, the `page.tsx` under `src/app/`, anything shared), and the contract
+   sketch when the work crosses the API seam (the `src/api/contracts.ts` group, its mock
+   and live modules, the error codes rendered) or adds a shared primitive under `src/ui/`
+   or `src/design-system/`.
 4. Acceptance criteria as checkable statements, including which widths (phone, rail,
    wide) the screen is checked at.
 5. Test expectations: which suites, what new tests pin the change.
@@ -79,7 +83,7 @@ that is what the input contract guarantees; hold it to that.
   `typecheck`, `lint`, `build`. A check reachable only by a hand-typed command is
   unfinished work: wire it or flag it in the report. Commit tests only where the task
   asks for them or this repo already keeps tests for that kind of change (pure functions
-  under Vitest — `src/auth/phone.test.ts` is the size and shape), roughly one focused
+  under Vitest — `src/features/auth/phone.test.ts` is the size and shape), roughly one focused
   test per stated behaviour; scratch checks are not turned into permanent test files.
 - The spine is law: no component calls `fetch`; only `src/api/env.ts` reads
   `process.env`; no `pg`, no SQL; configuration fields are the catalogue's `snake_case`
