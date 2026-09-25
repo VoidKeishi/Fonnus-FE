@@ -66,10 +66,16 @@ export default function RootLayout({ children }: { children: ReactNode }) {
    * No dark mode. colors.css defines a `[data-theme="dark"]` palette and the
    * product has never switched it on (CONTEXT.md §Look and feel) — the warm
    * cream ground is the page, on every screen.
+   *
+   * `data-scroll-behavior="smooth"` pairs with `scroll-behavior: smooth` in
+   * globals.css: it tells Next.js to switch smooth scrolling off during a route
+   * change, so a new page starts at its top instantly while an in-page anchor
+   * still glides.
    */
   return (
     <html
       lang="vi"
+      data-scroll-behavior="smooth"
       className={`h-full ${baloo.variable} ${beVietnam.variable} ${plex.variable}`}
     >
       {/*

@@ -92,8 +92,10 @@ Carried from the prototype, where each one was a bug first.
   silently kills `position: sticky` inside it.
 - The runway under the last sticky card is a real element, not padding. A sticky item is
   bounded by its parent's *content* box, which padding does not extend.
-- The voice orb is mounted once, at the root of the marketing layout, and never re-mounted.
-  It is deliberately outside every section.
+- The voice orb is mounted once, by the landing page after every section, and never
+  re-mounted: it flies between the hero, the corner and the call screen as one element, and a
+  re-mount restarts its canvas. The call state it opens lives in the marketing layout, so the
+  header can open the same call.
 - A two-column grid that collapses to `flex-direction: column` must restate
   `align-items: stretch`. `align-items: start` is a grid instruction; on a flex column it
   sizes every child to its own max-content, which blew a 375px phone page out to 620px.

@@ -13,7 +13,10 @@ export interface NavItem {
   label: string
   desc: string
   icon: IconName
+  /** Where the item leads; for the demo item, where the demo is on a page without it. */
   href: string
+  /** Opens the "Nghe thử" call on the landing page instead of navigating. */
+  demo?: true
 }
 
 export interface NavGroup {
@@ -30,9 +33,16 @@ export interface NavGroup {
  */
 export const LANDING_SECTION_IDS: readonly string[] = ['hero']
 
-export const NAV_GROUPS: NavGroup[] = []
+export const NAV_GROUPS: NavGroup[] = [
+  {
+    label: 'Sản phẩm',
+    items: [
+      { label: 'Nghe thử Linh', desc: 'Gọi thử ngay trên trình duyệt', icon: 'answered', href: '/#hero', demo: true },
+    ],
+  },
+]
 
-export const FOOTER_PAGE_LINKS: { href: string; label: string }[] = []
+export const FOOTER_PAGE_LINKS: { href: string; label: string }[] = [{ href: '/#hero', label: 'Nghe thử' }]
 
 export const CONTACT = {
   phone: '+84 914 378 064',

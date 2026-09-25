@@ -1,11 +1,15 @@
 'use client'
 
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import type { RefObject } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Button, Icon, Logo } from '@/design-system'
 import { NAV_GROUPS } from '@/data/content'
 import type { NavGroup, NavItem } from '@/data/content'
+import { NavItemLink } from './nav-item-link'
+import type { OnDemo } from './nav-item-link'
+import { useCallDemo } from './orb/call-demo-provider'
 
 /*
  * A floating glass pill, centred and stuck to the top at every scroll position.
@@ -19,6 +23,12 @@ import type { NavGroup, NavItem } from '@/data/content'
  *
  * The same header sits on every marketing page. A link to the page you are on
  * keeps its wash, so the header also says where you are.
+ *
+ * "Nghe thử Linh" opens the call demo, which lives on the landing page only. On
+ * `/` it is a button; on any other marketing page it is a link to `/#hero`,
+ * where the demo is. Closing the call puts focus back on the control the demo
+ * was reached through: the menu's trigger, or the drawer's toggle — the item
+ * itself is gone with the menu that held it.
  */
 
 /** Past this scroll the pill tightens and its glass goes more opaque. */
@@ -43,6 +53,9 @@ const PILL_SCROLLED =
 /* The open menu's wash, held for the page you are on. */
 const WASH = 'bg-[color-mix(in_srgb,var(--text-eyebrow)_11%,transparent)] text-text-body'
 const FAST = 'transition-colors duration-[var(--duration-fast)] ease-out'
+
+/** Opens the call demo, returning focus to the given control on close; undefined off `/`. */
+type OpenDemo = ((returnFocusTo: HTMLElement | null) => void) | undefined
 
 function subscribeScroll(onChange: () => void) {
   window.addEventListener('scroll', onChange, { passive: true })
@@ -127,6 +140,9 @@ export function Header() {
     () => false,
   )
   const menus = useMenus()
+  const drawerToggleRef = useRef<HTMLButtonElement>(null)
+  const { openCall } = useCallDemo()
+  const onDemo: OpenDemo = pathname === '/' ? openCall : undefined
 
   return (
     <>
@@ -164,21 +180,39 @@ export function Header() {
                   menus.toggle(group.label)
                 }}
                 onPick={menus.pick}
+                onDemo={onDemo}
               />
             ))}
           </nav>
 
-          <Actions drawerOpen={menus.menuOpen} onToggleDrawer={menus.toggleDrawer} />
+          <Actions drawerOpen={menus.menuOpen} onToggleDrawer={menus.toggleDrawer} toggleRef={drawerToggleRef} />
         </div>
       </div>
 
-      {menus.menuOpen ? <Drawer pathname={pathname} onPick={menus.pick} /> : null}
+      {menus.menuOpen ? (
+        <Drawer
+          pathname={pathname}
+          onPick={menus.pick}
+          onDemo={
+            onDemo &&
+            (() => {
+              onDemo(drawerToggleRef.current)
+            })
+          }
+        />
+      ) : null}
     </>
   )
 }
 
 /** Both shapes are rendered; the `nav` breakpoint shows one. */
-function Actions({ drawerOpen, onToggleDrawer }: { drawerOpen: boolean; onToggleDrawer: () => void }) {
+interface ActionsProps {
+  drawerOpen: boolean
+  onToggleDrawer: () => void
+  toggleRef: RefObject<HTMLButtonElement | null>
+}
+
+function Actions({ drawerOpen, onToggleDrawer, toggleRef }: ActionsProps) {
   return (
     <div className="ml-auto flex shrink-0 items-center gap-2">
       <Link href="/dang-nhap" className="hidden shrink-0 no-underline nav:block">
@@ -193,6 +227,7 @@ function Actions({ drawerOpen, onToggleDrawer }: { drawerOpen: boolean; onToggle
         </Button>
       </Link>
       <button
+        ref={toggleRef}
         type="button"
         onClick={onToggleDrawer}
         aria-label={drawerOpen ? 'Đóng menu' : 'Mở menu'}
@@ -218,6 +253,7 @@ interface TriggerProps {
   onRelease: () => void
   onToggle: () => void
   onPick: () => void
+  onDemo: OpenDemo
 }
 
 const NAV_LINK = [
@@ -227,7 +263,8 @@ const NAV_LINK = [
 ].join(' ')
 const NAV_LINK_IDLE = 'bg-transparent text-text-muted hover:bg-action-ghost-hover hover:text-text-body'
 
-function GroupTrigger({ group, current, open, onHold, onRelease, onToggle, onPick }: TriggerProps) {
+function GroupTrigger({ group, current, open, onHold, onRelease, onToggle, onPick, onDemo }: TriggerProps) {
+  const triggerRef = useRef<HTMLButtonElement>(null)
   if (!group.items) {
     return (
       <Link
@@ -244,6 +281,7 @@ function GroupTrigger({ group, current, open, onHold, onRelease, onToggle, onPic
   return (
     <div className="relative" onMouseEnter={onHold} onMouseLeave={onRelease}>
       <button
+        ref={triggerRef}
         type="button"
         onClick={onToggle}
         aria-expanded={open}
@@ -271,7 +309,17 @@ function GroupTrigger({ group, current, open, onHold, onRelease, onToggle, onPic
           ].join(' ')}
         >
           {group.items.map((item) => (
-            <PanelItem key={item.label} item={item} onPick={onPick} />
+            <PanelItem
+              key={item.label}
+              item={item}
+              onPick={onPick}
+              onDemo={
+                onDemo &&
+                (() => {
+                  onDemo(triggerRef.current)
+                })
+              }
+            />
           ))}
         </div>
       ) : null}
@@ -279,21 +327,24 @@ function GroupTrigger({ group, current, open, onHold, onRelease, onToggle, onPic
   )
 }
 
-function PanelItem({ item, onPick }: { item: NavItem; onPick: () => void }) {
+const PANEL_ROW = [
+  'flex items-start gap-3 rounded-lg px-[13px] py-3 text-left font-ui text-text-body no-underline',
+  'hover:bg-action-ghost-hover',
+  FAST,
+].join(' ')
+
+function PanelItem({ item, onPick, onDemo }: { item: NavItem; onPick: () => void; onDemo: OnDemo }) {
   return (
-    <Link
-      href={item.href}
-      role="menuitem"
-      onClick={onPick}
-      className={[
-        'flex items-start gap-3 rounded-lg px-[13px] py-3 text-left font-ui text-text-body no-underline',
-        'hover:bg-action-ghost-hover',
-        FAST,
-      ].join(' ')}
-    >
+    <NavItemLink item={item} onPick={onPick} onDemo={onDemo} role="menuitem" className={PANEL_ROW}>
+      {/* The demo's tile is filled: the one item that does something rather than go somewhere. */}
       <span
         aria-hidden="true"
-        className="grid size-[34px] shrink-0 place-items-center rounded-[11px] bg-[color-mix(in_srgb,var(--text-eyebrow)_12%,transparent)] text-text-accent"
+        className={[
+          'grid size-[34px] shrink-0 place-items-center rounded-[11px]',
+          item.demo && onDemo
+            ? 'bg-action-primary text-text-on-accent [--icon-accent:currentColor]'
+            : 'bg-[color-mix(in_srgb,var(--text-eyebrow)_12%,transparent)] text-text-accent',
+        ].join(' ')}
       >
         <Icon name={item.icon} size={17} />
       </span>
@@ -301,7 +352,7 @@ function PanelItem({ item, onPick }: { item: NavItem; onPick: () => void }) {
         <span className="text-body-sm leading-(--leading-body) font-semibold">{item.label}</span>
         <span className="text-[12.5px] leading-[1.45] text-text-muted">{item.desc}</span>
       </span>
-    </Link>
+    </NavItemLink>
   )
 }
 
@@ -309,7 +360,7 @@ const DRAWER_ROW =
   'rounded-[14px] p-3.5 text-left font-ui text-body-sm leading-(--leading-body) text-text-body no-underline hover:bg-action-ghost-hover'
 
 /** A second glass sheet under the pill, one row per destination. */
-function Drawer({ pathname, onPick }: { pathname: string; onPick: () => void }) {
+function Drawer({ pathname, onPick, onDemo }: { pathname: string; onPick: () => void; onDemo: OnDemo }) {
   return (
     <div
       className={[
@@ -329,9 +380,9 @@ function Drawer({ pathname, onPick }: { pathname: string; onPick: () => void }) 
               {group.label}
             </span>
             {group.items.map((item) => (
-              <Link key={item.label} href={item.href} onClick={onPick} className={`${DRAWER_ROW} font-medium`}>
+              <NavItemLink key={item.label} item={item} onPick={onPick} onDemo={onDemo} className={`${DRAWER_ROW} font-medium`}>
                 {item.label}
-              </Link>
+              </NavItemLink>
             ))}
           </div>
         ) : (

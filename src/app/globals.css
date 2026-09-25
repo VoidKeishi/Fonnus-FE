@@ -172,6 +172,16 @@ body {
 }
 
 /*
+ * The landing call screen's scroll lock (src/features/marketing/orb/
+ * use-call-demo.ts). An attribute on <html> rather than an inline style on
+ * <body>: removing it is the whole undo, and a reload never carries it over.
+ * The gutter above stays reserved, so locking does not shift the page.
+ */
+html[data-scroll-lock] body {
+  overflow: hidden;
+}
+
+/*
  * ---------------------------------------------------------------------------
  * Scroll reveal
  * ---------------------------------------------------------------------------
