@@ -36,7 +36,7 @@ src/
     icon.svg · not-found.tsx
     global-error.tsx            'use client', plain HTML, Vietnamese: runs when the root layout itself failed  [backlog]
     api/healthz/route.ts        Liveness of this server. Build SHA added at F7
-    (marketing)/                F4. layout (header, footer, the voice orb mounted once), page, cham-diem-hotline/, error.tsx
+    (marketing)/                F4. layout (header, footer, the call demo's provider), page, cham-diem-hotline/, error.tsx
     (auth)/                     layout (AuthShell, F1b), dang-nhap/, dang-ky/ (F1b), error.tsx [backlog]
     app/                        layout: RequireSession → AppShell (→ ConfigProvider, F3). error.tsx [backlog]
       page.tsx                  Tổng quan
@@ -69,8 +69,11 @@ src/
     auth/                       auth-shell, sign-in-page, sign-in-panel, sign-up-page (F1b), field, otp-field, use-countdown, last-method
     receptionist/               F3. The Lễ tân tab — see §3
     overview/ · calls/ · appointments/ · numbers/ · account/   One per tab; F5, F6
-    marketing/                  landing.tsx (the section list) · header.tsx · footer.tsx · hero/ (hero, sign-up-form, clinic-logos)
-                                F4 adds: orb/ · sections/ · hotline/ · use-reveal.ts
+    marketing/                  landing.tsx (the section list, then the orb) · header.tsx · nav-item-link.tsx · footer.tsx
+                                hero/ (hero, sign-up-form, clinic-logos)
+                                orb/ (voice-orb, orb, orb-field, use-orb-placement, orb-motion, call-overlay,
+                                call-demo-provider, use-call-demo, greeting-player, call-state)
+                                F4 adds: sections/ · hotline/ · use-reveal.ts
 
   design-system/                Brand primitives every surface uses
     button.tsx · input.tsx · icon.tsx · logo.tsx · icons.ts · index.ts
@@ -82,7 +85,7 @@ src/
     choice · chips · tiles · rows · save-bar · tabs · disclosure · slider · icon-button · play-button ·
     token-area · charts · table · use-appear · use-element-width · speak · index.ts   each with its first consumer
 
-  data/                         Copy with no markup: auth.ts, then pricing.ts, content.ts, call-demos.ts (F4)
+  data/                         Copy with no markup: auth.ts, content.ts, call-demo.ts (the call screen's chips and voices), then pricing.ts, call-demos.ts (F4)
   styles/tokens/                Byte copies from ../Fonnus-Web-UI (ADR 0002)
 ```
 
@@ -276,10 +279,13 @@ No gate enforces these; the pm's review does.
   sentences stay in its component. A nav or footer link lands in the same change as the
   section it points at, and `src/data/content.test.ts` fails on a link to a section that
   does not exist.
-- The voice orb is mounted once on the landing page, after every section, and never on
-  `/cham-diem-hotline`, whose header sends "Nghe thử Linh" back to `/#hero` instead. The call
-  demo runs entirely in the browser — the recorded greeting and a script, no `voice` group —
-  until Fonnus-BE has a per-IP budget and a kill switch (`docs/open-questions.md` Q21).
+- The voice orb is mounted once on the landing page, after every section, so leaving `/`
+  unmounts it and closes any open call. It is never on `/cham-diem-hotline`, whose header
+  sends "Nghe thử Linh" back to `/#hero` instead. The call's state lives one level up, in
+  `CallDemoProvider` in the marketing layout, because the header opens the same call as the
+  orb. The call demo runs entirely in the browser — the recorded greeting and a script, no
+  `voice` group — until Fonnus-BE has a per-IP budget and a kill switch
+  (`docs/open-questions.md` Q21).
 - A night surface (the footer) renders inside a `data-theme="dark"` scope, so every alias
   inside it resolves to the night palette `colors.css` already defines. This is a night
   island in a light page, not a dark mode: nothing switches it.

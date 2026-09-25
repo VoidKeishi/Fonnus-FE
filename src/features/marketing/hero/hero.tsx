@@ -78,9 +78,10 @@ export function Hero() {
           from. Single column at ≤900px, where it stands down to centre.
         */}
         <div className="relative z-1 flex flex-col items-center gap-[26px] justify-self-end [@media(max-width:900px)]:order-3 [@media(max-width:900px)]:mt-[26px] [@media(max-width:900px)]:justify-self-center">
-          {/* Empty, not the orb: the orb is one fixed element mounted once on
-              the page, and this box only tells it where "docked" is and how
-              big to be. It finds the box by `data-orb-dock`. */}
+          {/* Empty, not the orb: the orb is mounted once by `landing.tsx`,
+              outside every section, so it can fly to the corner and into the
+              call without restarting. This box only tells it where "docked"
+              is and how big to be; it finds the box by `data-orb-dock`. */}
           <div data-orb-dock="" aria-hidden="true" className="size-[clamp(208px,24vw,344px)] rounded-[50%]" />
           <p className="m-0 max-w-[42ch] text-center text-body-sm text-text-muted">
             Bấm để nghe Linh trả lời ngay trên trình duyệt.
