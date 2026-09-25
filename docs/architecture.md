@@ -73,11 +73,14 @@ src/
                                 hero/ (hero, sign-up-form, clinic-logos)
                                 orb/ (voice-orb, orb, orb-field, use-orb-placement, orb-motion, call-overlay,
                                 call-demo-provider, use-call-demo, greeting-player, call-state)
-                                F4 adds: sections/ · hotline/ · use-reveal.ts
+                                sections/ (section-chrome, pricing, plan-card, comparison-matrix, billing-period,
+                                billing-switch, plan-price, matrix-disclosure; later sections join them)
+                                use-reveal.ts · scroll-reveal.tsx (arms the reveal once, from the landing page)
+                                F4 adds: hotline/
 
   design-system/                Brand primitives every surface uses
-    button.tsx · input.tsx · icon.tsx · logo.tsx · icons.ts · index.ts
-    badge.tsx · switch.tsx · shape.tsx · pattern.tsx   arrive with their first consumer
+    button.tsx (+ buttonClassName, the classes a Link wears) · input.tsx · icon.tsx · logo.tsx · icons.ts · index.ts
+    pattern.tsx · switch.tsx · badge.tsx · shape.tsx   the last two arrive with their first consumer
 
   ui/                           The signed-in app's kit. Marketing never imports it
     placeholder.tsx             A screen not built yet. Deleting the last one closes the roadmap
@@ -85,7 +88,7 @@ src/
     choice · chips · tiles · rows · save-bar · tabs · disclosure · slider · icon-button · play-button ·
     token-area · charts · table · use-appear · use-element-width · speak · index.ts   each with its first consumer
 
-  data/                         Copy with no markup: auth.ts, content.ts, call-demo.ts (the call screen's chips and voices), then pricing.ts, call-demos.ts (F4)
+  data/                         Copy with no markup: auth.ts, content.ts, call-demo.ts (the call screen's chips and voices), pricing.ts, then call-demos.ts (F4)
   styles/tokens/                Byte copies from ../Fonnus-Web-UI (ADR 0002)
 ```
 
@@ -272,8 +275,13 @@ No gate enforces these; the pm's review does.
 
 - Server components by default. `'use client'` on the lowest file that holds state: the
   header (its menus, drawer and scroll state), the orb and its call demo, the two forms, the
-  hotline page's chart, and `use-reveal.ts`. The layout, the footer and the section copy
-  stay on the server.
+  hotline page's chart, the scroll reveal, the billing switch and the prices it changes, and
+  the comparison table's disclosure. The layout, the footer and the section copy stay on the
+  server: a client leaf that wraps server content takes it as `children`, as the plan cards
+  and the comparison table do.
+- The scroll reveal is armed once, by `scroll-reveal.tsx` on the landing page. Blocks
+  already on screen when it arms are marked revealed instead of hidden, because the server's
+  HTML is painted before any hook runs. The stagger is CSS keyed by the `data-reveal` value.
 - Copy the prototype kept in `data/` — the navigation, the FAQ, the testimonials, the
   contact details, the plans, the scripted calls — lives in `src/data/`; a section's own
   sentences stay in its component. A nav or footer link lands in the same change as the

@@ -82,8 +82,14 @@ ones sized S landed with the ADR on 2026-09-17.
   no "Vào ứng dụng" button is needed. Same deferral as above.
 - **A link styled as a button** (M): `<Link><Button>` puts a `<button>` inside an `<a>`, which
   is invalid HTML and gives a screen reader two controls for one. It is how the auth pages
-  and the marketing header open `/dang-ky` and `/dang-nhap`. `Button` needs a link form, or
-  a class a `Link` can wear.
+  and the marketing header open `/dang-ky` and `/dang-nhap`. `buttonClassName` in
+  `src/design-system/button.tsx` is the class a `Link` can wear (the pricing cards use it);
+  what remains is switching those two callers to it.
+- **`/dang-nhap` reads browser storage while rendering** (S): `sign-in-page.tsx` calls
+  `readLastMethod` inside `useState`, so after one sign-in the server renders no "Lần trước"
+  badge and the browser does, and React reports a hydration mismatch. Read it through
+  `useSyncExternalStore` with a server snapshot of `null`, as `src/session/session.ts` does.
+  Belongs with F1b, which reworks the sign-in doors.
 - **Base-palette names in components** (M): about twelve uses of `--milk`, `--blush`,
   `--terracotta`, `--night` in `src/features/auth/sign-in-panel.tsx`, `field.tsx`,
   `otp-field.tsx` and `src/design-system/button.tsx` (its `inverse` variant reads `--night` and `--cream-night`); `src/design-system/icon.tsx` falls back to `var(--terracotta)`. Each needs an alias line in

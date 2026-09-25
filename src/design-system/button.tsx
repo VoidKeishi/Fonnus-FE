@@ -10,6 +10,15 @@ import type { ButtonHTMLAttributes, ReactNode } from 'react'
 type Variant = 'primary' | 'secondary' | 'ghost' | 'inverse'
 type Size = 'sm' | 'md' | 'lg'
 
+const BASE = [
+  'inline-flex items-center justify-center rounded-pill whitespace-nowrap no-underline',
+  'font-ui font-medium leading-[1.2]',
+  'cursor-pointer transition-[background-color,transform] duration-[120ms] ease-out',
+  'active:scale-[var(--press-scale)]',
+  'focus-visible:outline-none focus-visible:shadow-[var(--ring-focus)]',
+  'disabled:cursor-not-allowed disabled:opacity-[0.42] disabled:active:scale-100',
+].join(' ')
+
 const SIZES: Record<Size, string> = {
   sm: 'gap-1.5 px-4 py-2 text-ui',
   md: 'gap-2 px-[22px] py-[11px] text-body-sm',
@@ -28,12 +37,25 @@ const VARIANTS: Record<Variant, string> = {
   inverse: 'bg-[var(--cream-night)] text-[var(--night)] hover:bg-[var(--cream)]',
 }
 
-export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+export interface ButtonLook {
   variant?: Variant
   size?: Size
+  fullWidth?: boolean
+}
+
+/**
+ * The button's look as a class string, for a link that navigates but has to
+ * look like a button. A `<Button>` inside an `<a>` is invalid HTML — two
+ * interactive elements, one focus stop too many — so the link wears the classes
+ * instead. `no-underline` is part of the base for that reason.
+ */
+export function buttonClassName({ variant = 'primary', size = 'md', fullWidth = false }: ButtonLook = {}): string {
+  return [BASE, SIZES[size], VARIANTS[variant], fullWidth ? 'flex w-full' : ''].filter(Boolean).join(' ')
+}
+
+export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement>, ButtonLook {
   icon?: ReactNode
   iconRight?: ReactNode
-  fullWidth?: boolean
 }
 
 export function Button({
@@ -50,20 +72,7 @@ export function Button({
   return (
     <button
       type={type}
-      className={[
-        'inline-flex items-center justify-center rounded-pill whitespace-nowrap',
-        'font-ui font-medium leading-[1.2]',
-        'cursor-pointer transition-[background-color,transform] duration-[120ms] ease-out',
-        'active:scale-[var(--press-scale)]',
-        'focus-visible:outline-none focus-visible:shadow-[var(--ring-focus)]',
-        'disabled:cursor-not-allowed disabled:opacity-[0.42] disabled:active:scale-100',
-        SIZES[size],
-        VARIANTS[variant],
-        fullWidth ? 'flex w-full' : '',
-        className,
-      ]
-        .filter(Boolean)
-        .join(' ')}
+      className={[buttonClassName({ variant, size, fullWidth }), className].filter(Boolean).join(' ')}
       {...rest}
     >
       {icon ? <span className="inline-flex shrink-0">{icon}</span> : null}
