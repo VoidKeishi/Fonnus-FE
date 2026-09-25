@@ -1,6 +1,8 @@
 import { Hero } from './hero/hero'
 import { VoiceOrb } from './orb/voice-orb'
 import { ScrollReveal } from './scroll-reveal'
+import { HowItWorks } from './sections/how-it-works'
+import { MissedCalls } from './sections/missed-calls'
 import { Pricing } from './sections/pricing'
 
 /**
@@ -17,7 +19,9 @@ export function LandingPage() {
     <>
       <main>
         <Hero />
-        {/* MissedCalls, HowItWorks, Capabilities and Band land here, in that order. */}
+        <MissedCalls />
+        <HowItWorks />
+        {/* Capabilities and Band land here, in that order. */}
         <Pricing />
       </main>
       <ScrollReveal />
