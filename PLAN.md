@@ -12,7 +12,7 @@ Status: ⬜ not started · 🔨 in progress · ✅ done, with the date.
 | **F1b · Sign-up and Google** — `/dang-ky` (clinic name, the Terms line, an existing number turning a sign-up into a sign-in) and Google on both doors: the in-page chooser for mock mode, the OAuth redirect for live | ⬜ | `/dang-ky` is a placeholder today. Google needs `googleAuthUrl()` pointed at a real endpoint, so it waits on `../Fonnus-BE` |
 | **F2 · The app shell** — `/app` layout: 216px sidebar, icon rail at ≤900px, bottom tab bar on phones; the session and toast providers | 🔨 | The frame, the nav and the session gate are in place (`src/shell/`, `src/session/`); the toast provider and the readiness dot on Lễ tân are not. Everything under `/app` is client-rendered by design (CLAUDE.md) |
 | **F3 · Lễ tân** — the hub and the three tabs (Hồ sơ, Kiến thức, Kỹ năng), the shared section frame, the save stack, the try-out panel. Brings `src/features/receptionist/model.ts` and `docs/field-catalogue-mapping.md` into force | ⬜ | The largest single step: ~60 fields across 13 forms |
-| **F4 · Landing page** — header, hero with the voice orb, the section stack, pricing, footer, the contact form against `POST /leads` | ⬜ | Server-rendered; this is the acquisition surface. Carries two layout items from `docs/architecture.md`: `src/app/page.tsx` moves into a `(marketing)/` route group with its own layout holding the orb, and `SessionProvider` stops probing `GET /me` outside `/app`, `/dang-nhap`, `/dang-ky` (the landing page reads the localStorage hint instead — its "Vào ứng dụng" button is the first thing that needs it). The probe change touches the session gate, so the demo login is re-checked in the same task |
+| **F4 · Landing page** — the landing page at `/` and the "Chấm điểm hotline" page at `/cham-diem-hotline`, ported from `../Fonnus-Web-UI` in nine stacked pull requests: the marketing frame, the hero, the voice orb and its call demo, pricing, how it works, capabilities, FAQ with security and testimonials, the contact form against `POST /leads`, and the hotline page against `POST /leads/hotline-report` | 🔨 | Server-rendered; this is the acquisition surface. The header always shows "Đăng nhập" and "Dùng thử miễn phí", as the prototype does, and reads no session. The call demo runs in the browser with no `voice` group until Q21 is answered. A nav or footer link appears only in the pull request that lands its section |
 | **F5 · Cuộc gọi** — the clinic's own call history | ⬜ | Blocked: `GET /calls` is "specified later" in `docs/api-contract.md` §7 and has no agreed shape |
 | **F6 · Lịch hẹn, Số điện thoại, Cài đặt** | ⬜ | |
 | **F7 · Deployment** — an ADR on where this runs, then the container, the proxy and CI | ⬜ | Deliberately undecided: this is a public site and Fonnus-Admin's posture (same VPS as the pipeline, behind basic auth) does not transfer. `output: 'standalone'` in `next.config.ts` (as Fonnus-Admin) and the build SHA on `/api/healthz` wait here: both are deployment posture, not layout |
@@ -72,9 +72,21 @@ ones sized S landed with the ADR on 2026-09-17.
   screen, so today it is Next.js's white English page; the copy is new and follows
   `docs/ui-ux-principles.md` §9, with a retry button. One approval on the copy, then a
   build.
+- **The session probe only where a session matters** (M): `SessionProvider` probes `GET /me`
+  on every route, the landing page included. `docs/architecture.md` §2.4 wants it limited to
+  `/app`, `/dang-nhap` and `/dang-ky`. Deferred out of F4 by the owner's call: the deeper
+  sign-in flows wait until Fonnus-BE exists. It touches the session gate, so the demo login
+  is re-checked in the same change.
+- **A signed-in owner on `/dang-nhap` goes straight to `/app`** (S): today they see the phone
+  form as if new. With this, the landing page's "Đăng nhập" is the way back into the app and
+  no "Vào ứng dụng" button is needed. Same deferral as above.
+- **A link styled as a button** (M): `<Link><Button>` puts a `<button>` inside an `<a>`, which
+  is invalid HTML and gives a screen reader two controls for one. It is how the auth pages
+  and the marketing header open `/dang-ky` and `/dang-nhap`. `Button` needs a link form, or
+  a class a `Link` can wear.
 - **Base-palette names in components** (M): about twelve uses of `--milk`, `--blush`,
   `--terracotta`, `--night` in `src/features/auth/sign-in-panel.tsx`, `field.tsx`,
-  `otp-field.tsx` and `src/design-system/button.tsx`. Each needs an alias line in
+  `otp-field.tsx` and `src/design-system/button.tsx` (its `inverse` variant reads `--night` and `--cream-night`); `src/design-system/icon.tsx` falls back to `var(--terracotta)`. Each needs an alias line in
   `globals.css` `@theme` and then the class; ADR 0002 point 2 forbids the base names.
 - **`api/auth.mock.ts` imports `features/auth/phone.ts`** (S): the mock normalises the
   typed phone number to match the demo account, and reaches into a feature to do it —

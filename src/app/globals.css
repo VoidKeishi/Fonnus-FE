@@ -60,6 +60,8 @@
   --color-text-link: var(--text-link);
   --color-text-accent: var(--text-accent);
   --color-text-on-accent: var(--text-on-accent);
+  --color-text-on-inverse: var(--text-on-inverse);
+  --color-text-muted-on-inverse: var(--text-muted-on-inverse);
 
   --color-border-hairline: var(--border-hairline);
   --color-border-strong: var(--border-strong);
@@ -70,6 +72,7 @@
   --color-action-primary-active: var(--action-primary-active);
   --color-action-secondary: var(--action-secondary);
   --color-action-secondary-hover: var(--action-secondary-hover);
+  --color-action-ghost-hover: var(--action-ghost-hover);
 
   --color-success: var(--success);
   --color-warning: var(--warning);
@@ -138,6 +141,8 @@
    */
   --breakpoint-rail: 40rem;
   --breakpoint-wide: 56.25rem;
+  /* The marketing header's measured width: the pill's five entries fit from 1100px. */
+  --breakpoint-nav: 68.75rem;
 
   --tracking-eyebrow: var(--tracking-eyebrow);
   --tracking-display: var(--tracking-display);

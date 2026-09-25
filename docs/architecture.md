@@ -135,14 +135,15 @@ No gate enforces these; the pm's review does.
 
 - `'use client'` goes on the lowest file that needs state or a hook, never on a layout or a
   page. `src/app/app/layout.tsx` is the model: a server component rendering client leaves.
-- **The `(marketing)` route group makes no request to Fonnus-BE on load.** The landing page
-  reads only the sign-in hint from localStorage (to show "Vào ứng dụng"); it does not probe
-  `GET /me`.
+- **The `(marketing)` route group makes no request to Fonnus-BE on load and reads no
+  session.** Its header always offers "Đăng nhập" and "Dùng thử miễn phí", as the prototype
+  does; sending an owner who is still signed in straight on to `/app` is the sign-in page's
+  job, not the landing page's (`PLAN.md` §Backlog).
 - `SessionProvider` is mounted in the root layout so state survives the move from
   `/dang-nhap` to `/app`, but its probe runs only when `usePathname()` is under `/app`,
   `/dang-nhap` or `/dang-ky`. This differs from the prototype, which probed on the landing
   page too because everything there was client-rendered. (Today the probe still runs
-  everywhere; the conditional probe lands with F4, `PLAN.md` §Roadmap.)
+  everywhere; the conditional probe is a `PLAN.md` §Backlog item, waiting on Fonnus-BE.)
 - `ToastProvider` is in the root layout too: a "session expired" toast has to survive the
   redirect from `/app` to `/dang-nhap`, and those two routes share no other layout.
 - `ConfigProvider` is mounted in `app/app/layout.tsx`, not the root. An App Router layout
@@ -262,13 +263,22 @@ No gate enforces these; the pm's review does.
 
 ### `src/features/marketing/`
 
-- Server components by default. `'use client'` only on the orb, the contact form and
-  `use-reveal.ts`.
-- Copy lives in `data/content.ts` and `data/pricing.ts`, not in JSX, so a sentence is fixed
-  in one place.
-- The voice orb is mounted once in `(marketing)/layout.tsx`, outside every section. It is
-  not wired to a real endpoint until Fonnus-BE has a per-IP budget and a kill switch
-  (`docs/open-questions.md` Q21); until then it plays a clip from `public/`.
+- Server components by default. `'use client'` on the lowest file that holds state: the
+  header (its menus, drawer and scroll state), the orb and its call demo, the two forms, the
+  hotline page's chart, and `use-reveal.ts`. The layout, the footer and the section copy
+  stay on the server.
+- Copy the prototype kept in `data/` — the navigation, the FAQ, the testimonials, the
+  contact details, the plans, the scripted calls — lives in `src/data/`; a section's own
+  sentences stay in its component. A nav or footer link lands in the same change as the
+  section it points at, and `src/data/content.test.ts` fails on a link to a section that
+  does not exist.
+- The voice orb is mounted once on the landing page, after every section, and never on
+  `/cham-diem-hotline`, whose header sends "Nghe thử Linh" back to `/#hero` instead. The call
+  demo runs entirely in the browser — the recorded greeting and a script, no `voice` group —
+  until Fonnus-BE has a per-IP budget and a kill switch (`docs/open-questions.md` Q21).
+- A night surface (the footer) renders inside a `data-theme="dark"` scope, so every alias
+  inside it resolves to the night palette `colors.css` already defines. This is a night
+  island in a light page, not a dark mode: nothing switches it.
 
 ### `src/design-system/`
 
