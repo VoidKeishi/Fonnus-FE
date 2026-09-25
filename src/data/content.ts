@@ -40,6 +40,7 @@ export const LANDING_SECTION_IDS: readonly string[] = [
   'faq',
   'bao-mat',
   'phong-kham',
+  'lien-he',
 ]
 
 export const NAV_GROUPS: NavGroup[] = [
@@ -70,6 +71,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: 'Câu hỏi thường gặp', desc: 'Những điều chủ phòng khám hay hỏi', icon: 'list', href: '/#faq' },
     ],
   },
+  { label: 'Liên hệ', href: '/#lien-he' },
 ]
 
 export const FOOTER_PAGE_LINKS: { href: string; label: string }[] = [

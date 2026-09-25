@@ -30,7 +30,7 @@ row are in `docs/open-questions.md`; the shapes are in `docs/api-contract.md`.
 | `knowledge` | `POST`/`DELETE /tenant/knowledge-files` | Knowledge file upload in F3 | ⬜ Not declared yet |
 | `voice` | `POST /tts/preview` | Hearing the receptionist speak | ⬜ Not declared yet |
 | `receptionist` | `POST /receptionist/preview` | The try-out panel in F3 | ⬜ Not declared yet |
-| `leads` | `POST /leads` | The landing page contact form in F4 | ⬜ Not declared yet |
+| `leads` | `POST /leads` | The landing page contact form in F4 | ⬜ Declared in `src/api/contracts.ts`, mocked |
 | `calls` | `GET /calls` | F5 | ⬜ Shape not specified — `api-contract.md` §7 |
 
 A group is declared in `src/api/contracts.ts` when the screen that calls it is built, not

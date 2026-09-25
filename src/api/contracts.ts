@@ -10,9 +10,9 @@
  * from `docs/field-catalogue-mapping.md`. When you change an interface here,
  * change that document in the same commit.
  *
- * Only the `auth` group exists today. The other five groups of the contract —
- * tenant, assistant, receptionist, voice, leads — arrive with the screens that
- * call them (PLAN.md); nothing ships ahead of its first consumer.
+ * The `auth` and `leads` groups exist today. The other groups of the contract —
+ * tenant, assistant, receptionist, voice — arrive with the screens that call
+ * them (PLAN.md); nothing ships ahead of its first consumer.
  */
 
 /** Every method takes this, so a caller can cancel on unmount. */
@@ -83,14 +83,36 @@ export interface AuthApi {
 }
 
 // ---------------------------------------------------------------------------
+// Leads
+// ---------------------------------------------------------------------------
+
+/** The landing page's contact form: who to ring back, and at which clinic. */
+export interface LeadInput {
+  clinic_name: string;
+  contact_name: string;
+  /**
+   * National form, digits only: a mobile (`0901234567`), a fixed line
+   * (`02838221234`) or a 1800/1900 hotline (`19001234`). See
+   * `normalizeCallbackNumber` in `./phone`.
+   */
+  phone: string;
+}
+
+export interface LeadsApi {
+  /** `POST /leads`. Unauthenticated: the landing page's contact form. */
+  submit(input: LeadInput, opts?: Signal): Promise<void>;
+}
+
+// ---------------------------------------------------------------------------
 // The aggregate
 // ---------------------------------------------------------------------------
 
 export interface FonnusApi {
   auth: AuthApi;
+  leads: LeadsApi;
 }
 
 /** The group names `NEXT_PUBLIC_API_LIVE_GROUPS` accepts. */
-export const API_GROUPS = ['auth'] as const;
+export const API_GROUPS = ['auth', 'leads'] as const;
 
 export type ApiGroup = (typeof API_GROUPS)[number];

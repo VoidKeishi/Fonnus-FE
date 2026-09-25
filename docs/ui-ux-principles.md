@@ -408,6 +408,12 @@ works (`0914378064` / `111002`).
 
 Newest first. One line per session that taught something; the rule itself goes above.
 
+- **2026-09-26 (landing page, Liên hệ)** — The prototype's own global stylesheet drew
+  every link without an underline until hovered; the copied `base.css` underlines every
+  `<a>` by default. The contact form was the first ported section with links inside running
+  text, and they came out underlined where the prototype had plain words. A link in running
+  text on the marketing pages wears `TEXT_LINK` from `section-chrome.ts`; check any other
+  ported link against the running prototype rather than against its component file.
 - **2026-09-25 (landing page, Vì sao and Cách hoạt động)** — Tailwind v4 sorts arbitrary
   media variants such as `[@media(max-width:900px)]:` by their text, not by width, so a
   900px rule can land after a 560px rule on the same property and override it on a phone.

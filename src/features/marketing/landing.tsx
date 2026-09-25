@@ -3,6 +3,7 @@ import { VoiceOrb } from './orb/voice-orb'
 import { ScrollReveal } from './scroll-reveal'
 import { Band } from './sections/band'
 import { Capabilities } from './sections/capabilities'
+import { Contact } from './sections/contact'
 import { Faq } from './sections/faq'
 import { HowItWorks } from './sections/how-it-works'
 import { MissedCalls } from './sections/missed-calls'
@@ -32,6 +33,7 @@ export function LandingPage() {
         <Faq />
         <Security />
         <Testimonials />
+        <Contact />
       </main>
       <ScrollReveal />
       <VoiceOrb />

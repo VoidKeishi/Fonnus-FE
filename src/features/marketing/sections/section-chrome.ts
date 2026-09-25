@@ -27,3 +27,10 @@ export const SECTION_EYEBROW_DEEP = `${EYEBROW} text-text-accent`
 
 export const SECTION_HEADING =
   'm-0 font-display text-[length:clamp(30px,3.8vw,44px)] leading-[1.2] font-semibold tracking-display text-pretty text-text-heading'
+
+/**
+ * A link inside running text. The prototype's global stylesheet drew every
+ * link without an underline until hovered, and in the link colour on hover
+ * too; the copied `base.css` underlines by default and turns hover terracotta.
+ */
+export const TEXT_LINK = 'no-underline hover:text-text-link hover:underline'

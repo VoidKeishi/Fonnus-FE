@@ -1,10 +1,10 @@
 /**
- * Vietnamese mobile numbers, as an owner would actually type them: with spaces,
+ * Vietnamese phone numbers, as an owner would actually type them: with spaces,
  * with or without the leading 0, or pasted from a contact card as +84.
  *
  * Kept in the API seam rather than in a feature: the national, digits-only form
- * is what the wire carries, and both sign-in and the landing hero need the same
- * rules — two features may share `@/api`, never each other.
+ * is what the wire carries, and sign-in, the landing hero and the contact form
+ * need the same rules — two features may share `@/api`, never each other.
  */
 
 /** Digits only, always in national form (leading 0, 10 digits). */
@@ -59,4 +59,43 @@ export function phoneError(raw: string): string | null {
 
 export function isValidEmail(raw: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(raw.trim())
+}
+
+/*
+ * A number a person can ring back — the landing page's contact form. Wider
+ * than `isValidPhone`, which is about receiving an SMS: a clinic may leave its
+ * front desk's fixed line or its 1800/1900 hotline instead of a mobile.
+ */
+
+const FIXED_LINE = /^02\d{9}$/
+const HOTLINE = /^1[89]00(\d{4}|\d{6})$/
+
+/**
+ * Digits only, in national form, keeping a 1800/1900 hotline as typed.
+ *
+ * `normalizePhone` puts a 0 in front of anything that lacks one, which turns
+ * `1900 1234` into `019001234`, with or without `+84` in front. `84` counts as the country code only when
+ * enough digits follow it for a whole national number (nine for a mobile, ten
+ * for a fixed line); a shorter run is a mobile typed without its 0, such as
+ * `84 123 4567` for 084 123 4567. A 0 written after the country code —
+ * `+84 (0) 90…` — is kept once, not doubled.
+ */
+export function normalizeCallbackNumber(raw: string): string {
+  const digits = raw.replace(/\D/g, '')
+  if (HOTLINE.test(digits)) return digits
+  // A hotline copied from a listing can carry the country code: `+84 1900 1234`.
+  const afterCountryCode = digits.startsWith('84') ? digits.slice(2) : digits
+  if (HOTLINE.test(afterCountryCode)) return afterCountryCode
+  if (digits.startsWith('84') && digits.length >= 11) {
+    const national = digits.slice(2)
+    return national.startsWith('0') ? national : `0${national}`
+  }
+  if (digits.startsWith('0')) return digits
+  return digits ? `0${digits}` : ''
+}
+
+/** A mobile (10 digits), a fixed line (11 digits, `02…`) or a 1800/1900 hotline (8 or 10 digits). */
+export function isValidCallbackNumber(raw: string): boolean {
+  const d = normalizeCallbackNumber(raw)
+  return (d.length === 10 && MOBILE_PREFIX.test(d)) || FIXED_LINE.test(d) || HOTLINE.test(d)
 }
