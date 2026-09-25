@@ -1,19 +1,17 @@
+import type { Metadata } from 'next'
 import Link from 'next/link'
-import { Button, Logo } from '@/design-system'
+import { Button } from '@/design-system'
+
+export const metadata: Metadata = { title: { absolute: 'Fonnus — Không cuộc gọi nào bị bỏ lỡ.' } }
 
 /**
- * The landing page, as a placeholder that is still honest about the product.
- *
- * The real one — hero with the orb, the recorded greeting, pricing, the whole
- * scroll — is the largest screen in the design and is its own roadmap step
- * (PLAN.md §Roadmap F4). What is here says what Fonnus does and opens both
- * doors, on the cream ground, in the right faces.
+ * The landing page, as a placeholder that is still honest about the product,
+ * until the hero replaces it (PLAN.md §Roadmap F4). The top padding clears the
+ * fixed header pill (22px inset + 68px pill).
  */
 export default function Page() {
   return (
-    <main className="mx-auto flex min-h-screen max-w-[720px] flex-col justify-center gap-7 px-6 py-16">
-      <Logo variant="horizontal" height={34} className="self-start" />
-
+    <main className="mx-auto flex min-h-screen max-w-[720px] flex-col justify-center gap-7 px-6 pt-[120px] pb-16">
       <h1 className="m-0 font-display text-display font-semibold tracking-display text-text-heading">
         Lễ tân AI nghe máy cho phòng khám, 24/7.
       </h1>
