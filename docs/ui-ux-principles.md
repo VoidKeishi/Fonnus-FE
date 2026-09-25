@@ -405,6 +405,13 @@ works (`0914378064` / `111002`).
 
 Newest first. One line per session that taught something; the rule itself goes above.
 
+- **2026-09-25 (landing page, Bảng giá)** — The prototype arms its scroll reveal before the
+  first paint, which is only true for a page the browser draws itself. Under server
+  rendering the HTML is already on screen when any hook runs, so arming hides blocks the
+  visitor is looking at and lifts them back in: a reload halfway down the page, or a hard
+  load of `/#bang-gia`, blinks. The port marks every block already above the trigger line
+  as revealed before arming, and only blocks still below it animate. Any "hidden until
+  scrolled to" effect ported to a server-rendered page needs the same check.
 - **2026-09-06 (fourth round — the dead kit)** — Rebuilding Kỹ năng retired the last
   users of four pieces of `app/ui`, and a repo-wide grep found nothing else reaching for
   any of them, so they went: `GateTag` + the `Gate` type + the `gate` prop threaded

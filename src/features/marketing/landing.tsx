@@ -1,5 +1,7 @@
 import { Hero } from './hero/hero'
 import { VoiceOrb } from './orb/voice-orb'
+import { ScrollReveal } from './scroll-reveal'
+import { Pricing } from './sections/pricing'
 
 /**
  * The landing page: its sections in page order, the prototype's `App.tsx`
@@ -15,7 +17,10 @@ export function LandingPage() {
     <>
       <main>
         <Hero />
+        {/* MissedCalls, HowItWorks, Capabilities and Band land here, in that order. */}
+        <Pricing />
       </main>
+      <ScrollReveal />
       <VoiceOrb />
     </>
   )

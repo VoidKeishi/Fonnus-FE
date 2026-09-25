@@ -209,6 +209,14 @@ html[data-scroll-lock] body {
 [data-reveal-armed] [data-reveal] {
   opacity: 0;
   transform: translate3d(var(--reveal-x, 0px), var(--reveal-y, var(--reveal-shift)), 0);
+}
+
+/* The transition lives on the revealed state only: hiding snaps, revealing
+   animates. Declared on the hidden state, arming would fade out blocks the
+   server had already painted, for 760ms, before they lift in again. */
+[data-reveal-armed] [data-reveal][data-revealed] {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
   /* --ease-arc is the brand's rising arc: it keeps moving through the middle of
      the run instead of racing to the end, which is what makes the reveal
      something you can actually watch rather than a flicker. */
@@ -217,10 +225,14 @@ html[data-scroll-lock] body {
     transform var(--reveal-duration) var(--ease-arc) var(--reveal-delay, 0ms);
 }
 
-[data-reveal-armed] [data-reveal][data-revealed] {
-  opacity: 1;
-  transform: translate3d(0, 0, 0);
-}
+/*
+ * The stagger: `data-reveal="<order>"` waits <order> steps within its group.
+ * One rule per order a section actually uses, so the delay is CSS and the hook
+ * never writes a style. A section that needs a higher order adds its line here.
+ */
+[data-reveal-armed] [data-reveal='1'] { --reveal-delay: calc(1 * var(--reveal-stagger)); }
+[data-reveal-armed] [data-reveal='2'] { --reveal-delay: calc(2 * var(--reveal-stagger)); }
+[data-reveal-armed] [data-reveal='3'] { --reveal-delay: calc(3 * var(--reveal-stagger)); }
 
 @media (min-width: 900px) {
   [data-reveal-armed] [data-reveal][data-reveal-from='left'] {
@@ -236,7 +248,8 @@ html[data-scroll-lock] body {
 
 /* Belt and braces: the hook already declines to arm under reduced motion. */
 @media (prefers-reduced-motion: reduce) {
-  [data-reveal-armed] [data-reveal] {
+  [data-reveal-armed] [data-reveal],
+  [data-reveal-armed] [data-reveal][data-revealed] {
     opacity: 1;
     transform: none;
     transition: none;
@@ -259,6 +272,14 @@ html[data-scroll-lock] body {
 @keyframes fnWave {
   0% { transform: scale(1); opacity: 0.85; }
   100% { transform: scale(1.55); opacity: 0; }
+}
+
+/* A price arriving after the billing period flips. The price is keyed by the
+   period, so the remount replays this one keyframe (src/features/marketing/
+   sections/plan-price.tsx). */
+@keyframes fnPriceIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
 }
 
 @keyframes fnFadeIn {

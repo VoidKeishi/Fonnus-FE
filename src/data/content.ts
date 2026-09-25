@@ -31,7 +31,7 @@ export interface NavGroup {
  * appends its id here in the same change that adds its nav or footer entry.
  * In-page links are written `/#<id>` so they work from every marketing page.
  */
-export const LANDING_SECTION_IDS: readonly string[] = ['hero']
+export const LANDING_SECTION_IDS: readonly string[] = ['hero', 'bang-gia']
 
 export const NAV_GROUPS: NavGroup[] = [
   {
@@ -40,9 +40,13 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: 'Nghe thử Linh', desc: 'Gọi thử ngay trên trình duyệt', icon: 'answered', href: '/#hero', demo: true },
     ],
   },
+  { label: 'Bảng giá', href: '/#bang-gia' },
 ]
 
-export const FOOTER_PAGE_LINKS: { href: string; label: string }[] = [{ href: '/#hero', label: 'Nghe thử' }]
+export const FOOTER_PAGE_LINKS: { href: string; label: string }[] = [
+  { href: '/#hero', label: 'Nghe thử' },
+  { href: '/#bang-gia', label: 'Bảng giá' },
+]
 
 export const CONTACT = {
   phone: '+84 914 378 064',
