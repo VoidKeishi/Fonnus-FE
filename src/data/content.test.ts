@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { FOOTER_PAGE_LINKS, LANDING_SECTION_IDS, NAV_GROUPS } from './content'
+import { FAQS, FOOTER_PAGE_LINKS, LANDING_SECTION_IDS, NAV_GROUPS, TESTIMONIALS } from './content'
 
 /*
  * The landing page is built one section at a time, and a visitor must never
@@ -48,5 +48,22 @@ describe('marketing links', () => {
 
   it('never list the same section twice', () => {
     expect(new Set(LANDING_SECTION_IDS).size).toBe(LANDING_SECTION_IDS.length)
+  })
+})
+
+/*
+ * The FAQ list keys each row by its question and the testimonials by their
+ * attribution. React warns on a duplicate key and may reuse one row for the
+ * other, so a repeated question or clinic is a bug even though it renders.
+ */
+describe('landing lists', () => {
+  it('have at least one FAQ, each question asked once', () => {
+    expect(FAQS.length).toBeGreaterThan(0)
+    expect(new Set(FAQS.map((item) => item.q)).size).toBe(FAQS.length)
+  })
+
+  it('have at least one testimonial, each clinic attributed once', () => {
+    expect(TESTIMONIALS.length).toBeGreaterThan(0)
+    expect(new Set(TESTIMONIALS.map((item) => item.attribution)).size).toBe(TESTIMONIALS.length)
   })
 })

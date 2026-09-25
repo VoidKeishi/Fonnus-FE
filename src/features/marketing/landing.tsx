@@ -3,9 +3,12 @@ import { VoiceOrb } from './orb/voice-orb'
 import { ScrollReveal } from './scroll-reveal'
 import { Band } from './sections/band'
 import { Capabilities } from './sections/capabilities'
+import { Faq } from './sections/faq'
 import { HowItWorks } from './sections/how-it-works'
 import { MissedCalls } from './sections/missed-calls'
 import { Pricing } from './sections/pricing'
+import { Security } from './sections/security'
+import { Testimonials } from './sections/testimonials'
 
 /**
  * The landing page: its sections in page order, the prototype's `App.tsx`
@@ -26,6 +29,9 @@ export function LandingPage() {
         <Capabilities />
         <Band />
         <Pricing />
+        <Faq />
+        <Security />
+        <Testimonials />
       </main>
       <ScrollReveal />
       <VoiceOrb />

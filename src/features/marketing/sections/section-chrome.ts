@@ -18,8 +18,12 @@ export const SECTION_BAND = 'px-[clamp(20px,5vw,64px)] py-[clamp(64px,11vh,128px
 export const SECTION_INNER = 'mx-auto max-w-[1280px]'
 
 /* No line height of its own in the prototype: it inherits the body's. */
-export const SECTION_EYEBROW =
-  'mb-5 text-eyebrow leading-(--leading-body) font-semibold tracking-eyebrow text-text-eyebrow uppercase'
+const EYEBROW = 'mb-5 text-eyebrow leading-(--leading-body) font-semibold tracking-eyebrow uppercase'
+
+export const SECTION_EYEBROW = `${EYEBROW} text-text-eyebrow`
+
+/* On a blush ground the eyebrow steps down to the deep tone, 6.5:1 instead of 4.0:1. */
+export const SECTION_EYEBROW_DEEP = `${EYEBROW} text-text-accent`
 
 export const SECTION_HEADING =
   'm-0 font-display text-[length:clamp(30px,3.8vw,44px)] leading-[1.2] font-semibold tracking-display text-pretty text-text-heading'

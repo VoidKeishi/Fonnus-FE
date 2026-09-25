@@ -77,7 +77,7 @@ src/
                                 play-when-seen, capabilities, capability-row, capability-actions,
                                 capability-visuals, call-demo-player, call-demo-timeline, band, pricing,
                                 plan-card, comparison-matrix, billing-period, billing-switch, plan-price,
-                                matrix-disclosure; later sections join them)
+                                matrix-disclosure, faq, faq-list, security, testimonials; later sections join them)
                                 use-reveal.ts · scroll-reveal.tsx (arms the reveal once, from the landing page)
                                 F4 adds: hotline/
 
@@ -281,7 +281,8 @@ No gate enforces these; the pm's review does.
   hotline page's chart, the scroll reveal, the billing switch and the prices it changes, and
   the comparison table's disclosure, `play-when-seen.tsx`, which plays a
   "Cách hoạt động" scene once, and `call-demo-player.tsx`, the scripted calls under
-  "Khả năng", which let one call play at a time and run a timer only while one plays. The layout, the footer and the section copy stay on the
+  "Khả năng", which let one call play at a time and run a timer only while one plays, and
+  `faq-list.tsx`, which keeps one answer of "Câu hỏi thường gặp" open at a time. The layout, the footer and the section copy stay on the
   server: a client leaf that wraps server content takes it as `children`, as the plan cards
   and the comparison table do.
 - The scroll reveal is armed once, by `scroll-reveal.tsx` on the landing page. Blocks
