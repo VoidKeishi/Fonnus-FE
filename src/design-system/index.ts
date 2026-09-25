@@ -1,3 +1,5 @@
+export { Badge } from './badge'
+export type { BadgeProps } from './badge'
 export { Button, buttonClassName } from './button'
 export type { ButtonLook, ButtonProps } from './button'
 export { Icon } from './icon'

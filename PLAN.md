@@ -90,6 +90,10 @@ ones sized S landed with the ADR on 2026-09-17.
   badge and the browser does, and React reports a hydration mismatch. Read it through
   `useSyncExternalStore` with a server snapshot of `null`, as `src/session/session.ts` does.
   Belongs with F1b, which reworks the sign-in doors.
+- **The button press snaps instead of easing** (S): `src/design-system/button.tsx` transitions
+  `background-color` and `transform`, but Tailwind v4's `active:scale-[…]` sets the separate
+  `scale` property, so the press shrink jumps in one frame. Add `scale` to the transitioned
+  properties; every button on every surface changes with it, so it wants its own look.
 - **Base-palette names in components** (M): about twelve uses of `--milk`, `--blush`,
   `--terracotta`, `--night` in `src/features/auth/sign-in-panel.tsx`, `field.tsx`,
   `otp-field.tsx` and `src/design-system/button.tsx` (its `inverse` variant reads `--night` and `--cream-night`); `src/design-system/icon.tsx` falls back to `var(--terracotta)`. Each needs an alias line in

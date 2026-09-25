@@ -331,6 +331,19 @@ html[data-scroll-lock] body {
   50% { transform: scaleY(1); }
 }
 
+/* The "Khả năng" call players (src/features/marketing/sections/
+   call-demo-player.tsx): the caller's live dot, and each waveform bar while
+   the call plays. Both loop only while a call is playing. */
+@keyframes fnSpeakDot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+@keyframes fnWaveBar {
+  0%, 100% { transform: scaleY(1); }
+  50% { transform: scaleY(0.45); }
+}
+
 /* A bottom sheet comes up from off-screen, not from 16px away: it is the
    whole surface arriving, and a short hop reads as a jitter instead. */
 @keyframes fnSheetUp {
