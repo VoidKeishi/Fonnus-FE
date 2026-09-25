@@ -409,6 +409,22 @@ The landing-page contact form. Unauthenticated.
 Needs bot protection, but **not a CAPTCHA the user must solve** — the form is three fields on
 a marketing page and a challenge there costs more leads than it saves. Rate-limit by IP.
 
+`phone` is national form, digits only, and is any number the clinic can be called back on —
+not only a mobile: a mobile (`0901234567`, 10 digits), a fixed line (`02838221234`, 11 digits
+starting `02`) or a 1800/1900 hotline (`19001234` or `1800123456`, 8 or 10 digits, sent as
+typed with no leading `0`). The frontend normalizes and checks it before sending
+(`api/phone.ts → normalizeCallbackNumber`, `isValidCallbackNumber`); the server checks again.
+`clinic_name` and `contact_name` arrive trimmed and non-empty.
+
+The route is unauthenticated, so a `401` is never expected here and never signs anyone out.
+
+| Status | Body | Frontend behaviour |
+|---|---|---|
+| `202` | — | The form is replaced by "Đã nhận thông tin" |
+| `422` | `code: "validation_failed"`, `errors[].field` ∈ `clinic_name` · `contact_name` · `phone`, `errors[].code` ∈ `required` · `invalid_phone` | The line for that field appears under it, as if the frontend had caught it. A field outside the three is ignored; when no known field is named, the generic message shows under the button |
+| `429` | — | "Bạn thao tác hơi nhanh…" under the button; what was typed stays |
+| `5xx` / network | — | The matching message under the button; what was typed stays. Never retried automatically |
+
 ---
 
 ## 7. Specified later — shape only

@@ -39,7 +39,7 @@ export function Input({
   return (
     <div className={`flex flex-col gap-1.5 ${className}`}>
       {label ? (
-        <label htmlFor={inputId} className="font-ui text-ui font-medium text-text-body">
+        <label htmlFor={inputId} className="font-ui text-ui leading-(--leading-body) font-medium text-text-body">
           {label}
         </label>
       ) : null}
@@ -54,12 +54,17 @@ export function Input({
         ].join(' ')}
       >
         {prefix ? <span className="inline-flex shrink-0 text-text-muted">{prefix}</span> : null}
+        {/*
+          The 1px × 2px padding is the browser's default for an input, which
+          the prototype never reset and Tailwind's preflight does; restated so
+          a field is the prototype's 73px tall, not 71px.
+        */}
         <input
           id={inputId}
           aria-invalid={error ? true : undefined}
           aria-describedby={describedBy}
           className={[
-            'min-w-0 flex-1 border-none bg-transparent text-body-sm text-text-body outline-none',
+            'min-w-0 flex-1 border-none bg-transparent px-0.5 py-px text-body-sm leading-normal text-text-body outline-none',
             'placeholder:text-text-muted',
             numeric ? 'font-num tabular-nums' : 'font-ui',
           ].join(' ')}
@@ -69,11 +74,11 @@ export function Input({
       </div>
 
       {error ? (
-        <span id={describedBy} role="alert" className="text-ui text-[var(--error)]">
+        <span id={describedBy} role="alert" className="text-ui leading-(--leading-body) text-[var(--error)]">
           {error}
         </span>
       ) : hint ? (
-        <span id={describedBy} className="text-ui text-text-muted">
+        <span id={describedBy} className="text-ui leading-(--leading-body) text-text-muted">
           {hint}
         </span>
       ) : null}

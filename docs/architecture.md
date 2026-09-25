@@ -50,10 +50,11 @@ src/
     http.ts                     The fetch wrapper; only *.live.ts imports it
     errors.ts                   ApiError and every Vietnamese error sentence
     mock-support.ts             delay, maybeFail, storage, the demo fixtures
-    phone.ts (+test)            Vietnamese phone rules and the national digits-only wire form; used by auth and marketing
+    phone.ts (+test)            Vietnamese phone rules and the national digits-only wire form: the SMS-able mobile (auth, hero) and the callback number (contact form)
     sign-up-handoff.ts (+test)  The number typed in the landing hero, carried to /dang-ky in sessionStorage
     auth.mock.ts · auth.live.ts
-    tenant.* (F3) · receptionist.* · voice.* (F3 try-out) · leads.* (F4) · shell.* · insights.* (Tổng quan) · calls.* (F5) · appointments.* · numbers.* · account.* (F6)
+    leads.mock.ts · leads.live.ts  POST /leads, the landing contact form (F4)
+    tenant.* (F3) · receptionist.* · voice.* (F3 try-out) · shell.* · insights.* (Tổng quan) · calls.* (F5) · appointments.* · numbers.* · account.* (F6)
 
   session/                      Who is signed in
     session.ts                  The localStorage hint, through useSyncExternalStore
@@ -77,7 +78,8 @@ src/
                                 play-when-seen, capabilities, capability-row, capability-actions,
                                 capability-visuals, call-demo-player, call-demo-timeline, band, pricing,
                                 plan-card, comparison-matrix, billing-period, billing-switch, plan-price,
-                                matrix-disclosure, faq, faq-list, security, testimonials; later sections join them)
+                                matrix-disclosure, faq, faq-list, security, testimonials, contact, contact-form,
+                                lead-fields (+test))
                                 use-reveal.ts · scroll-reveal.tsx (arms the reveal once, from the landing page)
                                 F4 adds: hotline/
 
@@ -282,8 +284,10 @@ No gate enforces these; the pm's review does.
   the comparison table's disclosure, `play-when-seen.tsx`, which plays a
   "Cách hoạt động" scene once, and `call-demo-player.tsx`, the scripted calls under
   "Khả năng", which let one call play at a time and run a timer only while one plays, and
-  `faq-list.tsx`, which keeps one answer of "Câu hỏi thường gặp" open at a time. The layout, the footer and the section copy stay on the
-  server: a client leaf that wraps server content takes it as `children`, as the plan cards
+  `faq-list.tsx`, which keeps one answer of "Câu hỏi thường gặp" open at a time, and
+  `contact-form.tsx`, the "Liên hệ" form and its sent panel, which calls `api.leads` and
+  keeps its rules in the pure `lead-fields.ts`. The layout, the footer and the section copy
+  stay on the server: a client leaf that wraps server content takes it as `children`, as the plan cards
   and the comparison table do.
 - The scroll reveal is armed once, by `scroll-reveal.tsx` on the landing page. Blocks
   already on screen when it arms are marked revealed instead of hidden, because the server's

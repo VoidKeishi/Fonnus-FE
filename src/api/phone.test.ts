@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { formatBusinessPhone, formatPhone, isValidEmail, isValidPhone, normalizePhone, phoneError } from './phone'
+import {
+  formatBusinessPhone,
+  formatPhone,
+  isValidCallbackNumber,
+  isValidEmail,
+  isValidPhone,
+  normalizeCallbackNumber,
+  normalizePhone,
+  phoneError,
+} from './phone'
 
 /*
  * Phone handling is the one piece of pure logic on the auth screens, and the
@@ -63,5 +72,75 @@ describe('isValidEmail', () => {
 
   it('rejects an address with no domain', () => {
     expect(isValidEmail('lan@')).toBe(false)
+  })
+})
+
+/*
+ * The contact form takes any number a person can be rung back on. The trap is
+ * the hotline: the sign-in normalizer would prefix its 0 and send a number
+ * that does not exist.
+ */
+describe('normalizeCallbackNumber', () => {
+  it.each([
+    ['0901234567', '0901234567'],
+    ['090 123 45 67', '0901234567'],
+    ['+84 90 123 4567', '0901234567'],
+    ['028 3822 1234', '02838221234'],
+    ['1900 1234', '19001234'],
+    ['1800 123 456', '1800123456'],
+    ['+84 28 3822 1234', '02838221234'],
+    ['+84 1900 1234', '19001234'],
+    ['+84 1800 123 456', '1800123456'],
+  ])('writes %s as %s on the wire', (typed, wire) => {
+    expect(normalizeCallbackNumber(typed)).toBe(wire)
+  })
+
+  it('keeps a 1900 hotline without gaining a leading zero', () => {
+    expect(normalizeCallbackNumber('1900.1234')).toBe('19001234')
+  })
+
+  it('keeps one zero when +84 is followed by the national 0', () => {
+    expect(normalizeCallbackNumber('+84 (0) 90 123 4567')).toBe('0901234567')
+  })
+
+  it('reads a short run starting 84 as a mobile typed without its 0', () => {
+    expect(normalizeCallbackNumber('84 123 4567')).toBe('0841234567')
+  })
+})
+
+describe('isValidCallbackNumber', () => {
+  it.each([
+    '0901234567',
+    '090 123 45 67',
+    '+84 90 123 4567',
+    '028 3822 1234',
+    '+84 28 3822 1234',
+    '1900 1234',
+    '+84 1900 1234',
+    '1800 123 456',
+  ])(
+    'accepts %s',
+    (typed) => {
+      expect(isValidCallbackNumber(typed)).toBe(true)
+    },
+  )
+
+  it('rejects a number too short to be anything', () => {
+    expect(isValidCallbackNumber('12345')).toBe(false)
+  })
+
+  it('rejects ten digits that are neither a mobile nor a fixed line', () => {
+    expect(isValidCallbackNumber('0123456789')).toBe(false)
+  })
+
+  it('rejects a mobile missing a digit', () => {
+    expect(isValidCallbackNumber('090123456')).toBe(false)
+  })
+})
+
+describe('the sign-in rules beside it', () => {
+  it('still treat a mobile the way sign-in always has', () => {
+    expect(normalizePhone('+84 914 378 064')).toBe('0914378064')
+    expect(isValidPhone('0914378064')).toBe(true)
   })
 })
