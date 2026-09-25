@@ -74,14 +74,16 @@ src/
                                 orb/ (voice-orb, orb, orb-field, use-orb-placement, orb-motion, call-overlay,
                                 call-demo-provider, use-call-demo, greeting-player, call-state)
                                 sections/ (section-chrome, missed-calls, how-it-works, how-it-works-visuals,
-                                play-when-seen, pricing, plan-card, comparison-matrix, billing-period,
-                                billing-switch, plan-price, matrix-disclosure; later sections join them)
+                                play-when-seen, capabilities, capability-row, capability-actions,
+                                capability-visuals, call-demo-player, call-demo-timeline, band, pricing,
+                                plan-card, comparison-matrix, billing-period, billing-switch, plan-price,
+                                matrix-disclosure; later sections join them)
                                 use-reveal.ts · scroll-reveal.tsx (arms the reveal once, from the landing page)
                                 F4 adds: hotline/
 
   design-system/                Brand primitives every surface uses
     button.tsx (+ buttonClassName, the classes a Link wears) · input.tsx · icon.tsx · logo.tsx · icons.ts · index.ts
-    pattern.tsx · switch.tsx · shape.tsx (only the drawings in use) · badge.tsx (arrives with its first consumer)
+    pattern.tsx · switch.tsx · shape.tsx (only the drawings in use) · badge.tsx
 
   ui/                           The signed-in app's kit. Marketing never imports it
     placeholder.tsx             A screen not built yet. Deleting the last one closes the roadmap
@@ -89,7 +91,7 @@ src/
     choice · chips · tiles · rows · save-bar · tabs · disclosure · slider · icon-button · play-button ·
     token-area · charts · table · use-appear · use-element-width · speak · index.ts   each with its first consumer
 
-  data/                         Copy with no markup: auth.ts, content.ts, call-demo.ts (the call screen's chips and voices), pricing.ts, then call-demos.ts (F4)
+  data/                         Copy with no markup: auth.ts, content.ts, call-demo.ts (the call screen's chips and voices), pricing.ts, call-demos.ts (the scripted calls under "Khả năng")
   styles/tokens/                Byte copies from ../Fonnus-Web-UI (ADR 0002)
 ```
 
@@ -277,8 +279,9 @@ No gate enforces these; the pm's review does.
 - Server components by default. `'use client'` on the lowest file that holds state: the
   header (its menus, drawer and scroll state), the orb and its call demo, the two forms, the
   hotline page's chart, the scroll reveal, the billing switch and the prices it changes, and
-  the comparison table's disclosure, and `play-when-seen.tsx`, which plays a
-  "Cách hoạt động" scene once. The layout, the footer and the section copy stay on the
+  the comparison table's disclosure, `play-when-seen.tsx`, which plays a
+  "Cách hoạt động" scene once, and `call-demo-player.tsx`, the scripted calls under
+  "Khả năng", which let one call play at a time and run a timer only while one plays. The layout, the footer and the section copy stay on the
   server: a client leaf that wraps server content takes it as `children`, as the plan cards
   and the comparison table do.
 - The scroll reveal is armed once, by `scroll-reveal.tsx` on the landing page. Blocks
