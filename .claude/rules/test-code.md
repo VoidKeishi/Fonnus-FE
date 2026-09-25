@@ -14,7 +14,7 @@ paths:
   never run and the suite stays green without it.
 - Test names describe behaviour in the owner's terms: "turns +84 into the
   leading zero", not "normalizePhone case 2". A short comment at the top says
-  why this logic deserves a test, as `src/features/auth/phone.test.ts` does.
+  why this logic deserves a test, as `src/api/phone.test.ts` does.
 - Example data is Vietnamese and realistic: `0914378064`, `lan@vietsmile.vn`,
   a landline `02473077199`.
 - Code under `src/api/` is tested through the mock implementation or a pure

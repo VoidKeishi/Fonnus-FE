@@ -88,17 +88,6 @@ ones sized S landed with the ADR on 2026-09-17.
   `--terracotta`, `--night` in `src/features/auth/sign-in-panel.tsx`, `field.tsx`,
   `otp-field.tsx` and `src/design-system/button.tsx` (its `inverse` variant reads `--night` and `--cream-night`); `src/design-system/icon.tsx` falls back to `var(--terracotta)`. Each needs an alias line in
   `globals.css` `@theme` and then the class; ADR 0002 point 2 forbids the base names.
-- **`api/auth.mock.ts` imports `features/auth/phone.ts`** (S): the mock normalises the
-  typed phone number to match the demo account, and reaches into a feature to do it —
-  the one import today that breaks `docs/architecture.md` §2.1 (`api/` imports nothing
-  outside itself). Move `normalizePhone` and `isValidEmail` next to the mock, or into
-  `mock-support.ts`, with the feature importing from there; decide with the lint gate
-  below, which would flag it.
-- **The import-direction lint gate** (S): one `no-restricted-imports` glob in
-  `eslint.config.mjs` — `features/X` never imports `@/features/Y`; `ui/`, `design-system/`
-  and `api/` never import `@/features`, `@/session`, `@/shell`. Added with the first task
-  that gives `features/` its second directory (F3 or F4), because before that the rule has
-  nothing to catch.
 - A token-copy test, in the shape of `../Fonnus-Admin/src/styles/tokens.test.ts`, asserting
   the six token files are byte-identical to their source in `../Fonnus-Web-UI`.
 - An SSR regression test: import `src/api/index.ts` in a Node environment with no `window`

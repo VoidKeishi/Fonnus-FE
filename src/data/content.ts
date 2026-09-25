@@ -28,7 +28,7 @@ export interface NavGroup {
  * appends its id here in the same change that adds its nav or footer entry.
  * In-page links are written `/#<id>` so they work from every marketing page.
  */
-export const LANDING_SECTION_IDS: readonly string[] = []
+export const LANDING_SECTION_IDS: readonly string[] = ['hero']
 
 export const NAV_GROUPS: NavGroup[] = []
 

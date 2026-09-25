@@ -38,4 +38,6 @@ export { ApiError, isApiError, isCanceled, messageFor } from './errors';
 export type { ApiErrorKind, FieldError } from './errors';
 export { setUnauthorizedHandler } from './http';
 export { API_MODE, isLive } from './env';
+export { formatPhone, isValidEmail, isValidPhone, normalizePhone, phoneError } from './phone';
+export { stashPhone, takePhone } from './sign-up-handoff';
 export * from './contracts';

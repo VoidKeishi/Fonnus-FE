@@ -1,6 +1,10 @@
 /**
  * Vietnamese mobile numbers, as an owner would actually type them: with spaces,
  * with or without the leading 0, or pasted from a contact card as +84.
+ *
+ * Kept in the API seam rather than in a feature: the national, digits-only form
+ * is what the wire carries, and both sign-in and the landing hero need the same
+ * rules — two features may share `@/api`, never each other.
  */
 
 /** Digits only, always in national form (leading 0, 10 digits). */

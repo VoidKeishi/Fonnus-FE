@@ -83,7 +83,7 @@ that is what the input contract guarantees; hold it to that.
   `typecheck`, `lint`, `build`. A check reachable only by a hand-typed command is
   unfinished work: wire it or flag it in the report. Commit tests only where the task
   asks for them or this repo already keeps tests for that kind of change (pure functions
-  under Vitest — `src/features/auth/phone.test.ts` is the size and shape), roughly one focused
+  under Vitest — `src/api/phone.test.ts` is the size and shape), roughly one focused
   test per stated behaviour; scratch checks are not turned into permanent test files.
 - The spine is law: no component calls `fetch`; only `src/api/env.ts` reads
   `process.env`; no `pg`, no SQL; configuration fields are the catalogue's `snake_case`

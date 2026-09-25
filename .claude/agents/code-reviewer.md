@@ -85,7 +85,7 @@ secret or a `.env` file in the diff. Three lenses, in order:
    components under `/app`; `vietnamese` font subset and `lang="vi"` untouched; the
    runtime dependency list unchanged unless a `PLAN.md` row says otherwise.
 3. **Tests and gates** — a pure function the change adds or alters has a Vitest case
-   sized like `src/features/auth/phone.test.ts`; a check the spec names is executed by
+   sized like `src/api/phone.test.ts`; a check the spec names is executed by
    `pnpm test`, `typecheck` or `lint`, not by a hand-typed command; `pnpm typecheck`
    would still catch a live module drifting from its mock.
 
