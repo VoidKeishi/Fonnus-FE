@@ -50,6 +50,8 @@ src/
     http.ts                     The fetch wrapper; only *.live.ts imports it
     errors.ts                   ApiError and every Vietnamese error sentence
     mock-support.ts             delay, maybeFail, storage, the demo fixtures
+    phone.ts (+test)            Vietnamese phone rules and the national digits-only wire form; used by auth and marketing
+    sign-up-handoff.ts (+test)  The number typed in the landing hero, carried to /dang-ky in sessionStorage
     auth.mock.ts · auth.live.ts
     tenant.* (F3) · receptionist.* · voice.* (F3 try-out) · leads.* (F4) · shell.* · insights.* (Tổng quan) · calls.* (F5) · appointments.* · numbers.* · account.* (F6)
 
@@ -64,10 +66,11 @@ src/
     shell-skeleton.tsx (F2) · toast.tsx (F2) · summary.ts (Tổng quan) · bottom-stack.tsx (F3)
 
   features/                     Every product surface. One directory per tab or door
-    auth/                       auth-shell, sign-in-page, sign-in-panel, sign-up-page (F1b), field, otp-field, use-countdown, last-method, phone(.test).ts
+    auth/                       auth-shell, sign-in-page, sign-in-panel, sign-up-page (F1b), field, otp-field, use-countdown, last-method
     receptionist/               F3. The Lễ tân tab — see §3
     overview/ · calls/ · appointments/ · numbers/ · account/   One per tab; F5, F6
-    marketing/                  F4. sections/ orb/ hotline/ header.tsx footer.tsx use-reveal.ts
+    marketing/                  landing.tsx (the section list) · header.tsx · footer.tsx · hero/ (hero, sign-up-form, clinic-logos)
+                                F4 adds: orb/ · sections/ · hotline/ · use-reveal.ts
 
   design-system/                Brand primitives every surface uses
     button.tsx · input.tsx · icon.tsx · logo.tsx · icons.ts · index.ts
@@ -256,7 +259,8 @@ No gate enforces these; the pm's review does.
 
 - The form is a client component; the copy panel is a server component handed down as a
   prop (`panel={<SignInPanel />}`).
-- `phone.ts` is the only pure logic on this screen and has a test. Nothing here calls any
+- The phone rules this screen validates with live in `api/phone.ts`, because the landing
+  hero needs the same rules and features never import each other. Nothing here calls any
   group but `api.auth`.
 - After sign-in: `session.signIn(me)` then `router.replace('/app')`, never `push`, so Back
   does not return to the form.
@@ -358,7 +362,7 @@ No gate enforces these; the pm's review does.
 |---|---|
 | `process.env` only in `env.ts` | ESLint `no-restricted-properties`, in place |
 | Mock and live share one interface | `pnpm typecheck`, in place |
-| Import direction (§2.1) | Not yet. One `no-restricted-imports` glob in `eslint.config.mjs`: `features/*` never imports another `@/features/*`; `ui/`, `design-system/`, `api/` never import `@/features`, `@/session`, `@/shell`. Added when `features/` gets its second directory (`PLAN.md` §Backlog). No dependency-cruiser: that is a dependency |
+| Import direction (§2.1) | ESLint `no-restricted-imports` in `eslint.config.mjs`, in place, by alias and by relative path: a feature never imports another (the list is read from `src/features/`); `features/marketing/` never imports `ui/`, `session/`, `shell/`; `ui/` and `design-system/` never import a feature, `api/`, `session/`, `shell/`; `session/` and `shell/` never import a feature; `api/` never reaches outside itself. No dependency-cruiser: that is a dependency |
 | Tokens are byte copies | Not yet. Token-copy test, `PLAN.md` §Backlog |
 | `api/index.ts` imports without `window` | Not yet. SSR test, `PLAN.md` §Backlog |
 | Kebab-case, file size, purpose names | None. The pm's review |

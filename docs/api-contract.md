@@ -116,7 +116,7 @@ Frontend constants the backend must match or override (they are currently hardco
 |---|---|---|
 | Code length | 6 digits | `auth/OtpField.tsx` |
 | Resend cooldown | 42 s | `auth/SignInPage.tsx` |
-| Phone format sent | national, digits only, 10 chars: `0914378064` | `auth/phone.ts → normalizePhone` |
+| Phone format sent | national, digits only, 10 chars: `0914378064` | `api/phone.ts → normalizePhone` |
 
 Only **mobile** prefixes are accepted client-side (`03|05|07|08|09`) — a landline cannot
 receive the SMS, so it is rejected before a code that would never arrive.
