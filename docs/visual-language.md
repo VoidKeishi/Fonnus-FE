@@ -9,8 +9,8 @@ when it was implemented. The code is the source of truth for what ships:
 | ------------------- | --------------------------------------------------------- |
 | Icons (glyph data)  | `src/design-system/icons.ts`                              |
 | Icon renderer       | `src/design-system/icon.tsx`                              |
-| Shapes              | `src/design-system/Shape.tsx`                             |
-| Patterns            | `src/design-system/Pattern.tsx`                           |
+| Shapes              | `src/design-system/shape.tsx`                             |
+| Patterns            | `src/design-system/pattern.tsx`                           |
 | The accent colour   | `--icon-accent` in `src/styles/tokens/colors.css`         |
 
 Everything is built from the two shapes in the logo: **a rising arc** and **a

@@ -292,6 +292,45 @@ html[data-scroll-lock] body {
   to { opacity: 1; transform: none; }
 }
 
+/*
+ * The "Cách hoạt động" scenes (src/features/marketing/sections/
+ * how-it-works-visuals.tsx). Every one states its start as well as its end,
+ * because a scene element's resting style is its finished state: a scene that
+ * never plays — reduced motion, no JavaScript, already on screen at load —
+ * still reads complete, and a keyframe with only a `to` would animate from the
+ * finished state to itself.
+ */
+@keyframes fnSceneRise {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* The chosen number: listed like the others first, picked a beat later. */
+@keyframes fnScenePick {
+  from { background: var(--surface-card); box-shadow: inset 0 0 0 1px var(--border-hairline); }
+  to { background: var(--surface-warm); box-shadow: inset 0 0 0 1.5px var(--text-eyebrow); }
+}
+
+@keyframes fnDrawX {
+  from { transform: scaleX(0); }
+  to { transform: none; }
+}
+
+@keyframes fnDrawY {
+  from { transform: scaleY(0); }
+  to { transform: none; }
+}
+
+@keyframes fnPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+}
+
+@keyframes fnTalk {
+  0%, 100% { transform: scaleY(0.3); }
+  50% { transform: scaleY(1); }
+}
+
 /* A bottom sheet comes up from off-screen, not from 16px away: it is the
    whole surface arriving, and a short hop reads as a jitter instead. */
 @keyframes fnSheetUp {

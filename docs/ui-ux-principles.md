@@ -44,7 +44,10 @@ you read and half were things you pressed to make an empty row.
 
 **Blush (`--surface-warm`) means speech** — the assistant's panel, and the
 receptionist's own line inside a call preview. Never a callout, never a badge inside a
-form.
+form. This governs the signed-in app's screens and forms. The landing page's illustrations
+(the "Với Fonnus" track, the step bullets, the "Cách 1/2" badges and the chosen number in
+the setup scenes) keep the prototype's blush: they are drawings of the product, not
+controls the owner fills in.
 
 **Status is a fact about the clinic, never an obligation.** A row says what is currently
 set — `2 số · Linh gọi chị Lan trước` — and a row with nothing in it says what she
@@ -405,6 +408,13 @@ works (`0914378064` / `111002`).
 
 Newest first. One line per session that taught something; the rule itself goes above.
 
+- **2026-09-25 (landing page, Vì sao and Cách hoạt động)** — Tailwind v4 sorts arbitrary
+  media variants such as `[@media(max-width:900px)]:` by their text, not by width, so a
+  900px rule can land after a 560px rule on the same property and override it on a phone.
+  Nested max-width breakpoints are written `max-[N+1px]:`, which Tailwind orders widest
+  first; the arbitrary form stays for one-off range or height queries. Also from these
+  sections: the prototype's stylesheet is not what shipped when an inline style overrode it
+  (the answer bar's ring still shows on phones), and the port matches the screen.
 - **2026-09-25 (landing page, Bảng giá)** — The prototype arms its scroll reveal before the
   first paint, which is only true for a page the browser draws itself. Under server
   rendering the HTML is already on screen when any hook runs, so arming hides blocks the
