@@ -46,8 +46,8 @@ you read and half were things you pressed to make an empty row.
 receptionist's own line inside a call preview. Never a callout, never a badge inside a
 form. This governs the signed-in app's screens and forms. The landing page's illustrations
 (the "Với Fonnus" track, the step bullets, the "Cách 1/2" badges and the chosen number in
-the setup scenes) keep the prototype's blush: they are drawings of the product, not
-controls the owner fills in.
+the setup scenes) and the "Bảo mật & dữ liệu" section's band keep the prototype's blush:
+they are drawings and backdrops of the product page, not controls the owner fills in.
 
 **Status is a fact about the clinic, never an obligation.** A row says what is currently
 set — `2 số · Linh gọi chị Lan trước` — and a row with nothing in it says what she

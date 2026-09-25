@@ -4,14 +4,15 @@
  * arc and the ink dot.
  *
  * Ink is `currentColor`; the accent is `--icon-accent`, so a shape on a night
- * surface goes cream + night terracotta without being told.
+ * surface goes cream + night terracotta without being told. The handoff target
+ * is sage, the colour of a resolved state.
  *
- * The prototype draws six. Only the two a screen here uses are drawn; the rest
- * (`handoff`, `relieved-owner`, `clear-price`, `appointment-grid`) arrive with
- * their first consumer. `docs/visual-language.md` § Shapes says what each means.
+ * The prototype draws six. Only the four a screen here uses are drawn; the rest
+ * (`clear-price`, `appointment-grid`) arrive with their first consumer.
+ * `docs/visual-language.md` § Shapes says what each means.
  */
 
-export type ShapeName = 'always-on' | 'rising-arcs'
+export type ShapeName = 'always-on' | 'rising-arcs' | 'handoff' | 'relieved-owner'
 
 export interface ShapeProps {
   name: ShapeName
@@ -46,7 +47,7 @@ export function Shape({ name, size = 180, className = '' }: ShapeProps) {
           />
           <circle cx="100" cy="100" r="16" fill="currentColor" />
         </>
-      ) : (
+      ) : name === 'rising-arcs' ? (
         /* Cuộc gọi được trả lời — three arcs rising from one point: the rising
            arc of the motion system. Heroes and opening sections. */
         <>
@@ -55,6 +56,29 @@ export function Shape({ name, size = 180, className = '' }: ShapeProps) {
           <path d="M38 152A62 62 0 0 1 162 152" stroke={ACCENT} strokeWidth="11" strokeLinecap="round" />
           <path d="M60 152A40 40 0 0 1 140 152" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
           <circle cx="100" cy="152" r="10" fill="currentColor" />
+        </>
+      ) : name === 'handoff' ? (
+        /* Chuyển cho bác sĩ — two points, one arc bridging them. The
+           destination is sage, the colour of a resolved state. */
+        <>
+          <path d="M56 124A44 44 0 0 1 144 124" stroke={ACCENT} strokeWidth="9" strokeLinecap="round" />
+          <circle cx="56" cy="124" r="26" fill="currentColor" />
+          <circle cx="144" cy="124" r="26" fill="var(--surface-sage)" stroke="currentColor" strokeWidth="3" />
+          <path
+            d="M136 124l7 7 13-14"
+            stroke="currentColor"
+            strokeWidth="3.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </>
+      ) : (
+        /* Chủ phòng khám nhẹ người — the person below, the call held above.
+           No face, no feelings; the posture says enough. */
+        <>
+          <path d="M64 62A36 36 0 0 1 136 62" stroke={ACCENT} strokeWidth="10" strokeLinecap="round" />
+          <circle cx="100" cy="114" r="21" fill="currentColor" />
+          <path d="M46 178A54 54 0 0 1 154 178" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
         </>
       )}
     </svg>
