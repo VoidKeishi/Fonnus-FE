@@ -408,6 +408,14 @@ works (`0914378064` / `111002`).
 
 Newest first. One line per session that taught something; the rule itself goes above.
 
+- **2026-09-26 (Chấm điểm hotline)** — Two things from porting the page's list and chart.
+  First, the §6 sample's `ref={rows.ref(b.id)}` calls a function that returns a ref during
+  render, and this repo's `react-hooks/refs` lint rule rejects it. The hotline form's
+  `use-appear.ts` holds one ref on the list and finds rows by a `data-appear-id` attribute
+  (`appearRow(id)`); the app kit's `useAppear`, when it arrives with F3, takes the same
+  shape. Second, "paint at zero, then grow" on a server-rendered page is `@starting-style`,
+  not the prototype's two-frame timer: the timer never fires in a tab that is not painting,
+  and the CSS form needs no JavaScript.
 - **2026-09-26 (landing page, Liên hệ)** — The prototype's own global stylesheet drew
   every link without an underline until hovered; the copied `base.css` underlines every
   `<a>` by default. The contact form was the first ported section with links inside running

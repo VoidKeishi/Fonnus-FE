@@ -36,7 +36,7 @@ src/
     icon.svg · not-found.tsx
     global-error.tsx            'use client', plain HTML, Vietnamese: runs when the root layout itself failed  [backlog]
     api/healthz/route.ts        Liveness of this server. Build SHA added at F7
-    (marketing)/                F4. layout (header, footer, the call demo's provider), page, cham-diem-hotline/, error.tsx
+    (marketing)/                F4. layout (header, footer, the call demo's provider), page, cham-diem-hotline/page.tsx (static, the hotline report), error.tsx
     (auth)/                     layout (AuthShell, F1b), dang-nhap/, dang-ky/ (F1b), error.tsx [backlog]
     app/                        layout: RequireSession → AppShell (→ ConfigProvider, F3). error.tsx [backlog]
       page.tsx                  Tổng quan
@@ -53,7 +53,7 @@ src/
     phone.ts (+test)            Vietnamese phone rules and the national digits-only wire form: the SMS-able mobile (auth, hero) and the callback number (contact form)
     sign-up-handoff.ts (+test)  The number typed in the landing hero, carried to /dang-ky in sessionStorage
     auth.mock.ts · auth.live.ts
-    leads.mock.ts · leads.live.ts  POST /leads, the landing contact form (F4)
+    leads.mock.ts · leads.live.ts  POST /leads (the landing contact form) and POST /leads/hotline-report (F4)
     tenant.* (F3) · receptionist.* · voice.* (F3 try-out) · shell.* · insights.* (Tổng quan) · calls.* (F5) · appointments.* · numbers.* · account.* (F6)
 
   session/                      Who is signed in
@@ -80,8 +80,10 @@ src/
                                 plan-card, comparison-matrix, billing-period, billing-switch, plan-price,
                                 matrix-disclosure, faq, faq-list, security, testimonials, contact, contact-form,
                                 lead-fields (+test))
-                                use-reveal.ts · scroll-reveal.tsx (arms the reveal once, from the landing page)
-                                F4 adds: hotline/
+                                use-reveal.ts · scroll-reveal.tsx (arms the reveal once per page: the landing page, the hotline page)
+                                hotline/ (hotline-report-page, missed-call-stats, stacked-columns, chart-geometry (+test),
+                                report-request, sample-report, report-form, report-sent, report-fields (+test),
+                                floating-cta, and the page's local kit: list-buttons, use-appear)
 
   design-system/                Brand primitives every surface uses
     button.tsx (+ buttonClassName, the classes a Link wears) · input.tsx · icon.tsx · logo.tsx · icons.ts · index.ts
@@ -93,7 +95,7 @@ src/
     choice · chips · tiles · rows · save-bar · tabs · disclosure · slider · icon-button · play-button ·
     token-area · charts · table · use-appear · use-element-width · speak · index.ts   each with its first consumer
 
-  data/                         Copy with no markup: auth.ts, content.ts, call-demo.ts (the call screen's chips and voices), pricing.ts, call-demos.ts (the scripted calls under "Khả năng")
+  data/                         Copy with no markup: auth.ts, content.ts, call-demo.ts (the call screen's chips and voices), pricing.ts, call-demos.ts (the scripted calls under "Khả năng"), hotline-report.ts (the figures and sample report of /cham-diem-hotline)
   styles/tokens/                Byte copies from ../Fonnus-Web-UI (ADR 0002)
 ```
 
@@ -109,7 +111,7 @@ app  →  features/*  →  { shell, session }  →  { ui, design-system, api, da
 |---|---|
 | Two directories under `features/` never import each other. | The only two channels between tabs are `session.patchMe()` (a page changes what the sidebar shows: the name, the plan) and `markSummaryStale()` from `shell/summary.ts` (a page makes the sidebar's numbers stale). The prototype ran the whole product on exactly those two. Needing a third means something is in the wrong directory. Keeping every feature under one parent is what lets this rule be one `no-restricted-imports` glob. |
 | `ui/` and `design-system/` never import a feature, `api/`, `session/` or `shell/`. | A control receives its data through props. A control that knows about the API cannot be reused and cannot be tested as a pure function. |
-| `features/marketing/` never imports `ui/`, `session/` or `shell/`. | The landing page is a server component so a crawler can read it. `ui/` is the client kit; pulling it in drags `'use client'` into the acquisition surface. Marketing uses `design-system/`, `data/`, and `api.leads` in the contact form. |
+| `features/marketing/` never imports `ui/`, `session/` or `shell/`. | The landing page is a server component so a crawler can read it. `ui/` is the client kit; pulling it in drags `'use client'` into the acquisition surface. Marketing uses `design-system/`, `data/`, and `api.leads` in the contact form and the hotline report form. |
 | `api/` imports nothing outside itself and no React. | `http.ts` exposes its 401 hook through a module-level setter instead of importing `session/`. The other direction is the cycle `session → api → session`. |
 | `session/` and `shell/` import `api/`, `ui/`, `design-system/`; never a feature. | The sidebar shows numbers from `api.shell`, not the state of one tab. |
 
@@ -286,10 +288,17 @@ No gate enforces these; the pm's review does.
   "Khả năng", which let one call play at a time and run a timer only while one plays, and
   `faq-list.tsx`, which keeps one answer of "Câu hỏi thường gặp" open at a time, and
   `contact-form.tsx`, the "Liên hệ" form and its sent panel, which calls `api.leads` and
-  keeps its rules in the pure `lead-fields.ts`. The layout, the footer and the section copy
-  stay on the server: a client leaf that wraps server content takes it as `children`, as the plan cards
-  and the comparison table do.
-- The scroll reveal is armed once, by `scroll-reveal.tsx` on the landing page. Blocks
+  keeps its rules in the pure `lead-fields.ts`. On `/cham-diem-hotline` the client leaves
+  are `stacked-columns.tsx` (the missed-calls chart: its pointer and keyboard scrub and its
+  tip), `report-form.tsx` (the request form, its location rows and the sent panel, which
+  calls `api.leads.requestHotlineReport` and keeps its rules in the pure `report-fields.ts`)
+  and `floating-cta.tsx` (the phone's bottom-edge button, one IntersectionObserver). The
+  page's list kit — `list-buttons.tsx`, `use-appear.ts` — is a port of the prototype's app
+  kit for this page alone, because marketing never imports `ui/`. The layout, the footer and
+  the section copy stay on the server: a client leaf that wraps server content takes it as
+  `children`, as the plan cards and the comparison table do.
+- The scroll reveal is armed once per page, by `scroll-reveal.tsx` mounted after the
+  sections — on the landing page and on `/cham-diem-hotline`. Blocks
   already on screen when it arms are marked revealed instead of hidden, because the server's
   HTML is painted before any hook runs. The stagger is CSS keyed by the `data-reveal` value.
 - Copy the prototype kept in `data/` — the navigation, the FAQ, the testimonials, the

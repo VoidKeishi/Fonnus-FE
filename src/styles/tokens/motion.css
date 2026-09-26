@@ -1,6 +1,8 @@
-/* Copied verbatim from ../Fonnus-Web-UI/src/styles/tokens/motion.css @ 302e3e8 (ADR 0002). Do not edit here — re-copy. */
+/* Copied verbatim from ../Fonnus-Web-UI/src/styles/tokens/motion.css @ 553835e (ADR 0002). Do not edit here — re-copy. */
 :root{
-/* The rising arc is the only motion idiom: a short lift-and-settle. No bounce, no blink, no countdowns. */
+/* The rising arc is the only motion idiom: a short lift-and-settle. No bounce, no blink, no countdowns —
+   except the checkout's payment window, at the owner's request, because the server enforces it
+   (Số điện thoại, ui-ux-principles §13). */
 --ease-arc:cubic-bezier(.2,.7,.3,1); /* @kind other */
 --ease-out:cubic-bezier(.16,1,.3,1); /* @kind other */
 --ease-in-out:cubic-bezier(.4,0,.2,1); /* @kind other */

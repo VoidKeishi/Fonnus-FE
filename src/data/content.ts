@@ -71,6 +71,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: 'Câu hỏi thường gặp', desc: 'Những điều chủ phòng khám hay hỏi', icon: 'list', href: '/#faq' },
     ],
   },
+  { label: 'Chấm điểm hotline', href: '/cham-diem-hotline' },
   { label: 'Liên hệ', href: '/#lien-he' },
 ]
 
@@ -78,6 +79,7 @@ export const FOOTER_PAGE_LINKS: { href: string; label: string }[] = [
   { href: '/#hero', label: 'Nghe thử' },
   { href: '/#cach-hoat-dong', label: 'Cách hoạt động' },
   { href: '/#bang-gia', label: 'Bảng giá' },
+  { href: '/cham-diem-hotline', label: 'Chấm điểm hotline' },
   { href: '/#bao-mat', label: 'Bảo mật & dữ liệu' },
 ]
 

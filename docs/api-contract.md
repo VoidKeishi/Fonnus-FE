@@ -425,6 +425,40 @@ The route is unauthenticated, so a `401` is never expected here and never signs 
 | `429` | — | "Bạn thao tác hơi nhanh…" under the button; what was typed stays |
 | `5xx` / network | — | The matching message under the button; what was typed stays. Never retried automatically |
 
+### `POST /leads/hotline-report`
+
+The "Chấm điểm hotline" page (`/cham-diem-hotline`): a clinic asks Fonnus to ring its
+published numbers as a patient would and email it a scored report. Unauthenticated.
+
+```jsonc
+{ "contact_name": "Nguyễn Minh Anh", "email": "anh@nhakhoaminhanh.vn",
+  "clinic_name": "Nha khoa Minh Anh",
+  "locations": [
+    { "address": "12 Nguyễn Trãi, Quận 1, TP.HCM", "phone": "02838221234" },
+    { "address": "45 Lê Lợi, Quận 3, TP.HCM", "phone": "19001234" }
+  ],
+  "source": "hotline_report" }
+// → 202
+```
+
+`locations` holds at least one and at most 20 entries, in the order the form lists them. Each
+`phone` is national form, digits only, under the same rule as `POST /leads`: a mobile, a fixed
+line, or a 1800/1900 hotline sent as typed with no leading `0` (`api/phone.ts →
+normalizeCallbackNumber`, `isValidCallbackNumber`). `contact_name`, `clinic_name` and every
+`address` arrive trimmed and non-empty; `email` arrives trimmed and passes `isValidEmail`. The
+server checks all of it again.
+
+Same bot-protection terms as `POST /leads`: rate-limit by IP, **no CAPTCHA the user must
+solve**. The route is unauthenticated, so a `401` is never expected here and never signs
+anyone out.
+
+| Status | Body | Frontend behaviour |
+|---|---|---|
+| `202` | — | The form is replaced by "Đã nhận yêu cầu", naming the email and the number of locations |
+| `422` | `code: "validation_failed"`, `errors[].field` ∈ `contact_name` · `email` · `clinic_name` · `locations.<i>.address` · `locations.<i>.phone` (`<i>` zero-based, in the order sent), `errors[].code` ∈ `required` · `invalid_email` · `invalid_phone` | The page's own line for that field appears under it — the "Nhập …" line for `required`, the "… chưa đúng" line otherwise — on the i-th location's row for a `locations` path, and the first one in form order takes the focus. A field outside these is ignored; when no known field is named, the generic message shows under the button. What was typed stays |
+| `429` | — | "Bạn thao tác hơi nhanh…" under the button; what was typed stays |
+| `5xx` / network | — | The matching message under the button; what was typed stays. Never retried automatically |
+
 ---
 
 ## 7. Specified later — shape only

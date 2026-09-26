@@ -82,6 +82,11 @@
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
+  /* The one-hue ramp a chart colours by, and a meter's unfilled part. Steps
+     arrive as a screen draws them: the hotline page uses 2 and 5. */
+  --color-chart-step-2: var(--chart-step-2);
+  --color-chart-step-5: var(--chart-step-5);
+  --color-meter-track: var(--meter-track);
 
   --font-display: var(--font-display);
   --font-ui: var(--font-ui);

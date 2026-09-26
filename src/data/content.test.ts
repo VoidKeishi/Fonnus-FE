@@ -9,7 +9,7 @@ import { FAQS, FOOTER_PAGE_LINKS, LANDING_SECTION_IDS, NAV_GROUPS, TESTIMONIALS 
  */
 
 /** Routes a marketing link may point at besides an in-page section. Extend with the page's own pull request. */
-const KNOWN_ROUTES = ['/', '/dang-nhap', '/dang-ky']
+const KNOWN_ROUTES = ['/', '/dang-nhap', '/dang-ky', '/cham-diem-hotline']
 
 const SECTION_ANCHOR = /^\/#(.+)$/
 
@@ -44,6 +44,11 @@ describe('the link check itself', () => {
 describe('marketing links', () => {
   it('lead only to a section that exists or to a known page', () => {
     expect(allHrefs.filter((href) => !isLive(href))).toEqual([])
+  })
+
+  it('offer the hotline report page from the header and from the footer', () => {
+    expect(NAV_GROUPS.some((group) => group.href === '/cham-diem-hotline')).toBe(true)
+    expect(FOOTER_PAGE_LINKS.some((link) => link.href === '/cham-diem-hotline')).toBe(true)
   })
 
   it('never list the same section twice', () => {
