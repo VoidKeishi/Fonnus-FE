@@ -5,8 +5,10 @@
 The customer-facing frontend of Fonnus (`../Fonnus`), the AI voice receptionist that
 answers the phone for Vietnamese clinics. Three surfaces, one application:
 
-1. **The landing page** — what Fonnus is, what it costs, and a way to be contacted. This is
-   an acquisition surface: clinics will find it by searching, so it is server-rendered.
+1. **The landing page** — what Fonnus is, what it costs, and a way to be contacted, plus
+   the "Chấm điểm hotline" page, which offers a free report on how many of a clinic's calls
+   go unanswered. This is an acquisition surface: clinics will find it by searching, so it
+   is server-rendered.
 2. **Sign-up and sign-in** — a phone number and a code, or an email, or Google. No password
    anywhere in the product.
 3. **The signed-in app at `/app`** — where a clinic owner configures their receptionist
@@ -36,6 +38,7 @@ tuning the pipeline. Different person, different repo, same design system.
 | Surface | Path | Holds |
 |---|---|---|
 | Landing | `/` | Hero with a live voice demo, how it works, pricing, contact |
+| Chấm điểm hotline | `/cham-diem-hotline` | The free report: Fonnus rings each of the clinic's locations as a patient would and scores the calls. For owners, often of a chain, who are not ready for a receptionist yet |
 | Sign-up / sign-in | `/dang-ky`, `/dang-nhap` | One flow: an existing number turns a sign-up into a sign-in |
 | Tổng quan | `/app` | The shape of the week: calls answered, what needs attention |
 | Cuộc gọi | `/app/cuoc-goi` | The clinic's own call history — the same read path as Fonnus-Admin with a tenant filter |

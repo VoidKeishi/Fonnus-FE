@@ -1,4 +1,4 @@
-/* Copied verbatim from ../Fonnus-Web-UI/src/styles/tokens/colors.css @ 302e3e8 (ADR 0002). Do not edit here — re-copy. */
+/* Copied verbatim from ../Fonnus-Web-UI/src/styles/tokens/colors.css @ 553835e (ADR 0002). Do not edit here — re-copy. */
 :root{
 /* --- Base palette (identity deck, "Bảng màu") --- */
 --paper:#F7EFE1;            /* Giấy — page ground */
@@ -59,13 +59,30 @@
 --action-secondary:var(--milk);
 --action-secondary-hover:#FBF3E4;
 --action-ghost-hover:rgba(184,92,43,.08);
+/* The unfilled part of a meter: a paler step of the same terracotta, never grey. */
+--meter-track:rgba(184,92,43,.14);
 --focus-ring:var(--terracotta);
 /* The one terracotta part of every icon, shape and pattern (see design-system/icons.ts).
    Night surfaces switch it to --terracotta-night; a terracotta surface sets it to currentColor. */
 --icon-accent:var(--terracotta);
+/* Single accents for a state dot or a lone figure — never three series of one
+   chart. Measured: terracotta against lemongrass separates by only ΔE 5.4 for a
+   deutan reader (8 is the floor) and 13.9 for normal vision (15 is the floor),
+   so a reader with the commonest colour blindness cannot tell two bars apart. */
 --chart-1:var(--terracotta);
 --chart-2:var(--lemongrass);
 --chart-3:var(--ink-soft);
+
+/* What a chart actually colours by: ONE hue in five steps, palest to full.
+   Every figure on these screens is a magnitude — how many calls, how much of
+   the whole — so the ramp is sequential and identity comes from position and a
+   direct label, not from hue. Same bargain the readiness meter already makes:
+   the unfilled arc is a paler step of the same terracotta, never grey. */
+--chart-step-1:rgba(184,92,43,.12);
+--chart-step-2:rgba(184,92,43,.28);
+--chart-step-3:rgba(184,92,43,.48);
+--chart-step-4:rgba(184,92,43,.70);
+--chart-step-5:var(--terracotta);
 }
 
 [data-theme="dark"]{
@@ -89,8 +106,16 @@
 --action-secondary:var(--night-surface);
 --action-secondary-hover:#372D22;
 --action-ghost-hover:rgba(224,138,80,.12);
+--meter-track:rgba(224,138,80,.18);
 --icon-accent:var(--terracotta-night);
 --chart-1:var(--terracotta-night);
 --chart-2:var(--lemongrass-night);
 --chart-3:rgba(243,233,218,.5);
+/* Chosen against the night card, not flipped: the light steps over #2D251C
+   collapse into the ground at the pale end. */
+--chart-step-1:rgba(224,138,80,.14);
+--chart-step-2:rgba(224,138,80,.30);
+--chart-step-3:rgba(224,138,80,.50);
+--chart-step-4:rgba(224,138,80,.72);
+--chart-step-5:var(--terracotta-night);
 }

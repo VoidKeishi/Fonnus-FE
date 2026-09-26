@@ -1,5 +1,5 @@
 /**
- * Leads against the real backend. Endpoint and body: `docs/api-contract.md` §6.
+ * Leads against the real backend. Endpoints and bodies: `docs/api-contract.md` §6.
  */
 import type { LeadsApi } from './contracts'
 import { http } from './http'
@@ -12,6 +12,15 @@ export const leadsLive: LeadsApi = {
     await http.post(
       '/leads',
       { ...input, source: 'landing_contact' },
+      { signal: opts?.signal, expect401: true, parse: 'none' },
+    )
+  },
+
+  async requestHotlineReport(input, opts) {
+    // Same terms as the contact form: unauthenticated, rate-limited by IP.
+    await http.post(
+      '/leads/hotline-report',
+      { ...input, source: 'hotline_report' },
       { signal: opts?.signal, expect401: true, parse: 'none' },
     )
   },

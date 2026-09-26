@@ -98,9 +98,29 @@ export interface LeadInput {
   phone: string;
 }
 
+/** One clinic site to ring: where it is, and the number patients call. */
+export interface HotlineLocation {
+  address: string;
+  /** National form, digits only, as `LeadInput.phone`: `02838221234`, `0901234567`, `19001234`. */
+  phone: string;
+}
+
+/** The "Chấm điểm hotline" page: who asks, where the report goes, which numbers to ring. */
+export interface HotlineReportInput {
+  contact_name: string;
+  /** Where the report is sent. */
+  email: string;
+  /** A clinic, or the chain that owns several. */
+  clinic_name: string;
+  /** At least one, at most 20. */
+  locations: HotlineLocation[];
+}
+
 export interface LeadsApi {
   /** `POST /leads`. Unauthenticated: the landing page's contact form. */
   submit(input: LeadInput, opts?: Signal): Promise<void>;
+  /** `POST /leads/hotline-report`. Unauthenticated: the "Chấm điểm hotline" page. */
+  requestHotlineReport(input: HotlineReportInput, opts?: Signal): Promise<void>;
 }
 
 // ---------------------------------------------------------------------------

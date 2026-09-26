@@ -1,8 +1,9 @@
 /**
- * Leads, faked in the browser: the landing page's contact form, going nowhere.
+ * Leads, faked in the browser: the landing page's contact form and the
+ * "Chấm điểm hotline" request, both going nowhere.
  *
- * Nothing is stored. The form validates before it calls, so the mock never
- * sees a number it would reject; `NEXT_PUBLIC_MOCK_FAILURE_RATE` is how the
+ * Nothing is stored. The forms validate before they call, so the mock never
+ * sees a value it would reject; `NEXT_PUBLIC_MOCK_FAILURE_RATE` is how the
  * failed-send state is reached.
  */
 import type { LeadsApi } from './contracts'
@@ -10,6 +11,11 @@ import { delay, maybeFail } from './mock-support'
 
 export const leadsMock: LeadsApi = {
   async submit(_input, opts) {
+    await delay(1.4, opts?.signal)
+    maybeFail()
+  },
+
+  async requestHotlineReport(_input, opts) {
     await delay(1.4, opts?.signal)
     maybeFail()
   },
