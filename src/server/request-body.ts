@@ -4,7 +4,13 @@
  * server.
  */
 
-/** Three short names and a phone fit in far less; anything larger is not the form. */
+/**
+ * Sized by the larger form. The contact form fits in far less; the fullest
+ * hotline report the checks allow — 20 locations with 500-character addresses
+ * of three-byte letters, two 200-character names, a 254-character email — is
+ * about 32.3 KB of compact JSON, just under this. Anything larger is not
+ * either form. Raising a length cap in `leads-input.ts` means checking this.
+ */
 export const MAX_BODY_BYTES = 32 * 1024
 
 /**

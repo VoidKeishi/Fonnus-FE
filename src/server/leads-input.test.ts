@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { MAX_NAME_LENGTH, parseLead } from './leads-input'
+import { MAX_LOCATIONS, MAX_NAME_LENGTH, parseHotlineReport, parseLead } from './leads-input'
 
 /*
  * The server's copy of the contact form's rules is the only thing between a
@@ -64,5 +64,162 @@ describe('parseLead', () => {
     ['a string', JSON.stringify(VALID)],
   ])('refuses %s as a body', (_, body) => {
     expect(errorsOf(body).map(({ field }) => field)).toEqual(['clinic_name', 'contact_name', 'phone'])
+  })
+})
+
+/*
+ * The hotline report is the larger body: a chain sends up to twenty sites,
+ * and a refusal has to land on the right row of the form, so the paths and
+ * their order are what matter.
+ */
+
+const REPORT = {
+  contact_name: 'Nguyễn Minh Anh',
+  email: 'anh@nhakhoaminhanh.vn',
+  clinic_name: 'Nha khoa Minh Anh',
+  locations: [
+    { address: '12 Nguyễn Trãi, Quận 1, TP.HCM', phone: '02838221234' },
+    { address: '45 Lê Lợi, Quận 3, TP.HCM', phone: '19001234' },
+  ],
+  source: 'hotline_report',
+}
+
+function reportErrorsOf(body: unknown) {
+  const result = parseHotlineReport(body)
+  return result.ok ? [] : result.errors
+}
+
+function sites(count: number) {
+  return Array.from({ length: count }, (_, i) => ({ address: `${String(i + 1)} Hai Bà Trưng, Quận 1, TP.HCM`, phone: '0901234567' }))
+}
+
+describe('parseHotlineReport', () => {
+  it('accepts the example request, text trimmed and numbers in national digits', () => {
+    const result = parseHotlineReport({
+      ...REPORT,
+      contact_name: ' Nguyễn Minh Anh ',
+      email: ' anh@nhakhoaminhanh.vn ',
+      locations: [
+        { address: ' 12 Nguyễn Trãi, Quận 1, TP.HCM ', phone: '+84 28 3822 1234' },
+        { address: '45 Lê Lợi, Quận 3, TP.HCM', phone: '1900 1234' },
+      ],
+    })
+    expect(result).toEqual({
+      ok: true,
+      report: {
+        contact_name: 'Nguyễn Minh Anh',
+        email: 'anh@nhakhoaminhanh.vn',
+        clinic_name: 'Nha khoa Minh Anh',
+        locations: [
+          { address: '12 Nguyễn Trãi, Quận 1, TP.HCM', phone: '02838221234' },
+          { address: '45 Lê Lợi, Quận 3, TP.HCM', phone: '19001234' },
+        ],
+      },
+    })
+  })
+
+  it('names the second location’s blank address and bad number after the person’s fields', () => {
+    const [first] = REPORT.locations
+    expect(
+      reportErrorsOf({ ...REPORT, contact_name: '', locations: [first, { address: '  ', phone: '0123456789' }] }),
+    ).toEqual([
+      { field: 'contact_name', code: 'required' },
+      { field: 'locations.1.address', code: 'required' },
+      { field: 'locations.1.phone', code: 'invalid_phone' },
+    ])
+  })
+
+  it('treats a location that is not an object as missing both parts', () => {
+    expect(reportErrorsOf({ ...REPORT, locations: ['02838221234'] })).toEqual([
+      { field: 'locations.0.address', code: 'required' },
+      { field: 'locations.0.phone', code: 'required' },
+    ])
+  })
+
+  it.each([
+    ['no locations', []],
+    ['a list that is not an array', { address: '12 Nguyễn Trãi', phone: '02838221234' }],
+  ])('asks for locations when there are %s', (_, locations) => {
+    expect(reportErrorsOf({ ...REPORT, locations })).toEqual([{ field: 'locations', code: 'required' }])
+  })
+
+  it('refuses more locations than the form allows, without checking each one', () => {
+    const tooMany = [...sites(MAX_LOCATIONS), { address: '', phone: '' }]
+    expect(tooMany).toHaveLength(21)
+    expect(reportErrorsOf({ ...REPORT, locations: tooMany })).toEqual([{ field: 'locations', code: 'too_long' }])
+  })
+
+  it('accepts exactly twenty locations', () => {
+    const result = parseHotlineReport({ ...REPORT, locations: sites(20) })
+    expect(result.ok && result.report.locations).toHaveLength(20)
+  })
+
+  it('refuses an email with no top-level domain', () => {
+    expect(reportErrorsOf({ ...REPORT, email: 'anh@nhakhoa' })).toEqual([{ field: 'email', code: 'invalid_email' }])
+  })
+
+  it('refuses a 255-character email and a 501-character address', () => {
+    const email = `${'a'.repeat(255 - '@nhakhoaminhanh.vn'.length)}@nhakhoaminhanh.vn`
+    const address = '12 Nguyễn Trãi, Quận 1, TP.HCM'.padEnd(501, '.')
+    expect([email.length, address.length]).toEqual([255, 501])
+    expect(reportErrorsOf({ ...REPORT, email, locations: [{ address, phone: '02838221234' }] })).toEqual([
+      { field: 'email', code: 'too_long' },
+      { field: 'locations.0.address', code: 'too_long' },
+    ])
+  })
+
+  it('accepts an email and an address of exactly the limit', () => {
+    const email = `${'a'.repeat(254 - '@nhakhoaminhanh.vn'.length)}@nhakhoaminhanh.vn`
+    const address = '12 Nguyễn Trãi, Quận 1, TP.HCM'.padEnd(500, '.')
+    expect([email.length, address.length]).toEqual([254, 500])
+    expect(reportErrorsOf({ ...REPORT, email, locations: [{ address, phone: '02838221234' }] })).toEqual([])
+  })
+
+  it('refuses a contact or clinic name longer than the form allows', () => {
+    const name = 'Nha khoa Minh Anh'.padEnd(MAX_NAME_LENGTH + 1, '.')
+    expect(name).toHaveLength(201)
+    expect(reportErrorsOf({ ...REPORT, contact_name: name, clinic_name: name })).toEqual([
+      { field: 'contact_name', code: 'too_long' },
+      { field: 'clinic_name', code: 'too_long' },
+    ])
+  })
+
+  it('treats a location part that is not a string as missing', () => {
+    expect(
+      reportErrorsOf({
+        ...REPORT,
+        locations: [
+          { address: '12 Nguyễn Trãi, Quận 1, TP.HCM', phone: 2838221234 },
+          { address: ['45 Lê Lợi'], phone: '19001234' },
+        ],
+      }),
+    ).toEqual([
+      { field: 'locations.0.phone', code: 'required' },
+      { field: 'locations.1.address', code: 'required' },
+    ])
+  })
+
+  it('lists problems location by location, the first site before the second', () => {
+    expect(
+      reportErrorsOf({
+        ...REPORT,
+        locations: [
+          { address: '12 Nguyễn Trãi, Quận 1, TP.HCM', phone: '12345' },
+          { address: '', phone: '19001234' },
+        ],
+      }),
+    ).toEqual([
+      { field: 'locations.0.phone', code: 'invalid_phone' },
+      { field: 'locations.1.address', code: 'required' },
+    ])
+  })
+
+  it('refuses a body that is not an object, one field at a time', () => {
+    expect(reportErrorsOf(null)).toEqual([
+      { field: 'contact_name', code: 'required' },
+      { field: 'email', code: 'required' },
+      { field: 'clinic_name', code: 'required' },
+      { field: 'locations', code: 'required' },
+    ])
   })
 })
