@@ -36,6 +36,7 @@ src/
     icon.svg · not-found.tsx
     global-error.tsx            'use client', plain HTML, Vietnamese: runs when the root layout itself failed  [backlog]
     api/healthz/route.ts        Liveness of this server. Build SHA added at F7
+    api/leads/route.ts          POST /api/leads: the contact form, appended to a Google Sheet (ADR 0005)
     (marketing)/                F4. layout (header, footer, the call demo's provider), page, cham-diem-hotline/page.tsx (static, the hotline report), error.tsx
     (auth)/                     layout (AuthShell, F1b), dang-nhap/, dang-ky/ (F1b), error.tsx [backlog]
     app/                        layout: RequireSession → AppShell (→ ConfigProvider, F3). error.tsx [backlog]
@@ -55,6 +56,16 @@ src/
     auth.mock.ts · auth.live.ts
     leads.mock.ts · leads.live.ts  POST /leads (the landing contact form) and POST /leads/hotline-report (F4)
     tenant.* (F3) · receptionist.* · voice.* (F3 try-out) · shell.* · insights.* (Tổng quan) · calls.* (F5) · appointments.* · numbers.* · account.* (F6)
+
+  server/                       Code that runs only in a route handler (ADR 0005). Only src/app/ imports it
+    env.ts                      The three Google variables, read per request. The only file here that reads process.env
+    leads-input.ts (+test)      Checks a posted body again, with the forms' own rules
+    lead-rows.ts (+test)        A checked lead as a spreadsheet row, stamped in Vietnam time
+    google-jwt.ts (+test)       The signed assertion a service account trades for an access token
+    google-token.ts             The exchange, and the token kept while the instance is warm
+    sheets.ts                   appendRows: one call to spreadsheets.values.append
+    request-body.ts (+test)     The JSON media-type check and the body reader capped at 32 KB
+    leads-handler.ts            Request in, Response out: 415, 413, 400, 422, 503, 202
 
   session/                      Who is signed in
     session.ts                  The localStorage hint, through useSyncExternalStore
@@ -114,6 +125,7 @@ app  →  features/*  →  { shell, session }  →  { ui, design-system, api, da
 | `features/marketing/` never imports `ui/`, `session/` or `shell/`. | The landing page is a server component so a crawler can read it. `ui/` is the client kit; pulling it in drags `'use client'` into the acquisition surface. Marketing uses `design-system/`, `data/`, and `api.leads` in the contact form and the hotline report form. |
 | `api/` imports nothing outside itself and no React. | `http.ts` exposes its 401 hook through a module-level setter instead of importing `session/`. The other direction is the cycle `session → api → session`. |
 | `session/` and `shell/` import `api/`, `ui/`, `design-system/`; never a feature. | The sidebar shows numbers from `api.shell`, not the state of one tab. |
+| Only `app/` imports `server/`. `server/` imports itself, `api/phone`, `api/contracts`, `api/errors` and Node built-ins. | `server/` holds the Google credential and runs only inside a route handler. It shares the forms' phone and email rules through the three pure `api/` files, never through `api/index.ts`, which pulls in the mocks. |
 
 ### 2.2 Naming
 
@@ -187,8 +199,20 @@ No gate enforces these; the pm's review does.
   it runs when the root layout itself has failed.
 - No `loading.tsx` under `/app`: a client page draws its own skeleton from its state, and
   `RequireSession` already draws the shell's.
-- No `route.ts` other than `healthz`. No API-proxying route handler, no server action
-  (ADR 0003 point 5).
+- Two kinds of `route.ts` exist: `healthz`, and the `leads` handlers of ADR 0005. A
+  `route.ts` exports the method and hands the request to one function in `src/server/`. No
+  route handler proxies Fonnus-BE, and there is no server action (ADR 0003 point 5).
+
+### `src/server/` — what runs only in a route handler
+
+- It exists for the `leads` group (ADR 0005). A second use needs its own decision.
+- A module that reads a secret or opens a connection starts with `import 'server-only'`.
+  The pure modules do not: Vitest cannot resolve that import, and they are the tested ones.
+- `env.ts` reads the environment inside a function, per request, so `next build` needs no
+  secret. A missing variable is a `503`, not a crash.
+- A log line carries the step and the upstream status. Never a field a visitor typed, never
+  the key or a token.
+- A response carries a status and, for a `422`, the field list. Never text from Google.
 
 ### `src/api/` — the door to the network
 
@@ -361,7 +385,7 @@ No gate enforces these; the pm's review does.
 | A new endpoint | An interface in `api/contracts.ts`, the `.mock.ts`/`.live.ts` pair, a line in `index.ts`, a section in `docs/api-contract.md`. Same commit as the screen that uses it |
 | A Vietnamese error sentence | `api/errors.ts` |
 | Screen copy | In the screen's component; landing copy in `data/` |
-| An environment variable | One constant in `api/env.ts`, the name written out in full, plus a line in `.env.example` |
+| An environment variable | One constant in `api/env.ts`, the name written out in full, plus a line in `.env.example`. A secret is never `NEXT_PUBLIC_` and is read in `server/env.ts` |
 | A hook one feature uses | That feature's directory, named `use-<job>.ts` |
 | A hook two features use | `ui/` if it is about the DOM or layout; `shell/` if it is about app state |
 | A shared form control | `ui/` |
@@ -376,9 +400,10 @@ No gate enforces these; the pm's review does.
 
 - `src/components/`, `src/hooks/`, `src/utils/`, `src/lib/`, `src/types/`, `src/constants/`.
   A directory named for a kind of code is where everything lands and nothing is found.
-- `fetch` outside `api/http.ts`. `process.env` outside `api/env.ts` (lint-enforced).
+- `fetch` outside `api/http.ts` and `server/`. `process.env` outside `api/env.ts` and
+  `server/env.ts` (lint-enforced).
 - `middleware.ts` while mock is the default (ADR 0003 point 9).
-- An API-proxying route handler, a server action, `fetch` in a server component
+- A route handler that proxies Fonnus-BE, a server action, `fetch` in a server component
   (ADR 0003 point 5).
 - A hex colour in a component; a base-palette name (`--milk`, `--terracotta`) in a
   component, even inside `[var(...)]`.
@@ -393,7 +418,8 @@ No gate enforces these; the pm's review does.
 
 | Rule | Gate |
 |---|---|
-| `process.env` only in `env.ts` | ESLint `no-restricted-properties`, in place |
+| `process.env` only in `api/env.ts` and `server/env.ts` | ESLint `no-restricted-properties`, in place |
+| Only `app/` imports `server/`, and `server/` imports only itself, three `api/` files and Node built-ins | ESLint `no-restricted-imports`, in place |
 | Mock and live share one interface | `pnpm typecheck`, in place |
 | Import direction (§2.1) | ESLint `no-restricted-imports` in `eslint.config.mjs`, in place, by alias and by relative path: a feature never imports another (the list is read from `src/features/`); `features/marketing/` never imports `ui/`, `session/`, `shell/`; `ui/` and `design-system/` never import a feature, `api/`, `session/`, `shell/`; `session/` and `shell/` never import a feature; `api/` never reaches outside itself. No dependency-cruiser: that is a dependency |
 | Tokens are byte copies | Not yet. Token-copy test, `PLAN.md` §Backlog |

@@ -1,6 +1,7 @@
 /**
- * The only file in the app that reads `process.env`, enforced by a lint rule
- * (`eslint.config.mjs`).
+ * The only file in the app that reads `process.env`, bar its server-side
+ * counterpart `src/server/env.ts`, which reads the route handlers' secrets;
+ * enforced by a lint rule (`eslint.config.mjs`).
  *
  * Two Next.js rules shape this file. Only a variable prefixed `NEXT_PUBLIC_` is
  * available in the browser at all, and only a *literal*
