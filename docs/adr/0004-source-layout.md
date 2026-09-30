@@ -18,7 +18,8 @@ the rules there. The parts that are decisions rather than defaults:
    `letan/`.
 3. **Shared code lives in five fixed directories** — `api/`, `session/`, `shell/`, `ui/`,
    `design-system/` — plus `data/` for copy and `styles/tokens/` for the byte-copied tokens.
-   Features import them; they never import a feature.
+   Features import them; they never import a feature. ADR 0005 adds a sixth, `src/server/`,
+   for code that runs only in a route handler; only `src/app/` imports it.
 4. **Import direction is `app → features → {shell, session} → {ui, design-system, api,
    data}`,** and two feature directories never import each other. The only channels between
    tabs are `session.patchMe()` and `markSummaryStale()` from `shell/summary.ts`.

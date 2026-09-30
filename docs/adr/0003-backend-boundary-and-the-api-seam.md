@@ -32,7 +32,8 @@ the browser. It has no `pg`, no `DATABASE_URL`, no SQL, and no server-side data 
    is an httpOnly cookie the *browser* holds, and the mock implementations are
    localStorage-backed and cannot run on a server at all — a server-fetch design forks the
    two modes at exactly the layer that must not fork. There is no server-side secret here to
-   justify the hop.
+   justify the hop. The one exception is the unauthenticated `leads` group, which this app
+   receives itself and writes to a Google Sheet (ADR 0005).
 6. **The transport is same-origin `/api/v1` in development**, forwarded by a rewrite in
    `next.config.ts` to `API_PROXY_TARGET`, which is read there and never reaches the bundle.
    That removes CORS from development entirely. In production `NEXT_PUBLIC_API_BASE_URL` is
