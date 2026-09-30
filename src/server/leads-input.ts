@@ -1,22 +1,37 @@
-import { isValidCallbackNumber, normalizeCallbackNumber } from '@/api/phone'
-import type { LeadInput } from '@/api/contracts'
+import { isValidCallbackNumber, isValidEmail, normalizeCallbackNumber } from '@/api/phone'
+import type { HotlineLocation, HotlineReportInput, LeadInput } from '@/api/contracts'
 import type { FieldError } from '@/api/errors'
 
 /*
- * The contact form's body, checked again on the server (ADR 0005 point 5).
+ * The two marketing forms' bodies, checked again on the server (ADR 0005
+ * point 5).
  *
- * The rules are the form's own (`features/marketing/sections/lead-fields.ts`):
- * names trimmed and non-empty, the number one a person can be rung back on.
- * The length cap is the server's addition — the inputs are to carry the same
- * `maxLength`, so a visitor typing in the form never meets it. Anything the
- * browser did not check is treated as if it had not: a non-string is missing.
+ * The rules are the forms' own (`features/marketing/sections/lead-fields.ts`,
+ * `features/marketing/hotline/report-fields.ts`): text trimmed and non-empty,
+ * an email that looks like one, a number a person can be rung back on, 1–20
+ * locations. The length caps are the server's addition — the inputs are to
+ * carry the same `maxLength`, so a visitor typing in the form never meets
+ * them. Anything the browser did not check is treated as if it had not: a
+ * non-string is missing.
  */
 
 /** The longest clinic or contact name accepted, in UTF-16 units — what `maxLength` counts. */
 export const MAX_NAME_LENGTH = 200
 
+/** The longest address an email can have (RFC 5321's path limit, less the brackets). */
+export const MAX_EMAIL_LENGTH = 254
+
+export const MAX_ADDRESS_LENGTH = 500
+
+/** The form's own ceiling (`MAX_LOCATIONS` in `report-fields.ts`). */
+export const MAX_LOCATIONS = 20
+
 export type LeadParse =
   | { ok: true; lead: LeadInput }
+  | { ok: false; errors: FieldError[] }
+
+export type HotlineReportParse =
+  | { ok: true; report: HotlineReportInput }
   | { ok: false; errors: FieldError[] }
 
 type Fields = Record<string, unknown>
@@ -29,16 +44,26 @@ function trimmedText(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
 }
 
-function nameError(field: 'clinic_name' | 'contact_name', name: string): FieldError | null {
-  if (!name) return { field, code: 'required' }
-  if (name.length > MAX_NAME_LENGTH) return { field, code: 'too_long' }
+/** `required` when empty, `too_long` past `max`. */
+function textError(field: string, text: string, max: number): FieldError | null {
+  if (!text) return { field, code: 'required' }
+  if (text.length > max) return { field, code: 'too_long' }
   return null
 }
 
-function phoneError(phone: string): FieldError | null {
-  if (!phone) return { field: 'phone', code: 'required' }
-  if (!isValidCallbackNumber(phone)) return { field: 'phone', code: 'invalid_phone' }
+function nameError(field: 'clinic_name' | 'contact_name', name: string): FieldError | null {
+  return textError(field, name, MAX_NAME_LENGTH)
+}
+
+function phoneError(phone: string, field = 'phone'): FieldError | null {
+  if (!phone) return { field, code: 'required' }
+  if (!isValidCallbackNumber(phone)) return { field, code: 'invalid_phone' }
   return null
+}
+
+/** Length before shape, so an oversized string is refused for its size. */
+function emailError(email: string): FieldError | null {
+  return textError('email', email, MAX_EMAIL_LENGTH) ?? (isValidEmail(email) ? null : { field: 'email', code: 'invalid_email' })
 }
 
 /**
@@ -60,4 +85,47 @@ export function parseLead(body: unknown): LeadParse {
   if (errors.length > 0) return { ok: false, errors }
 
   return { ok: true, lead: { clinic_name, contact_name, phone: normalizeCallbackNumber(phone) } }
+}
+
+/** One location, checked under its `locations.<i>` path; an entry that is not an object has neither part. */
+function parseLocation(entry: unknown, index: number): { location: HotlineLocation; errors: FieldError[] } {
+  const fields: Fields = isPlainObject(entry) ? entry : {}
+  const address = trimmedText(fields.address)
+  const phone = trimmedText(fields.phone)
+  const errors = [
+    textError(`locations.${String(index)}.address`, address, MAX_ADDRESS_LENGTH),
+    phoneError(phone, `locations.${String(index)}.phone`),
+  ].filter((error) => error !== null)
+  return { location: { address, phone: normalizeCallbackNumber(phone) }, errors }
+}
+
+/**
+ * The report request to store, or every field that is wrong, in form order:
+ * the person, then each location's address and phone, location by location.
+ * A list that is missing, empty or longer than the form allows is one error on
+ * `locations`, and its rows are not checked. `source` and any other key are
+ * ignored, as for `parseLead`.
+ */
+export function parseHotlineReport(body: unknown): HotlineReportParse {
+  const fields: Fields = isPlainObject(body) ? body : {}
+  const contact_name = trimmedText(fields.contact_name)
+  const email = trimmedText(fields.email)
+  const clinic_name = trimmedText(fields.clinic_name)
+  const entries: unknown[] = Array.isArray(fields.locations) ? fields.locations : []
+
+  let listError: FieldError | null = null
+  if (entries.length === 0) listError = { field: 'locations', code: 'required' }
+  else if (entries.length > MAX_LOCATIONS) listError = { field: 'locations', code: 'too_long' }
+  const locations = listError === null ? entries.map(parseLocation) : []
+
+  const errors = [
+    nameError('contact_name', contact_name),
+    emailError(email),
+    nameError('clinic_name', clinic_name),
+    listError,
+    ...locations.flatMap((parsed) => parsed.errors),
+  ].filter((error) => error !== null)
+  if (errors.length > 0) return { ok: false, errors }
+
+  return { ok: true, report: { contact_name, email, clinic_name, locations: locations.map((parsed) => parsed.location) } }
 }

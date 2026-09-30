@@ -37,6 +37,7 @@ src/
     global-error.tsx            'use client', plain HTML, Vietnamese: runs when the root layout itself failed  [backlog]
     api/healthz/route.ts        Liveness of this server. Build SHA added at F7
     api/leads/route.ts          POST /api/leads: the contact form, appended to a Google Sheet (ADR 0005)
+    api/leads/hotline-report/route.ts   POST /api/leads/hotline-report: one row per location
     (marketing)/                F4. layout (header, footer, the call demo's provider), page, cham-diem-hotline/page.tsx (static, the hotline report), error.tsx
     (auth)/                     layout (AuthShell, F1b), dang-nhap/, dang-ky/ (F1b), error.tsx [backlog]
     app/                        layout: RequireSession → AppShell (→ ConfigProvider, F3). error.tsx [backlog]
@@ -60,7 +61,7 @@ src/
   server/                       Code that runs only in a route handler (ADR 0005). Only src/app/ imports it
     env.ts                      The three Google variables, read per request. The only file here that reads process.env
     leads-input.ts (+test)      Checks a posted body again, with the forms' own rules
-    lead-rows.ts (+test)        A checked lead as a spreadsheet row, stamped in Vietnam time
+    lead-rows.ts (+test)        A checked lead as a spreadsheet row, a hotline report as one row per location, stamped in Vietnam time
     google-jwt.ts (+test)       The signed assertion a service account trades for an access token
     google-token.ts             The exchange, and the token kept while the instance is warm
     sheets.ts                   appendRows: one call to spreadsheets.values.append
