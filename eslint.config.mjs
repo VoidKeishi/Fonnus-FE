@@ -33,6 +33,15 @@ const NO_APP_LAYER = 'A shared directory never imports a feature, api/, session/
 const NO_FEATURE_FROM_FRAME = 'session/ and shell/ never import a feature (docs/architecture.md §2.1): a tab changes the frame through session.patchMe() or markSummaryStale().';
 const MARKETING_STAYS_SERVER = "The landing page never imports ui/, session/ or shell/ (docs/architecture.md §2.1): they pull the app's client kit into a server-rendered page.";
 const API_IMPORTS_ITSELF = 'api/ imports nothing outside itself (docs/architecture.md §2.1): the other direction is the cycle session → api → session.';
+const SERVER_ONLY_FROM_APP = 'Only src/app/ imports server/ (ADR 0005 point 4): it holds the route handlers\' secrets, and everything else can end up in the browser.';
+const SERVER_IMPORTS_LITTLE = 'server/ imports only itself, @/api/phone, @/api/contracts, @/api/errors and node: built-ins (ADR 0005 point 4): anything more pulls browser code into a route handler.';
+
+// Added to every fenced layer's own list, because a second object over the
+// same files would replace that list rather than join it.
+const NO_SERVER = [
+  ['^@/server(/|$)', SERVER_ONLY_FROM_APP],
+  ['^(\\.\\./)+server(/|$)', SERVER_ONLY_FROM_APP],
+];
 
 function restrictImports(files, patterns) {
   return {
@@ -59,8 +68,19 @@ function featureRules(feature) {
             ['^(\\.\\./)+(ui|session|shell)(/|$)', MARKETING_STAYS_SERVER],
           ]
         : []),
+      ...NO_SERVER,
     ],
   );
+}
+
+// A bare specifier is a package: server/ may name only node: built-ins and the
+// packages listed, such as the `server-only` marker Next.js resolves itself.
+function serverRules(files, packages) {
+  return restrictImports(files, [
+    ['^@/(?!api/(phone|contracts|errors)$)', SERVER_IMPORTS_LITTLE],
+    ['^(\\.\\./)+(features|session|shell|ui|design-system|data|app|styles|api)(/|$)', SERVER_IMPORTS_LITTLE],
+    [`^(?!\\.|@/|node:|(${packages})$)`, SERVER_IMPORTS_LITTLE],
+  ]);
 }
 
 const importDirectionRules = [
@@ -70,6 +90,7 @@ const importDirectionRules = [
     [
       ['^@/(features|session|shell|api)(/|$)', NO_APP_LAYER],
       ['^(\\.\\./)+(features|session|shell|api)(/|$)', NO_APP_LAYER],
+      ...NO_SERVER,
     ],
   ),
   restrictImports(
@@ -77,6 +98,7 @@ const importDirectionRules = [
     [
       ['^@/features(/|$)', NO_FEATURE_FROM_FRAME],
       ['^(\\.\\./)+features(/|$)', NO_FEATURE_FROM_FRAME],
+      ...NO_SERVER,
     ],
   ),
   restrictImports(
@@ -84,10 +106,15 @@ const importDirectionRules = [
     [
       // Only a path that climbs out of api/ is forbidden, so a future
       // api/contracts/<group>.ts may still import ../errors (architecture §2.3).
-      ['^(\\.\\./)+(features|session|shell|ui|design-system|data|app|styles)(/|$)', API_IMPORTS_ITSELF],
+      // `@/server` is already caught by the second pattern.
+      ['^(\\.\\./)+(features|session|shell|ui|design-system|data|app|styles|server)(/|$)', API_IMPORTS_ITSELF],
       ['^@/(?!api(/|$))', API_IMPORTS_ITSELF],
     ],
   ),
+  restrictImports(['src/data/**'], NO_SERVER),
+  serverRules(['src/server/**'], 'server-only'),
+  // Later, so it replaces the object above for the tests, which also need vitest.
+  serverRules(['src/server/**/*.test.ts'], 'server-only|vitest'),
 ];
 
 export default tseslint.config(
@@ -118,19 +145,20 @@ export default tseslint.config(
     },
   },
   {
-    // CLAUDE.md §Ground rules: one file reads the environment. Enforced here so
-    // a new `process.env.X` fails lint instead of quietly bypassing
+    // CLAUDE.md §Ground rules: one file reads the environment, and one more
+    // reads the route handlers' secrets (ADR 0005 point 8). Enforced here so a
+    // new `process.env.X` fails lint instead of quietly bypassing
     // `src/api/env.ts` — the same gate the pipeline puts on `app/src/config/`.
     // It also protects a Next.js-specific trap: only a literal
     // `process.env.NEXT_PUBLIC_X` is inlined into the client bundle, so a value
     // read through a computed key is `undefined` in the browser and defined on
     // the server, which is the worst kind of bug to find later.
     files: ['src/**/*.ts', 'src/**/*.tsx'],
-    ignores: ['src/api/env.ts'],
+    ignores: ['src/api/env.ts', 'src/server/env.ts'],
     rules: {
       'no-restricted-properties': [
         'error',
-        { object: 'process', property: 'env', message: 'only src/api/env.ts reads process.env' },
+        { object: 'process', property: 'env', message: 'only src/api/env.ts and src/server/env.ts read process.env' },
       ],
     },
   },
