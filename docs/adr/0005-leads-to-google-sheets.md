@@ -31,7 +31,10 @@ handler runs as a Node.js function and the project can hold a secret.
    may import the pure rules in `src/api/phone.ts` and the types in `src/api/contracts.ts`.
 5. **The handler checks everything again**, with the same rules the forms use
    (`isValidCallbackNumber`, `isValidEmail`, non-empty trimmed text, 1–20 locations), plus a
-   length cap per field and a cap on the body size. A refusal is a `422` in the shape §6
+   length cap per field and a cap on the body size. A body whose `Content-Type` is not
+   `application/json` is refused with `415`: a `text/plain` POST needs no CORS preflight, so
+   without this any other site could make a visitor's browser append a row from that
+   visitor's own IP, which a per-IP rate limit cannot count. A refusal is a `422` in the shape §6
    already specifies, with one new code, `too_long`. The inputs carry a matching
    `maxLength`, so a visitor typing in the form never meets it.
 6. **Google access is a service account and the Sheets API, with no new dependency.** The
