@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ChangeEvent } from 'react'
 import Link from 'next/link'
-import { api, isCanceled } from '@/api'
+import { MAX_NAME_LENGTH, api, isCanceled } from '@/api'
 import type { LeadInput } from '@/api'
 import { Button, Icon, Input } from '@/design-system'
 import { CONTACT } from '@/data/content'
@@ -149,6 +149,8 @@ export function ContactForm() {
         label="Tên phòng khám"
         placeholder="Nha khoa Minh Anh"
         autoComplete="organization"
+        // The server's cap, so a pasted name is cut here rather than refused there.
+        maxLength={MAX_NAME_LENGTH}
         value={fields.clinic_name}
         onChange={edit('clinic_name')}
         error={errors.clinic_name}
@@ -158,6 +160,7 @@ export function ContactForm() {
         label="Tên bạn"
         placeholder="Nguyễn Minh Anh"
         autoComplete="name"
+        maxLength={MAX_NAME_LENGTH}
         value={fields.contact_name}
         onChange={edit('contact_name')}
         error={errors.contact_name}

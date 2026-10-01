@@ -1,3 +1,4 @@
+import { MAX_ADDRESS_LENGTH, MAX_EMAIL_LENGTH, MAX_LOCATIONS, MAX_NAME_LENGTH } from '@/api/lead-limits'
 import { isValidCallbackNumber, isValidEmail, normalizeCallbackNumber } from '@/api/phone'
 import type { HotlineLocation, HotlineReportInput, LeadInput } from '@/api/contracts'
 import type { FieldError } from '@/api/errors'
@@ -9,22 +10,13 @@ import type { FieldError } from '@/api/errors'
  * The rules are the forms' own (`features/marketing/sections/lead-fields.ts`,
  * `features/marketing/hotline/report-fields.ts`): text trimmed and non-empty,
  * an email that looks like one, a number a person can be rung back on, 1–20
- * locations. The length caps are the server's addition — the inputs are to
- * carry the same `maxLength`, so a visitor typing in the form never meets
- * them. Anything the browser did not check is treated as if it had not: a
- * non-string is missing.
+ * locations. The length caps are the server's addition, read from the same
+ * `@/api/lead-limits` the inputs take their `maxLength` from, so a visitor
+ * typing in the form never meets them. Anything the browser did not check is
+ * treated as if it had not: a non-string is missing.
  */
 
-/** The longest clinic or contact name accepted, in UTF-16 units — what `maxLength` counts. */
-export const MAX_NAME_LENGTH = 200
-
-/** The longest address an email can have (RFC 5321's path limit, less the brackets). */
-export const MAX_EMAIL_LENGTH = 254
-
-export const MAX_ADDRESS_LENGTH = 500
-
-/** The form's own ceiling (`MAX_LOCATIONS` in `report-fields.ts`). */
-export const MAX_LOCATIONS = 20
+export { MAX_ADDRESS_LENGTH, MAX_EMAIL_LENGTH, MAX_LOCATIONS, MAX_NAME_LENGTH }
 
 export type LeadParse =
   | { ok: true; lead: LeadInput }

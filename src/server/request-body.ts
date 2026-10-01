@@ -5,13 +5,14 @@
  */
 
 /**
- * Sized by the larger form. The contact form fits in far less; the fullest
- * hotline report the checks allow — 20 locations with 500-character addresses
- * of three-byte letters, two 200-character names, a 254-character email — is
- * about 32.3 KB of compact JSON, just under this. Anything larger is not
- * either form. Raising a length cap in `leads-input.ts` means checking this.
+ * Sized from the caps in `src/api/lead-limits.ts`, by the larger form. The
+ * contact form fits in far less; the fullest hotline report those caps allow —
+ * 20 locations with 500-character addresses, two 200-character names, a
+ * 254-character email, every character three bytes — is about 33 KB of compact
+ * JSON. 48 KiB leaves room above that without letting a large body through.
+ * Raising a cap there means rechecking this.
  */
-export const MAX_BODY_BYTES = 32 * 1024
+export const MAX_BODY_BYTES = 48 * 1024
 
 /**
  * Whether the `Content-Type` names JSON, parameters such as `charset` aside.

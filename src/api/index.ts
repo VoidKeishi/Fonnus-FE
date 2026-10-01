@@ -51,4 +51,5 @@ export {
   phoneError,
 } from './phone';
 export { stashPhone, takePhone } from './sign-up-handoff';
+export { MAX_ADDRESS_LENGTH, MAX_EMAIL_LENGTH, MAX_LOCATIONS, MAX_NAME_LENGTH } from './lead-limits';
 export * from './contracts';

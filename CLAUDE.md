@@ -3,7 +3,8 @@
 The customer-facing frontend of Fonnus, the AI voice receptionist for Vietnamese clinics:
 the landing page, sign-up and sign-in, and the signed-in app where a clinic owner configures
 their receptionist and reads its call history. It owns no data — everything comes from
-`../Fonnus-BE` over HTTP. Product and constraints: `CONTEXT.md`.
+`../Fonnus-BE` over HTTP, except the two marketing forms, which this app receives itself and
+appends to a Google Sheet (ADR 0005). Product and constraints: `CONTEXT.md`.
 
 Three sibling repositories, each of which must exist beside this one for a `../X/…` pointer
 to resolve:
@@ -66,7 +67,10 @@ before code.
   (`../Fonnus/docs/adr/0013-repo-boundaries.md`).
 - **Only `src/api/env.ts` reads `process.env`,** enforced by a lint rule. Next.js inlines
   only a *literal* `process.env.NEXT_PUBLIC_X`; read through a computed key it is
-  `undefined` in the browser and defined on the server.
+  `undefined` in the browser and defined on the server. The one other reader is
+  `src/server/env.ts`, for the Google secret of the lead route handlers.
+- **`src/server/` runs only in a route handler, and only `src/app/` imports it** (ADR 0005).
+  It holds the one secret this app has; nothing in it may be reachable from a component.
 - **No hex in a component.** Only the alias tokens (`--surface-card`, `--text-muted`,
   `--action-primary`, …) or their Tailwind names. Token files under `src/styles/tokens/` are
   copies: a change there is a re-copy of the whole file, never an edit (ADR 0002).

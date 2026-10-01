@@ -34,7 +34,7 @@ const NO_FEATURE_FROM_FRAME = 'session/ and shell/ never import a feature (docs/
 const MARKETING_STAYS_SERVER = "The landing page never imports ui/, session/ or shell/ (docs/architecture.md §2.1): they pull the app's client kit into a server-rendered page.";
 const API_IMPORTS_ITSELF = 'api/ imports nothing outside itself (docs/architecture.md §2.1): the other direction is the cycle session → api → session.';
 const SERVER_ONLY_FROM_APP = 'Only src/app/ imports server/ (ADR 0005 point 4): it holds the route handlers\' secrets, and everything else can end up in the browser.';
-const SERVER_IMPORTS_LITTLE = 'server/ imports only itself, @/api/phone, @/api/contracts, @/api/errors and node: built-ins (ADR 0005 point 4): anything more pulls browser code into a route handler.';
+const SERVER_IMPORTS_LITTLE = 'server/ imports only itself, @/api/phone, @/api/contracts, @/api/errors, @/api/lead-limits and node: built-ins (ADR 0005 point 4): anything more pulls browser code into a route handler.';
 
 // Added to every fenced layer's own list, because a second object over the
 // same files would replace that list rather than join it.
@@ -77,7 +77,7 @@ function featureRules(feature) {
 // packages listed, such as the `server-only` marker Next.js resolves itself.
 function serverRules(files, packages) {
   return restrictImports(files, [
-    ['^@/(?!api/(phone|contracts|errors)$)', SERVER_IMPORTS_LITTLE],
+    ['^@/(?!api/(phone|contracts|errors|lead-limits)$)', SERVER_IMPORTS_LITTLE],
     ['^(\\.\\./)+(features|session|shell|ui|design-system|data|app|styles|api)(/|$)', SERVER_IMPORTS_LITTLE],
     [`^(?!\\.|@/|node:|(${packages})$)`, SERVER_IMPORTS_LITTLE],
   ]);

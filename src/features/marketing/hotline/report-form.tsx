@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import type { ChangeEvent } from 'react'
-import { api, isCanceled } from '@/api'
+import { MAX_ADDRESS_LENGTH, MAX_EMAIL_LENGTH, MAX_NAME_LENGTH, api, isCanceled } from '@/api'
 import { Button, Icon, Input } from '@/design-system'
 import { sendErrorFrom } from '../sections/lead-fields'
 import { AddButton, IconButton } from './list-buttons'
@@ -226,13 +226,21 @@ function ReportForm({ focusOnMount, onSent }: { focusOnMount: boolean; onSent: (
       }}
     >
       <div className={`${PAIR} grid-cols-[minmax(0,1fr)_minmax(0,1fr)]`}>
-        <Input label="Họ và tên" placeholder="Nguyễn Minh Anh" autoComplete="name" {...personInput('contact_name')} />
+        {/* Each text cap is the server's (`@/api/lead-limits`), so a pasted value is cut here rather than refused there. */}
+        <Input
+          label="Họ và tên"
+          placeholder="Nguyễn Minh Anh"
+          autoComplete="name"
+          maxLength={MAX_NAME_LENGTH}
+          {...personInput('contact_name')}
+        />
         <Input
           label="Email công việc"
           placeholder="ten@phongkham.vn"
           type="email"
           inputMode="email"
           autoComplete="email"
+          maxLength={MAX_EMAIL_LENGTH}
           {...personInput('email')}
         />
       </div>
@@ -241,6 +249,7 @@ function ReportForm({ focusOnMount, onSent }: { focusOnMount: boolean; onSent: (
         label="Tên phòng khám hoặc chuỗi phòng khám"
         placeholder="Nha khoa Minh Anh"
         autoComplete="organization"
+        maxLength={MAX_NAME_LENGTH}
         {...personInput('clinic_name')}
       />
 
@@ -331,6 +340,7 @@ function LocationEntry({ row, ordinal, canRemove, onRemove, field }: LocationEnt
           placeholder="12 Nguyễn Trãi, Quận 1, TP.HCM"
           // Off, so the browser does not offer the visitor's home address for a clinic.
           autoComplete="off"
+          maxLength={MAX_ADDRESS_LENGTH}
           {...field('address')}
         />
         <Input
