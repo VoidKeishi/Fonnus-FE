@@ -13,10 +13,10 @@ Status: ⬜ not started · 🔨 in progress · ✅ done, with the date.
 | **F2 · The app shell** — `/app` layout: 216px sidebar, icon rail at ≤900px, bottom tab bar on phones; the session and toast providers | 🔨 | The frame, the nav and the session gate are in place (`src/shell/`, `src/session/`); the toast provider and the readiness dot on Lễ tân are not. Everything under `/app` is client-rendered by design (CLAUDE.md) |
 | **F3 · Lễ tân** — the hub and the three tabs (Hồ sơ, Kiến thức, Kỹ năng), the shared section frame, the save stack, the try-out panel. Brings `src/features/receptionist/model.ts` and `docs/field-catalogue-mapping.md` into force | ⬜ | The largest single step: ~60 fields across 13 forms |
 | **F4 · Landing page** — the landing page at `/` and the "Chấm điểm hotline" page at `/cham-diem-hotline`, ported from `../Fonnus-Web-UI` in nine stacked pull requests: the marketing frame, the hero, the voice orb and its call demo, pricing, how it works, capabilities, FAQ with security and testimonials, the contact form against `POST /leads`, and the hotline page against `POST /leads/hotline-report` | ✅ | Server-rendered; this is the acquisition surface. The header always shows "Đăng nhập" and "Dùng thử miễn phí", as the prototype does, and reads no session. The call demo runs in the browser with no `voice` group until Q21 is answered. A nav or footer link appears only in the pull request that lands its section |
-| **F4b · Leads to a Google Sheet** — the contact form and the "Chấm điểm hotline" request stop waiting on `../Fonnus-BE`: this app receives them in two route handlers and appends them to a Google Sheet (ADR 0005). Four stacked pull requests: the decision, `POST /api/leads`, `POST /api/leads/hotline-report`, then both forms switched to them | 🔨 | The decision is recorded; no code yet. The forms stay on the mock until the last pull request, because `leads` goes live for both at once. The first real append needs the owner's Google service account and spreadsheet, and settles the three assumptions ADR 0005 lists |
+| **F4b · Leads to a Google Sheet** — the contact form and the "Chấm điểm hotline" request stop waiting on `../Fonnus-BE`: this app receives them in two route handlers and appends them to a Google Sheet (ADR 0005). Four stacked pull requests: the decision, `POST /api/leads`, `POST /api/leads/hotline-report`, then both forms switched to them | ✅ 2026-09-30 | Built and gated by typecheck, lint, test and build only: no request has reached a real sheet yet. `NEXT_PUBLIC_API_LIVE_GROUPS=leads` turns both forms live at once. What remains is the owner's setup and the first live append; see Backlog |
 | **F5 · Cuộc gọi** — the clinic's own call history | ⬜ | Blocked: `GET /calls` is "specified later" in `docs/api-contract.md` §7 and has no agreed shape |
 | **F6 · Lịch hẹn, Số điện thoại, Cài đặt** | ⬜ | |
-| **F7 · Deployment** — an ADR on where this runs, then the container, the proxy and CI | ⬜ | Deliberately undecided: this is a public site and Fonnus-Admin's posture (same VPS as the pipeline, behind basic auth) does not transfer. `output: 'standalone'` in `next.config.ts` (as Fonnus-Admin) and the build SHA on `/api/healthz` wait here: both are deployment posture, not layout |
+| **F7 · Deployment** — an ADR on how this runs on Vercel: the domain, the environments, CI, and the cookie posture towards Fonnus-BE | ⬜ | The host is Vercel (the owner's choice, and the premise of ADR 0005); everything else is undecided. The build SHA on `/api/healthz` waits here |
 
 ## Waiting on ../Fonnus-BE
 
@@ -31,11 +31,11 @@ row are in `docs/open-questions.md`; the shapes are in `docs/api-contract.md`.
 | `knowledge` | `POST`/`DELETE /tenant/knowledge-files` | Knowledge file upload in F3 | ⬜ Not declared yet |
 | `voice` | `POST /tts/preview` | Hearing the receptionist speak | ⬜ Not declared yet |
 | `receptionist` | `POST /receptionist/preview` | The try-out panel in F3 | ⬜ Not declared yet |
-| `leads` | `POST /leads`, `POST /leads/hotline-report` | The landing page contact form and the "Chấm điểm hotline" request in F4 | ⬜ Declared in `src/api/contracts.ts`, mocked |
 | `calls` | `GET /calls` | F5 | ⬜ Shape not specified — `api-contract.md` §7 |
 
 A group is declared in `src/api/contracts.ts` when the screen that calls it is built, not
-before (ADR 0003).
+before (ADR 0003). The `leads` group is not in this table: this app implements it itself
+(ADR 0005).
 
 ## Decisions the user still owes
 
@@ -50,8 +50,9 @@ Each blocks nothing today and has a default that applies if nothing is said.
    the written contract. **Recommendation: two subdomains**, which is what the contract
    already says; development uses the rewrite either way. **Default if undecided:** the
    subdomain posture stands as written in ADR 0003.
-2. **Where Fonnus-FE is deployed** — see roadmap row F7. **Default if undecided:** nothing
-   is decided and `CONTEXT.md` §Deployment keeps saying so.
+2. **How Fonnus-FE runs on Vercel** — the host is chosen; the domain, the environments and
+   CI are not. See roadmap row F7. **Default if undecided:** `CONTEXT.md` §Deployment keeps
+   saying what is open.
 3. **Whether Cài đặt is a sidebar destination.** The prototype keeps it out of the nav list:
    on a wide screen it sits under the user block at the bottom of the sidebar, beside sign
    out, and on a phone it is reached through "Thêm". This repo's `src/shell/nav.ts` lists it
@@ -63,7 +64,35 @@ Each blocks nothing today and has a default that applies if nothing is said.
    when F6 builds Cài đặt, so the placement and the screen land together. **Default if
    undecided:** the prototype's placement, since it is the design authority.
 
+4. **Whether a contact's name, phone and email may sit in Google Sheets.** The two marketing
+   forms store them there (ADR 0005). If that counts as a cross-border transfer of personal
+   data under PDPL (Law 91/2025/QH15) and Decree 356/2025/ND-CP, it may need a filing or a
+   line of consent on the forms; nobody with legal standing has answered. Keeping the sheet
+   costs nothing to build and leaves the question open; moving the rows to Fonnus-BE's own
+   database removes the question at the cost of waiting for that server.
+   **Recommendation: ask before the forms go live on the public site.** **Default if
+   undecided:** the forms stay as built and this stays open.
+5. **Which Google account owns the lead sheet.** It is a personal Gmail account for now, by
+   the owner's call. A company account removes the dependence on one person, at the cost of
+   a redeploy with a new key and, if that account's organization forbids service account
+   keys, a change of credential (ADR 0005 §Revisit). **Default if undecided:** the personal
+   account stays.
+
 ## Backlog
+
+- **The first live append of the lead forms** (owner's setup, then S): create the Google
+  Cloud project, the service account key and the two-tab spreadsheet as `README.md` lists,
+  put the rate limit on `/api/leads*` in the Vercel Firewall, set the three variables, then
+  send each form once with `NEXT_PUBLIC_API_LIVE_GROUPS=leads`. That run settles what ADR
+  0005 still assumes: that sharing the sheet with the service account lets it append, that a
+  personal Google account can create the key, and that a private key pasted with literal
+  `\n` is accepted. It is also the first time either endpoint answers a real request; until
+  then the `415`, `413`, `422`, `503` and `429` answers are verified by reading and by unit
+  tests only.
+- **A late append can duplicate a lead** (S, only if it happens): when Google accepts a row
+  after the handler's 12-second deadline, the visitor is told the send failed and may send
+  again. The `request_id` column makes duplicates of a hotline report visible; the contact
+  tab has none.
 
 Layout items are the gap between today's tree and `docs/architecture.md` (ADR 0004); the
 ones sized S landed with the ADR on 2026-09-17.

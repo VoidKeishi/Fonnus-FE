@@ -86,7 +86,10 @@ export interface AuthApi {
 // Leads
 // ---------------------------------------------------------------------------
 
-/** The landing page's contact form: who to ring back, and at which clinic. */
+/**
+ * The landing page's contact form: who to ring back, and at which clinic.
+ * Both names at most `MAX_NAME_LENGTH` (`./lead-limits`) once trimmed.
+ */
 export interface LeadInput {
   clinic_name: string;
   contact_name: string;
@@ -100,26 +103,35 @@ export interface LeadInput {
 
 /** One clinic site to ring: where it is, and the number patients call. */
 export interface HotlineLocation {
+  /** At most `MAX_ADDRESS_LENGTH` (`./lead-limits`) once trimmed. */
   address: string;
   /** National form, digits only, as `LeadInput.phone`: `02838221234`, `0901234567`, `19001234`. */
   phone: string;
 }
 
-/** The "Chấm điểm hotline" page: who asks, where the report goes, which numbers to ring. */
+/**
+ * The "Chấm điểm hotline" page: who asks, where the report goes, which numbers
+ * to ring. Caps from `./lead-limits`, measured on the trimmed text.
+ */
 export interface HotlineReportInput {
+  /** At most `MAX_NAME_LENGTH`. */
   contact_name: string;
-  /** Where the report is sent. */
+  /** Where the report is sent. At most `MAX_EMAIL_LENGTH`. */
   email: string;
-  /** A clinic, or the chain that owns several. */
+  /** A clinic, or the chain that owns several. At most `MAX_NAME_LENGTH`. */
   clinic_name: string;
-  /** At least one, at most 20. */
+  /** At least one, at most `MAX_LOCATIONS` (20). */
   locations: HotlineLocation[];
 }
 
+/**
+ * Received by this app's own route handlers, not Fonnus-BE (ADR 0005): the
+ * paths are on this origin, outside `/api/v1`.
+ */
 export interface LeadsApi {
-  /** `POST /leads`. Unauthenticated: the landing page's contact form. */
+  /** `POST /api/leads`. Unauthenticated: the landing page's contact form. */
   submit(input: LeadInput, opts?: Signal): Promise<void>;
-  /** `POST /leads/hotline-report`. Unauthenticated: the "Chấm điểm hotline" page. */
+  /** `POST /api/leads/hotline-report`. Unauthenticated: the "Chấm điểm hotline" page. */
   requestHotlineReport(input: HotlineReportInput, opts?: Signal): Promise<void>;
 }
 
