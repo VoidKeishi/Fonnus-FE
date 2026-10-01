@@ -97,7 +97,7 @@ src/
   data/           Copy with no markup around it
   styles/tokens/  The design tokens, copied verbatim from ../Fonnus-Web-UI
 docs/             The API contract, the field catalogue mapping, the UI rules, the ADRs
-public/           Logo assets and the greeting clip the landing page plays
+public/           Logo assets, the greeting clip and the three sample-call recordings the landing page plays
 ```
 
 The rules behind this tree — which directory imports which, how files are named, where a

@@ -2,13 +2,23 @@ import type { CallDemo, CallTurn } from '@/data/call-demos'
 
 /*
  * Everything a sample call shows at a given second, as pure functions of the
- * elapsed time. The player keeps one number — how far into the call it is —
- * and draws the rest from it in render.
+ * elapsed time. The player keeps one number — how far into the call it is,
+ * read off the recording or, when that will not play, a timer — and draws the
+ * rest from it in render.
  */
 
 /** Seconds into the call at `nowMs`, for a clock started at `startedAtMs` from `from` seconds in; never past the end. */
 export function elapsedSince(demo: CallDemo, from: number, startedAtMs: number, nowMs: number): number {
   return Math.min(demo.duration, from + (nowMs - startedAtMs) / 1000)
+}
+
+/**
+ * Seconds into the call while its recording is the clock. An ended recording
+ * reads as the whole call, so the call counts as finished however far the
+ * decoder's last frame lands from `duration`; until then, never past the end.
+ */
+export function elapsedOnRecording(demo: CallDemo, position: number, ended: boolean): number {
+  return ended ? demo.duration : Math.min(demo.duration, position)
 }
 
 /** Share of the call already played, 0 to 1. */
