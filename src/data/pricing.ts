@@ -1,7 +1,12 @@
 /**
- * The plans and the comparison table the landing page's "Bảng giá" shows,
- * copied from ../Fonnus-Web-UI/src/data/pricing.ts. Prices are display strings,
- * already written the Vietnamese way (`2.500.000`); nothing computes with them.
+ * The plans and the comparison table the landing page's "Bảng giá" shows.
+ * The shape is ported from ../Fonnus-Web-UI/src/data/pricing.ts; the prices,
+ * minutes and overage rate are the product owner's, set after the port. Prices
+ * are display strings, already written the Vietnamese way (`4.275.000`);
+ * nothing computes with them, so a price change touches every string below.
+ *
+ * Paying yearly is the monthly price less exactly 15%, deliberately not
+ * rounded (`3.633.750`); "thanh toán một lần" is twelve of those.
  */
 export type PlanName = 'Dùng thử' | 'Cơ bản' | 'Tiêu chuẩn' | 'Nâng cao'
 
@@ -28,19 +33,19 @@ export const PLANS: Plan[] = [
     blurb: 'Nghe thử trên số thật, 14 ngày',
     freeLabel: 'Miễn phí',
     freeNote: 'không cần thẻ, dừng khi hết phút',
-    features: ['100 phút dùng thử', '1 số máy', '1 cuộc gọi cùng lúc', '1 giọng nói'],
+    features: ['20 phút dùng thử', '1 số máy', '1 cuộc gọi cùng lúc', '1 giọng nói'],
     cta: 'Dùng thử',
   },
   {
     name: 'Cơ bản',
     blurb: 'Một phòng khám, một số máy chính',
-    price: { monthly: '2.500.000', annual: '2.125.000' },
+    price: { monthly: '900.000', annual: '765.000' },
     note: {
-      monthly: 'hoặc trả năm 2.125.000 đ/tháng',
-      annual: 'thanh toán một lần 25.500.000 đ',
+      monthly: 'hoặc trả năm 765.000 đ/tháng',
+      annual: 'thanh toán một lần 9.180.000 đ',
     },
     features: [
-      '1.000 phút mỗi tháng',
+      '200 phút mỗi tháng',
       'Vượt gói 3.000 đ/phút',
       '2 số máy · 2 cuộc gọi cùng lúc',
       'Sổ lịch và kho kiến thức tự học',
@@ -50,14 +55,14 @@ export const PLANS: Plan[] = [
   {
     name: 'Tiêu chuẩn',
     blurb: 'Phòng khám 1–2 cơ sở',
-    price: { monthly: '4.900.000', annual: '4.165.000' },
+    price: { monthly: '4.275.000', annual: '3.633.750' },
     note: {
-      monthly: 'hoặc trả năm 4.165.000 đ/tháng',
-      annual: 'thanh toán một lần 49.980.000 đ',
+      monthly: 'hoặc trả năm 3.633.750 đ/tháng',
+      annual: 'thanh toán một lần 43.605.000 đ',
     },
     features: [
-      '2.500 phút mỗi tháng',
-      'Vượt gói 2.500 đ/phút',
+      '1.000 phút mỗi tháng',
+      'Vượt gói 3.000 đ/phút',
       '5 số máy · 10 cuộc gọi cùng lúc',
       'Giọng nói riêng',
       'Kết nối lịch',
@@ -69,14 +74,14 @@ export const PLANS: Plan[] = [
   {
     name: 'Nâng cao',
     blurb: 'Nhiều cơ sở, nhiều máy cùng đổ chuông',
-    price: { monthly: '9.900.000', annual: '8.415.000' },
+    price: { monthly: '8.100.000', annual: '6.885.000' },
     note: {
-      monthly: 'hoặc trả năm 8.415.000 đ/tháng',
-      annual: 'thanh toán một lần 100.980.000 đ',
+      monthly: 'hoặc trả năm 6.885.000 đ/tháng',
+      annual: 'thanh toán một lần 82.620.000 đ',
     },
     features: [
-      '6.000 phút mỗi tháng',
-      'Vượt gói 2.200 đ/phút',
+      '2.000 phút mỗi tháng',
+      'Vượt gói 3.000 đ/phút',
       '10 số máy · 25 cuộc gọi cùng lúc',
       'Quản lý tài khoản riêng',
     ],
@@ -90,9 +95,9 @@ export type MatrixRow =
 
 export const COMPARISON_MATRIX: MatrixRow[] = [
   { kind: 'group', label: 'Sử dụng' },
-  { kind: 'row', label: 'Số phút bao gồm', cells: ['100', '1.000', '2.500', '6.000'] },
-  { kind: 'row', label: 'Giá thực tế mỗi phút', cells: ['—', '2.500 đ', '1.960 đ', '1.650 đ'] },
-  { kind: 'row', label: 'Giá vượt phút', cells: ['Dừng', '3.000 đ', '2.500 đ', '2.200 đ'] },
+  { kind: 'row', label: 'Số phút bao gồm', cells: ['20', '200', '1.000', '2.000'] },
+  { kind: 'row', label: 'Giá thực tế mỗi phút', cells: ['—', '4.500 đ', '4.275 đ', '4.050 đ'] },
+  { kind: 'row', label: 'Giá vượt phút', cells: ['Dừng', '3.000 đ', '3.000 đ', '3.000 đ'] },
   { kind: 'row', label: 'Cuộc gọi cùng lúc', cells: ['1', '2', '10', '25'] },
   { kind: 'row', label: 'Số máy bao gồm', cells: ['1', '2', '5', '10'] },
   { kind: 'row', label: 'Thêm số máy, mỗi tháng', cells: ['—', '500.000 đ', '500.000 đ', '500.000 đ'] },
