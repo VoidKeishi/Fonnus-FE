@@ -11,8 +11,8 @@ import type { HotlineReportInput } from '@/api'
  * id, not its position, so a line stays on its row when a row above is removed.
  */
 
-/** A chain larger than this is a sales conversation, not a form. */
-export const MAX_LOCATIONS = 20
+/** A chain larger than this is a sales conversation, not a form. The server's ceiling too (`@/api/lead-limits`). */
+export { MAX_LOCATIONS } from '@/api'
 
 export type PersonField = 'contact_name' | 'email' | 'clinic_name'
 export type LocationPart = 'address' | 'phone'
