@@ -36,6 +36,15 @@ export interface RequestOptions {
    * an infinite loop on the first page load of a signed-out visitor.
    */
   expect401?: boolean
+  /**
+   * The path is this app's own, used as written instead of under
+   * `API_BASE_URL`.
+   *
+   * Set only by the `leads` group, which this app's route handlers receive
+   * (ADR 0005). In production `API_BASE_URL` is Fonnus-BE's origin, and the
+   * lead forms must not go there.
+   */
+  ownOrigin?: boolean
 }
 
 // ------------------------------------------------------------------ 401 hook
@@ -63,8 +72,13 @@ function fireUnauthorized(): void {
 
 // ------------------------------------------------------------------ helpers
 
-function buildUrl(path: string, query?: RequestOptions['query']): string {
-  const url = `${API_BASE_URL}${path.startsWith('/') ? path : `/${path}`}`
+/** Exported for its test. */
+export function buildUrl(
+  path: string,
+  { query, ownOrigin = false }: { query?: RequestOptions['query'] | undefined; ownOrigin?: boolean | undefined } = {},
+): string {
+  const absolute = path.startsWith('/') ? path : `/${path}`
+  const url = ownOrigin ? absolute : `${API_BASE_URL}${absolute}`
   if (!query) return url
   const params = new URLSearchParams()
   for (const [k, v] of Object.entries(query)) {
@@ -103,7 +117,7 @@ const isAbort = (e: unknown) => e instanceof DOMException && e.name === 'AbortEr
 
 export async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
   const { method = 'GET', body, query, timeoutMs = DEFAULT_TIMEOUT_MS, parse = 'json' } = opts
-  const url = buildUrl(path, query)
+  const url = buildUrl(path, { query, ownOrigin: opts.ownOrigin })
 
   const isForm = typeof FormData !== 'undefined' && body instanceof FormData
   const headers: Record<string, string> = { Accept: 'application/json', ...opts.headers }

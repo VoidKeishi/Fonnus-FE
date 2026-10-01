@@ -35,14 +35,14 @@ describe('isJsonMediaType', () => {
 })
 
 describe('readCappedText', () => {
-  it('accepts a body of exactly 32 KB', async () => {
-    expect(MAX_BODY_BYTES).toBe(32768)
-    const text = await readCappedText(streamOf(new Uint8Array(32768).fill(0x61)))
-    expect(text).toHaveLength(32768)
+  it('accepts a body of exactly 48 KiB', async () => {
+    expect(MAX_BODY_BYTES).toBe(49152)
+    const text = await readCappedText(streamOf(new Uint8Array(49152).fill(0x61)))
+    expect(text).toHaveLength(49152)
   })
 
   it('refuses one byte more, even when it arrives in a later chunk', async () => {
-    expect(await readCappedText(streamOf(new Uint8Array(32768).fill(0x61), new Uint8Array(1).fill(0x61)))).toBeNull()
+    expect(await readCappedText(streamOf(new Uint8Array(49152).fill(0x61), new Uint8Array(1).fill(0x61)))).toBeNull()
   })
 
   it('decodes a Vietnamese letter split across two chunks', async () => {

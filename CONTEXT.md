@@ -16,7 +16,9 @@ answers the phone for Vietnamese clinics. Three surfaces, one application:
    the calls it has answered, and manages their phone number and account.
 
 It owns no data. Everything it shows comes from `../Fonnus-BE` over HTTP (ADR 0003); the
-call pipeline itself is never contacted directly.
+call pipeline itself is never contacted directly. The one thing it receives itself is the
+two marketing forms, the contact request and the hotline report request, which it appends to
+a Google Sheet the team works from (ADR 0005).
 
 The design comes from `../Fonnus-Web-UI`, a complete Vite prototype of this same product.
 That repo is the absolute authority on how the product looks and behaves, and is now frozen:
@@ -83,11 +85,20 @@ here as `docs/context-field-catalogue.v1.md` and mapped in `docs/field-catalogue
   personal data. The app renders consent outcomes; it never decides them, and it never shows
   caller-derived text that consent did not cover.
 
-### Nothing here is secret
+### One secret, and it never reaches the browser
 
-Every `NEXT_PUBLIC_*` value is inlined into the JavaScript the browser downloads. The
-session is an httpOnly cookie the browser holds and this code never reads. `.env*` is
-gitignored; `.env.example` is the list of what exists.
+Every `NEXT_PUBLIC_*` value is inlined into the JavaScript the browser downloads, so none of
+them is a secret. The session is an httpOnly cookie the browser holds and this code never
+reads. The one secret is the Google service account key that lets the lead route handlers
+append to the sheet: it is a server-side variable of the host, read only in
+`src/server/env.ts` (ADR 0005). `.env*` is gitignored; `.env.example` is the list of what
+exists, with no values.
+
+### Personal data in the lead sheet
+
+The two marketing forms collect a contact's name, phone and email, and this app stores them
+in Google Sheets. Whether that is a cross-border transfer of personal data under PDPL is an
+open question with no answer yet; `PLAN.md` carries it.
 
 ### Look and feel
 
@@ -103,7 +114,7 @@ redesigning a screen, and add to it after.
 |---|---|---|
 | Framework | Next.js 16, App Router, React 19, TypeScript strict | Server-rendered marketing surface, client app behind it, one deployable |
 | Styling | Tailwind CSS v4 over copied design tokens | Same shape as `../Fonnus-Admin`, so a screen can move between the repos |
-| Data | `fetch` in the browser against Fonnus-BE, behind `src/api/` | No database, no server-side fetching, no backend-for-frontend (ADR 0003) |
+| Data | `fetch` in the browser against Fonnus-BE, behind `src/api/` | No database, no server-side fetching, no backend-for-frontend (ADR 0003). The exception is the two lead route handlers, which write to a Google Sheet (ADR 0005) |
 | Toolchain | pnpm 11, Node 22, ESLint flat config with `strictTypeChecked`, Vitest | Same as `../Fonnus/app` and `../Fonnus-Admin` |
 
 Three runtime dependencies: `next`, `react`, `react-dom`. The HTTP client, the error type,
@@ -111,7 +122,7 @@ the mock layer and the icons are hand-written.
 
 ## Deployment
 
-Not decided. Fonnus-Admin runs on the same VPS that answers the phone, behind Caddy with
-basic auth; this is a public site for customers and the security posture is different
-enough that it deserves its own decision. Nothing is deployable yet, so the decision waits
-for a later ADR. `PLAN.md` carries the row.
+The host is Vercel: the owner's choice, and the premise ADR 0005 rests on, because the lead
+route handlers run as functions there and the project holds the Google key. The rest is not
+decided: the domain, the environments, CI, and the cookie posture towards Fonnus-BE once it
+exists. Those wait for their own ADR; `PLAN.md` carries the row.

@@ -3,12 +3,14 @@
 What the web frontend expects from the backend. Written for a backend engineer who has never
 opened this repo.
 
-**Status: proposed, not implemented.** Nothing here exists yet on either side. This document
-lives in Fonnus-FE and Fonnus-FE is its authority until `../Fonnus-BE` implements it. The
-frontend runs against in-browser mocks (`NEXT_PUBLIC_API_MODE=mock`, the committed default) that implement
-exactly these signatures, so the shapes below are already exercised — but no HTTP request has
-ever been made. Treat this as a specification to agree on, not a description of a running
-system. Where a decision is genuinely open, it is marked and listed in
+**Status: proposed, not implemented** — except §6, the `leads` group, which this app's own
+route handlers implement ([ADR 0005](./adr/0005-leads-to-google-sheets.md)). Nothing else here
+exists yet on either side. This document lives in Fonnus-FE and Fonnus-FE is its authority
+until `../Fonnus-BE` implements it. The frontend runs against in-browser mocks
+(`NEXT_PUBLIC_API_MODE=mock`, the committed default) that implement exactly these signatures,
+so the shapes below are already exercised — but outside §6 no HTTP request has ever been
+made. Treat everything outside §6 as a specification to agree on, not a description of a
+running system. Where a decision is genuinely open, it is marked and listed in
 [`open-questions.md`](./open-questions.md).
 
 For how the frontend is wired to swap mocks for real calls, see
@@ -26,7 +28,8 @@ For field names and their meanings, see
 Every path below is relative to a configurable base (`NEXT_PUBLIC_API_BASE_URL`, default
 `/api/v1`). In development the Next.js server rewrites `/api/v1/*` to `API_PROXY_TARGET`
 (`next.config.ts`), so the browser only ever talks to `localhost:3000` — **no CORS is involved
-in dev at all.**
+in dev at all.** The exception is §6: the `leads` paths are this app's own, written in full
+(`/api/leads…`) and never under the base.
 
 ### Authentication — read this before anything else
 
@@ -396,9 +399,45 @@ reading the same record, so what the owner hears here is what a caller will hear
 
 ## 6. Leads
 
-### `POST /leads`
+**This group is not Fonnus-BE's.** This app's own route handlers receive both forms and
+append them to a Google Sheet ([ADR 0005](./adr/0005-leads-to-google-sheets.md);
+`src/app/api/leads/…`, `src/server/`). The paths below are on the app's own origin, outside
+`/api/v1`, and are not under `NEXT_PUBLIC_API_BASE_URL`: `leads.live.ts` calls them with
+`http.ts`'s `ownOrigin` option.
 
-The landing-page contact form. Unauthenticated.
+What both endpoints share:
+
+- **Unauthenticated.** No cookie is read, a `401` is never answered, and nothing here signs
+  anyone out (`expect401`).
+- **The request must be `Content-Type: application/json`** (parameters such as `charset`
+  aside), or the answer is `415`. A form-encoded or `text/plain` post is one any other site can
+  make a visitor's browser send without a CORS preflight; JSON forces the preflight, and the
+  routes send no CORS headers.
+- **The body is at most 48 KiB (49,152 bytes)**, or the answer is `413`. The fullest hotline
+  report the caps below allow is about 33 KB of compact JSON when every character is three
+  bytes, so no valid submission comes near it.
+- **Text caps**, measured in UTF-16 units on the trimmed text — the numbers in
+  `src/api/lead-limits.ts`, which the forms also put on their inputs as `maxLength`: 200 for
+  `clinic_name` and `contact_name`, 254 for `email`, 500 for a location's `address`. Past a
+  cap the field is refused with `too_long`.
+- **Bot protection is a per-IP rate limit at the host's firewall**, which answers `429`
+  before the handler runs. **No CAPTCHA the user must solve** — a challenge on a marketing
+  form costs more leads than it saves.
+- **Google failing is a `503`, never retried** by the handler or the frontend: the visitor
+  keeps what they typed and sends again. So is a deployment missing its Google
+  configuration. The handler answers within 12 seconds, under the frontend's 15-second
+  timeout.
+- Refusals other than `422` have no body, and no response carries `x-request-id`.
+- `source` is sent by the frontend and ignored by the handler, as is any other extra key.
+
+The frontend behaviour below is what `http.ts` and `errors.ts` render: `kindForStatus` maps
+`413` and `415` to `unknown` and `400` to `validation`; a validation error naming no field of
+the form, and an `unknown` one, both show "Có lỗi xảy ra. Bạn thử lại giúp mình nhé." under
+the button.
+
+### `POST /api/leads`
+
+The landing-page contact form.
 
 ```jsonc
 { "clinic_name": "Nha khoa Minh Anh", "contact_name": "Nguyễn Minh Anh",
@@ -406,29 +445,30 @@ The landing-page contact form. Unauthenticated.
 // → 202
 ```
 
-Needs bot protection, but **not a CAPTCHA the user must solve** — the form is three fields on
-a marketing page and a challenge there costs more leads than it saves. Rate-limit by IP.
-
 `phone` is national form, digits only, and is any number the clinic can be called back on —
 not only a mobile: a mobile (`0901234567`, 10 digits), a fixed line (`02838221234`, 11 digits
 starting `02`) or a 1800/1900 hotline (`19001234` or `1800123456`, 8 or 10 digits, sent as
 typed with no leading `0`). The frontend normalizes and checks it before sending
-(`api/phone.ts → normalizeCallbackNumber`, `isValidCallbackNumber`); the server checks again.
-`clinic_name` and `contact_name` arrive trimmed and non-empty.
+(`api/phone.ts → normalizeCallbackNumber`, `isValidCallbackNumber`); the server checks again
+and stores the normalized form. `clinic_name` and `contact_name` arrive trimmed and non-empty.
 
-The route is unauthenticated, so a `401` is never expected here and never signs anyone out.
+A `202` means one row was appended to the sheet's `leads` tab.
 
 | Status | Body | Frontend behaviour |
 |---|---|---|
 | `202` | — | The form is replaced by "Đã nhận thông tin" |
-| `422` | `code: "validation_failed"`, `errors[].field` ∈ `clinic_name` · `contact_name` · `phone`, `errors[].code` ∈ `required` · `invalid_phone` | The line for that field appears under it, as if the frontend had caught it. A field outside the three is ignored; when no known field is named, the generic message shows under the button |
-| `429` | — | "Bạn thao tác hơi nhanh…" under the button; what was typed stays |
-| `5xx` / network | — | The matching message under the button; what was typed stays. Never retried automatically |
+| `400` | — (the body is not JSON) | "Có lỗi xảy ra. Bạn thử lại giúp mình nhé." under the button; what was typed stays |
+| `413` | — (the body is over 48 KiB) | The same line |
+| `415` | — (not `application/json`) | The same line |
+| `422` | `code: "validation_failed"`, `errors[].field` ∈ `clinic_name` · `contact_name` · `phone`, in that order; `errors[].code` ∈ `required` · `invalid_phone` · `too_long` | The line for that field appears under it, as if the frontend had caught it: on a name, whatever the code, the name's "Nhập …" line. The inputs' `maxLength` keeps `too_long` from being reached by typing or pasting; a browser that counts grapheme clusters, or an extension that sets the value directly, can still exceed it, and the form then shows that "Nhập …" line. On the phone, "Nhập số điện thoại…" for `required`, "Số này chưa đúng…" otherwise. A field outside the three is ignored; when no known field is named, the generic line shows under the button |
+| `429` | — (from the firewall) | "Bạn thao tác hơi nhanh. Đợi một chút rồi thử lại nhé." under the button; what was typed stays |
+| `503` | — (Google failed, or the deployment has no Google configuration) | "Máy chủ đang gặp sự cố. Bọn mình đang xử lý — bạn thử lại sau ít phút nhé." under the button; what was typed stays. Never retried automatically |
+| network / timeout | — | The matching message under the button; what was typed stays |
 
-### `POST /leads/hotline-report`
+### `POST /api/leads/hotline-report`
 
 The "Chấm điểm hotline" page (`/cham-diem-hotline`): a clinic asks Fonnus to ring its
-published numbers as a patient would and email it a scored report. Unauthenticated.
+published numbers as a patient would and email it a scored report.
 
 ```jsonc
 { "contact_name": "Nguyễn Minh Anh", "email": "anh@nhakhoaminhanh.vn",
@@ -441,23 +481,27 @@ published numbers as a patient would and email it a scored report. Unauthenticat
 // → 202
 ```
 
-`locations` holds at least one and at most 20 entries, in the order the form lists them. Each
-`phone` is national form, digits only, under the same rule as `POST /leads`: a mobile, a fixed
-line, or a 1800/1900 hotline sent as typed with no leading `0` (`api/phone.ts →
-normalizeCallbackNumber`, `isValidCallbackNumber`). `contact_name`, `clinic_name` and every
-`address` arrive trimmed and non-empty; `email` arrives trimmed and passes `isValidEmail`. The
-server checks all of it again.
+`locations` holds at least one and at most 20 entries (`MAX_LOCATIONS`), in the order the form
+lists them. Each `phone` is national form, digits only, under the same rule as
+`POST /api/leads`: a mobile, a fixed line, or a 1800/1900 hotline sent as typed with no
+leading `0` (`api/phone.ts → normalizeCallbackNumber`, `isValidCallbackNumber`).
+`contact_name`, `clinic_name` and every `address` arrive trimmed and non-empty; `email`
+arrives trimmed and passes `isValidEmail`. The server checks all of it again and stores the
+numbers normalized.
 
-Same bot-protection terms as `POST /leads`: rate-limit by IP, **no CAPTCHA the user must
-solve**. The route is unauthenticated, so a `401` is never expected here and never signs
-anyone out.
+A `202` means one row per location was appended to the sheet's `hotline_report` tab, in one
+request, each row carrying the same received time and a request id generated by the handler.
 
 | Status | Body | Frontend behaviour |
 |---|---|---|
 | `202` | — | The form is replaced by "Đã nhận yêu cầu", naming the email and the number of locations |
-| `422` | `code: "validation_failed"`, `errors[].field` ∈ `contact_name` · `email` · `clinic_name` · `locations.<i>.address` · `locations.<i>.phone` (`<i>` zero-based, in the order sent), `errors[].code` ∈ `required` · `invalid_email` · `invalid_phone` | The page's own line for that field appears under it — the "Nhập …" line for `required`, the "… chưa đúng" line otherwise — on the i-th location's row for a `locations` path, and the first one in form order takes the focus. A field outside these is ignored; when no known field is named, the generic message shows under the button. What was typed stays |
-| `429` | — | "Bạn thao tác hơi nhanh…" under the button; what was typed stays |
-| `5xx` / network | — | The matching message under the button; what was typed stays. Never retried automatically |
+| `400` | — (the body is not JSON) | "Có lỗi xảy ra. Bạn thử lại giúp mình nhé." under the button; what was typed stays |
+| `413` | — (the body is over 48 KiB) | The same line |
+| `415` | — (not `application/json`) | The same line |
+| `422` | `code: "validation_failed"`, `errors[].field` ∈ `contact_name` · `email` · `clinic_name` · `locations` · `locations.<i>.address` · `locations.<i>.phone` (`<i>` zero-based, in the order sent), in form order: the person's fields, then each location's address and phone, location by location; `errors[].code` ∈ `required` · `invalid_email` · `invalid_phone` · `too_long`. The bare `locations` field means the list itself: `required` when it is missing, not an array or empty, `too_long` past 20 — and its rows are then not checked | The page's own line for that field appears under it — on the email, "Email này chưa đúng…" for any code but `required`; on a phone, "Số này chưa đúng…" for any code but `required`; otherwise the "Nhập …" line. The inputs' `maxLength` keeps `too_long` from being reached by typing or pasting; a browser that counts grapheme clusters, or an extension that sets the value directly, can still exceed it, and the form then shows the field's "Nhập …" line (on the email, its "Email này chưa đúng…" line). A line for a `locations.<i>` path lands on the i-th location's row, and the first one in form order takes the focus. The bare `locations` field and any field outside these are ignored; when no known field is named, the generic line shows under the button. What was typed stays |
+| `429` | — (from the firewall) | "Bạn thao tác hơi nhanh. Đợi một chút rồi thử lại nhé." under the button; what was typed stays |
+| `503` | — (Google failed, or the deployment has no Google configuration) | "Máy chủ đang gặp sự cố. Bọn mình đang xử lý — bạn thử lại sau ít phút nhé." under the button; what was typed stays. Never retried automatically |
+| network / timeout | — | The matching message under the button; what was typed stays |
 
 ---
 
