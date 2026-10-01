@@ -129,7 +129,7 @@ export function MissedCalls() {
             <Shape name="always-on" size={84} />
             {/* No measure cap: at 34ch the sentence broke before "mỗi tháng". */}
             <div className="font-display text-[length:clamp(20px,2.2vw,var(--size-heading))] leading-[1.3] font-semibold text-text-on-inverse">
-              Fonnus nghe máy 24/7, từ 2.500.000 đ mỗi tháng.
+              Fonnus nghe máy 24/7, từ 900.000 đ mỗi tháng.
             </div>
           </div>
           <Link href="/#bang-gia" className={buttonClassName({ variant: 'inverse' })}>
