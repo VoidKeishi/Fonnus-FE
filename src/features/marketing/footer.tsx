@@ -3,6 +3,7 @@ import { Logo, Pattern } from '@/design-system'
 import { CONTACT, FOOTER_PAGE_LINKS } from '@/data/content'
 
 const LINK = 'text-text-on-inverse no-underline hover:underline'
+const LEGAL_LINK = 'cursor-pointer text-text-muted-on-inverse hover:text-text-on-inverse hover:underline'
 
 /*
  * The night footer every marketing page ends on.
@@ -56,8 +57,19 @@ export function Footer() {
         </div>
       </div>
 
-      <div className="mx-auto mt-10 max-w-[1280px] pt-6 text-ui leading-(--leading-body) text-text-muted-on-inverse shadow-[inset_0_1px_0_var(--border-on-inverse)]">
-        © 2026 Fonnus
+      <div className="mx-auto mt-10 flex max-w-[1280px] flex-wrap items-center justify-between gap-x-6 gap-y-3 pt-6 text-ui leading-(--leading-body) text-text-muted-on-inverse shadow-[inset_0_1px_0_var(--border-on-inverse)]">
+        <span>© 2026 Fonnus. Bảo lưu mọi quyền.</span>
+        {/* Placeholders by the owner's call: the two policies are not written
+            yet, so these look and click like links but go nowhere. Buttons, not
+            `href="#"`, which would jump the page to the top. Each becomes a
+            `Link` once its page exists. */}
+        <span className="flex flex-wrap gap-x-5 gap-y-2">
+          {['Chính sách bảo mật', 'Điều khoản dịch vụ'].map((label) => (
+            <button key={label} type="button" className={LEGAL_LINK}>
+              {label}
+            </button>
+          ))}
+        </span>
       </div>
     </footer>
   )

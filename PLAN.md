@@ -80,6 +80,18 @@ Each blocks nothing today and has a default that applies if nothing is said.
 
 ## Backlog
 
+- **The two legal pages behind the footer** (L, waits on the text): the marketing footer
+  shows "Chính sách bảo mật" and "Điều khoản dịch vụ" as link-styled buttons that go
+  nowhere, by the owner's call, because neither policy is written. Once someone with legal
+  standing supplies the text, each becomes a page in the marketing route group and the
+  buttons become links; `/dang-ky` (F1b) links the same terms. The privacy policy is tied
+  to decision 4 above (the lead forms and PDPL).
+- **A sample call whose recording stalls mid-call** (S): on the landing page's "Khả năng",
+  a recording that has started and then stops downloading holds the transcript with it and
+  keeps showing as playing; the visitor has to pause and press ▶ again, which falls back to
+  the silent transcript if the file still does not play. A watchdog that turns such a run
+  silent from where it stopped would remove the dead wait. Not built because nobody has
+  seen it happen; worth doing if a phone on a weak connection shows it.
 - **The first live append of the lead forms** (owner's setup, then S): create the Google
   Cloud project, the service account key and the two-tab spreadsheet as `README.md` lists,
   put the rate limit on `/api/leads*` in the Vercel Firewall, set the three variables, then
