@@ -48,14 +48,15 @@ src/
   api/                          The one door to the network (ADR 0003)
     contracts.ts                Types only: one interface per group, API_GROUPS
     index.ts                    The only file that chooses mock or live
-    env.ts                      The only file that reads process.env (lint-enforced)
-    http.ts                     The fetch wrapper; only *.live.ts imports it
+    env.ts                      The only file outside server/ that reads process.env (lint-enforced)
+    http.ts (+test)             The fetch wrapper; only *.live.ts imports it. `ownOrigin` addresses this app instead of Fonnus-BE
     errors.ts                   ApiError and every Vietnamese error sentence
     mock-support.ts             delay, maybeFail, storage, the demo fixtures
     phone.ts (+test)            Vietnamese phone rules and the national digits-only wire form: the SMS-able mobile (auth, hero) and the callback number (contact form)
     sign-up-handoff.ts (+test)  The number typed in the landing hero, carried to /dang-ky in sessionStorage
     auth.mock.ts · auth.live.ts
-    leads.mock.ts · leads.live.ts  POST /leads (the landing contact form) and POST /leads/hotline-report (F4)
+    leads.mock.ts · leads.live.ts  The contact form and the hotline report. Live posts to this app's own /api/leads… (ADR 0005)
+    lead-limits.ts              The length caps and the 20-location limit, read by the forms and by server/
     tenant.* (F3) · receptionist.* · voice.* (F3 try-out) · shell.* · insights.* (Tổng quan) · calls.* (F5) · appointments.* · numbers.* · account.* (F6)
 
   server/                       Code that runs only in a route handler (ADR 0005). Only src/app/ imports it
@@ -65,7 +66,7 @@ src/
     google-jwt.ts (+test)       The signed assertion a service account trades for an access token
     google-token.ts             The exchange, and the token kept while the instance is warm
     sheets.ts                   appendRows: one call to spreadsheets.values.append
-    request-body.ts (+test)     The JSON media-type check and the body reader capped at 32 KB
+    request-body.ts (+test)     The JSON media-type check and the body reader capped at 48 KB, sized from api/lead-limits.ts
     leads-handler.ts            Request in, Response out: 415, 413, 400, 422, 503, 202
 
   session/                      Who is signed in
@@ -126,7 +127,7 @@ app  →  features/*  →  { shell, session }  →  { ui, design-system, api, da
 | `features/marketing/` never imports `ui/`, `session/` or `shell/`. | The landing page is a server component so a crawler can read it. `ui/` is the client kit; pulling it in drags `'use client'` into the acquisition surface. Marketing uses `design-system/`, `data/`, and `api.leads` in the contact form and the hotline report form. |
 | `api/` imports nothing outside itself and no React. | `http.ts` exposes its 401 hook through a module-level setter instead of importing `session/`. The other direction is the cycle `session → api → session`. |
 | `session/` and `shell/` import `api/`, `ui/`, `design-system/`; never a feature. | The sidebar shows numbers from `api.shell`, not the state of one tab. |
-| Only `app/` imports `server/`. `server/` imports itself, `api/phone`, `api/contracts`, `api/errors` and Node built-ins. | `server/` holds the Google credential and runs only inside a route handler. It shares the forms' phone and email rules through the three pure `api/` files, never through `api/index.ts`, which pulls in the mocks. |
+| Only `app/` imports `server/`. `server/` imports itself, `api/phone`, `api/contracts`, `api/errors`, `api/lead-limits` and Node built-ins. | `server/` holds the Google credential and runs only inside a route handler. It shares the forms' rules and caps through the four pure `api/` files, never through `api/index.ts`, which pulls in the mocks. |
 
 ### 2.2 Naming
 
@@ -420,7 +421,7 @@ No gate enforces these; the pm's review does.
 | Rule | Gate |
 |---|---|
 | `process.env` only in `api/env.ts` and `server/env.ts` | ESLint `no-restricted-properties`, in place |
-| Only `app/` imports `server/`, and `server/` imports only itself, three `api/` files and Node built-ins | ESLint `no-restricted-imports`, in place |
+| Only `app/` imports `server/`, and `server/` imports only itself, four `api/` files and Node built-ins | ESLint `no-restricted-imports`, in place |
 | Mock and live share one interface | `pnpm typecheck`, in place |
 | Import direction (§2.1) | ESLint `no-restricted-imports` in `eslint.config.mjs`, in place, by alias and by relative path: a feature never imports another (the list is read from `src/features/`); `features/marketing/` never imports `ui/`, `session/`, `shell/`; `ui/` and `design-system/` never import a feature, `api/`, `session/`, `shell/`; `session/` and `shell/` never import a feature; `api/` never reaches outside itself. No dependency-cruiser: that is a dependency |
 | Tokens are byte copies | Not yet. Token-copy test, `PLAN.md` §Backlog |

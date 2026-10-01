@@ -72,9 +72,15 @@ GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY=""   # private_key from the key file, quoted,
 LEADS_SPREADSHEET_ID=           # the part of the sheet's URL between /d/ and /edit
 ```
 
-The two forms still use the mock; they are pointed at these endpoints in a later change. On
-a public deployment the endpoints accept requests as soon as the three variables are set, so
-put the host's rate limit on `/api/leads*` first.
+6. Turn the forms live: `NEXT_PUBLIC_API_LIVE_GROUPS=leads`. Both forms switch together.
+   Without it they keep using the mock, which stores nothing.
+
+On a public deployment the endpoints accept requests as soon as the three variables are set,
+so put the rate limit on first. In the Vercel project: Firewall → a new rule, condition
+"request path starts with `/api/leads`", action Rate Limit, fixed window, keyed on IP,
+answering `429`. The forms already show "Bạn thao tác hơi nhanh…" for that answer. Mark the
+private key as a Sensitive variable, and redeploy after changing any of the three: a
+variable applies only to new deployments.
 
 ## Layout
 
