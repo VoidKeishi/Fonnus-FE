@@ -38,7 +38,7 @@ src/
     api/healthz/route.ts        Liveness of this server. Build SHA added at F7
     api/leads/route.ts          POST /api/leads: the contact form, appended to a Google Sheet (ADR 0005)
     api/leads/hotline-report/route.ts   POST /api/leads/hotline-report: one row per location
-    (marketing)/                F4. layout (header, footer, the call demo's provider), page, cham-diem-hotline/page.tsx (static, the hotline report), error.tsx
+    (marketing)/                F4. layout (header, footer, the call demo's provider), page, cham-diem-hotline/page.tsx (static, the hotline report), chinh-sach-bao-mat/ and dieu-khoan-dich-vu/ (static, noindex: the notice that each legal text is not published yet), error.tsx
     (auth)/                     layout (AuthShell, F1b), dang-nhap/, dang-ky/ (F1b), error.tsx [backlog]
     app/                        layout: RequireSession → AppShell (→ ConfigProvider, F3). error.tsx [backlog]
       page.tsx                  Tổng quan
@@ -85,6 +85,7 @@ src/
     overview/ · calls/ · appointments/ · numbers/ · account/   One per tab; F5, F6
     marketing/                  landing.tsx (the section list, then the orb) · header.tsx · nav-item-link.tsx · footer.tsx
                                 hero/ (hero, sign-up-form, clinic-logos)
+                                legal/ (legal-notice-page: one server component for both legal routes, copy from LEGAL_PAGES in data/)
                                 orb/ (voice-orb, orb, orb-field, use-orb-placement, orb-motion, call-overlay,
                                 call-demo-provider, use-call-demo, greeting-player, call-state)
                                 sections/ (section-chrome, missed-calls, how-it-works, how-it-works-visuals,

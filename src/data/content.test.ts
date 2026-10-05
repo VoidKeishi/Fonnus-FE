@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { FAQS, FOOTER_PAGE_LINKS, LANDING_SECTION_IDS, NAV_GROUPS, TESTIMONIALS } from './content'
+import { FAQS, FOOTER_PAGE_LINKS, LANDING_SECTION_IDS, LEGAL_PAGES, NAV_GROUPS, TESTIMONIALS } from './content'
 
 /*
  * The landing page is built one section at a time, and a visitor must never
@@ -9,7 +9,7 @@ import { FAQS, FOOTER_PAGE_LINKS, LANDING_SECTION_IDS, NAV_GROUPS, TESTIMONIALS 
  */
 
 /** Routes a marketing link may point at besides an in-page section. Extend with the page's own pull request. */
-const KNOWN_ROUTES = ['/', '/dang-nhap', '/dang-ky', '/cham-diem-hotline']
+const KNOWN_ROUTES = ['/', '/dang-nhap', '/dang-ky', '/cham-diem-hotline', '/chinh-sach-bao-mat', '/dieu-khoan-dich-vu']
 
 const SECTION_ANCHOR = /^\/#(.+)$/
 
@@ -25,6 +25,7 @@ const allHrefs = [
     ...(group.items ?? []).map((item) => item.href),
   ]),
   ...FOOTER_PAGE_LINKS.map((link) => link.href),
+  ...Object.values(LEGAL_PAGES).flatMap((page) => [page.href, ...page.links.map((link) => link.href)]),
 ]
 
 describe('the link check itself', () => {

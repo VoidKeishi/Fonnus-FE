@@ -80,12 +80,13 @@ Each blocks nothing today and has a default that applies if nothing is said.
 
 ## Backlog
 
-- **The two legal pages behind the footer** (L, waits on the text): the marketing footer
-  shows "Chính sách bảo mật" and "Điều khoản dịch vụ" as link-styled buttons that go
-  nowhere, by the owner's call, because neither policy is written. Once someone with legal
-  standing supplies the text, each becomes a page in the marketing route group and the
-  buttons become links; `/dang-ky` (F1b) links the same terms. The privacy policy is tied
-  to decision 4 above (the lead forms and PDPL).
+- **The text of the two legal pages** (M, waits on the text): the footer's "Chính sách bảo
+  mật" and "Điều khoản dịch vụ" link to `/chinh-sach-bao-mat` and `/dieu-khoan-dich-vu`,
+  which today say only that the document is being finalised and whom to ask, and are kept
+  out of search with `noindex`. Once someone with legal standing supplies the text, it
+  replaces the body of `src/features/marketing/legal/legal-notice-page.tsx`, the `robots`
+  metadata on both pages is removed, and `/dang-ky` (F1b) links the same terms. The privacy
+  policy is tied to decision 4 above (the lead forms and PDPL).
 - **A sample call whose recording stalls mid-call** (S): on the landing page's "Khả năng",
   a recording that has started and then stops downloading holds the transcript with it and
   keeps showing as playing; the visitor has to pause and press ▶ again, which falls back to

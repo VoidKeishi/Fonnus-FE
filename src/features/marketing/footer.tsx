@@ -1,9 +1,11 @@
 import Link from 'next/link'
 import { Logo, Pattern } from '@/design-system'
-import { CONTACT, FOOTER_PAGE_LINKS } from '@/data/content'
+import { CONTACT, FOOTER_PAGE_LINKS, LEGAL_PAGES } from '@/data/content'
 
 const LINK = 'text-text-on-inverse no-underline hover:underline'
-const LEGAL_LINK = 'cursor-pointer text-text-muted-on-inverse hover:text-text-on-inverse hover:underline'
+/* The base stylesheet underlines a link and turns its hover underline terracotta; these stay quiet until hovered, then underline in their own colour. */
+const LEGAL_LINK =
+  'text-text-muted-on-inverse no-underline hover:text-text-on-inverse hover:underline hover:decoration-current'
 
 /*
  * The night footer every marketing page ends on.
@@ -59,15 +61,11 @@ export function Footer() {
 
       <div className="mx-auto mt-10 flex max-w-[1280px] flex-wrap items-center justify-between gap-x-6 gap-y-3 pt-6 text-ui leading-(--leading-body) text-text-muted-on-inverse shadow-[inset_0_1px_0_var(--border-on-inverse)]">
         <span>© 2026 Fonnus. Bảo lưu mọi quyền.</span>
-        {/* Placeholders by the owner's call: the two policies are not written
-            yet, so these look and click like links but go nowhere. Buttons, not
-            `href="#"`, which would jump the page to the top. Each becomes a
-            `Link` once its page exists. */}
         <span className="flex flex-wrap gap-x-5 gap-y-2">
-          {['Chính sách bảo mật', 'Điều khoản dịch vụ'].map((label) => (
-            <button key={label} type="button" className={LEGAL_LINK}>
-              {label}
-            </button>
+          {[LEGAL_PAGES.privacy, LEGAL_PAGES.terms].map((page) => (
+            <Link key={page.href} href={page.href} className={LEGAL_LINK}>
+              {page.title}
+            </Link>
           ))}
         </span>
       </div>

@@ -408,6 +408,13 @@ works (`0914378064` / `111002`).
 
 Newest first. One line per session that taught something; the rule itself goes above.
 
+- **2026-10-05 (footer, the legal links)** — Turning a link-styled `<button>` into a `Link`
+  changes its hover: the copied `base.css` gives every `<a>` a terracotta colour and
+  underline on hover, which a button never matched. A quiet link with its own hover colour,
+  such as the legal links on the night footer, adds `no-underline` and
+  `hover:decoration-current` so the underline follows the text colour. Tailwind wraps
+  `hover:` in `@media (hover: hover)` and `base.css` does not, so on a touch screen the
+  base rule may still show for the moment of the tap; nobody has looked at that on a phone.
 - **2026-09-26 (Chấm điểm hotline)** — Two things from porting the page's list and chart.
   First, the §6 sample's `ref={rows.ref(b.id)}` calls a function that returns a ref during
   render, and this repo's `react-hooks/refs` lint rule rejects it. The hotline form's
