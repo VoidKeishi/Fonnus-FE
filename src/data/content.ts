@@ -83,6 +83,43 @@ export const FOOTER_PAGE_LINKS: { href: string; label: string }[] = [
   { href: '/#bao-mat', label: 'Bảo mật & dữ liệu' },
 ]
 
+export interface LegalPage {
+  href: string
+  /** The document's name: the footer link and the page's heading. */
+  title: string
+  /** What a visitor might want to ask, before the email and phone that answer it. */
+  contactQuestion: string
+  /** Where to go instead, in order. */
+  links: { href: string; label: string }[]
+}
+
+/**
+ * The two legal documents the footer links to. Neither text is written yet,
+ * so each page only says so and names whom to ask; when a text arrives it
+ * replaces that page's body and the URL stays.
+ */
+export const LEGAL_PAGES: Record<'privacy' | 'terms', LegalPage> = {
+  privacy: {
+    href: '/chinh-sach-bao-mat',
+    title: 'Chính sách bảo mật',
+    contactQuestion: 'Bạn cần hỏi về dữ liệu của phòng khám hoặc của người gọi?',
+    links: [
+      { href: '/#bao-mat', label: 'Xem các cam kết về dữ liệu của Fonnus' },
+      { href: '/dieu-khoan-dich-vu', label: 'Điều khoản dịch vụ' },
+      { href: '/', label: 'Về trang chủ' },
+    ],
+  },
+  terms: {
+    href: '/dieu-khoan-dich-vu',
+    title: 'Điều khoản dịch vụ',
+    contactQuestion: 'Bạn cần hỏi về điều kiện sử dụng dịch vụ?',
+    links: [
+      { href: '/chinh-sach-bao-mat', label: 'Chính sách bảo mật' },
+      { href: '/', label: 'Về trang chủ' },
+    ],
+  },
+}
+
 export interface FaqItem {
   q: string
   a: string
