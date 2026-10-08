@@ -26,6 +26,10 @@ marked `'use client'`.
   server component rejects it.
 - A client component that calls `useSearchParams` on a prerendered route sits
   inside `<Suspense>`, or `next build` fails. `next dev` does not show this.
+- Content the server must render but a client state switches between — the two billing
+  periods of a plan — stays in a server component: the provider writes the state on a
+  `group` wrapper as `data-*`, and each server-rendered block hides itself with a group
+  data-attribute variant. `plan-price.tsx` is the pattern.
 
 ## Data through `src/api`
 
