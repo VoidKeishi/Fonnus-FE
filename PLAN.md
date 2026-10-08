@@ -80,6 +80,12 @@ Each blocks nothing today and has a default that applies if nothing is said.
 
 ## Backlog
 
+- **A server-render test for `PlanPrice`** (S, waits on the go-ahead for a new kind of test):
+  render the component with `react-dom/server` under Vitest and assert that, for every paid
+  plan in `PLANS`, both periods' price and note strings are in the output and each block
+  carries its hide-the-other-period variant and its `sr-only` label. It would stop a future
+  change from bringing back the single-period render that hid the annual total from crawlers
+  that run no JavaScript. The repo has no component test yet, so it is a decision, not a chore.
 - **The text of the two legal pages** (M, waits on the text): the footer's "Chính sách bảo
   mật" and "Điều khoản dịch vụ" link to `/chinh-sach-bao-mat` and `/dieu-khoan-dich-vu`,
   which today say only that the document is being finalised and whom to ask, and are kept

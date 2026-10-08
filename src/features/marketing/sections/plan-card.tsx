@@ -18,7 +18,7 @@ function groundFor(plan: Plan): string {
 
 /**
  * One plan. A server component: only its price changes with the billing period,
- * and that is the `PlanPrice` leaf. Every card is one column with the call to
+ * and `PlanPrice` renders both and lets CSS show one. Every card is one column with the call to
  * action pushed to the bottom (`mt-auto`), so the four cards end level however
  * many features each lists.
  */
