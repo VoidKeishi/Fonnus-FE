@@ -29,7 +29,10 @@ marked `'use client'`.
 - Content the server must render but a client state switches between — the two billing
   periods of a plan — stays in a server component: the provider writes the state on a
   `group` wrapper as `data-*`, and each server-rendered block hides itself with a group
-  data-attribute variant. `plan-price.tsx` is the pattern.
+  data-attribute variant. `plan-price.tsx` is the pattern. When the state is local to the
+  client component that renders the content, a plain `hidden` on the unreached items does
+  the same job — `call-demo-player.tsx` renders every transcript turn and hides the ones
+  the playback has not reached.
 
 ## Data through `src/api`
 
