@@ -18,13 +18,28 @@ const GROUPS = COMPARISON_MATRIX.reduce<Group[]>((groups, row) => {
 }, [])
 
 /*
- * The band and the columns share one arithmetic: of 5.6 parts of the width,
- * the criteria column takes 1.6 and each plan column 1. The criteria column
- * has no pixel floor: table layout is not guaranteed to honour a column width
- * that mixes a length with a percentage, and the band's grid, which would
- * honour it, would then drift off its column on a phone.
+ * The prototype's geometry: a 16px inset on both sides, then the criteria
+ * column at 1.6 parts and each plan column at 1 part of what is left, with the
+ * criteria column never under 220px. A table column takes only a plain
+ * percentage — Chrome ignores a length mixed in through min, max or calc on a
+ * col — and the inset lives inside the first and last cells, so the
+ * percentages below are that geometry worked out at two widths. Under an 800px
+ * viewport the table is always its 720px minimum, where the first set is exact
+ * (criteria column 220px). From 800px up the second set is exact at the
+ * section's full 1280px and within 3px of the prototype down to a 900px
+ * viewport. The band's grid uses the same sets, so it stays on its column.
+ * Indexed by column: criteria, the plans, and the last plan, which also holds
+ * the right inset.
  */
-const PLAN_COLUMN = 'w-[17.8571%]'
+const COLUMN_WIDTHS = [
+  'w-[32.7778%] min-[800px]:w-[29.1071%]',
+  'w-[16.25%] min-[800px]:w-[17.4107%]',
+  'w-[16.25%] min-[800px]:w-[17.4107%]',
+  'w-[16.25%] min-[800px]:w-[17.4107%]',
+  'w-[18.4722%] min-[800px]:w-[18.6607%]',
+]
+const BAND_TRACKS =
+  'grid-cols-[32.7778%_16.25%_16.25%_16.25%_18.4722%] min-[800px]:grid-cols-[29.1071%_17.4107%_17.4107%_17.4107%_18.6607%]'
 const CELL = 'py-3 align-middle shadow-[inset_0_-1px_0_var(--border-hairline)] text-body-sm leading-(--leading-body)'
 const HEAD_CELL = 'bg-surface-page py-3.5 text-ui leading-(--leading-body) font-semibold text-center align-middle'
 /*
@@ -47,13 +62,13 @@ export function ComparisonMatrix() {
     <div data-reveal="0" className="mt-10">
       <MatrixDisclosure>
         <div className="mt-6 overflow-x-auto">
-          <div className="min-w-[770px]">
+          <div className="min-w-[720px]">
             {/* Hosts the band at the table's exact width, and stops it short of the footnote. */}
             <div className="relative">
               {/* The "Tiêu chuẩn" card's clay, carried down its column behind the rows. */}
               <div
                 aria-hidden="true"
-                className="pointer-events-none absolute inset-0 grid grid-cols-[28.5714%_repeat(4,17.8571%)]"
+                className={`pointer-events-none absolute inset-0 grid ${BAND_TRACKS}`}
               >
                 <span />
                 {COLUMNS.map((column, i) => (
@@ -74,9 +89,9 @@ export function ComparisonMatrix() {
                   <span className="sr-only">Bảng so sánh đầy đủ các gói</span>
                 </caption>
                 <colgroup>
-                  <col className="w-[28.5714%]" />
-                  {COLUMNS.map((column) => (
-                    <col key={column} className={PLAN_COLUMN} />
+                  <col className={COLUMN_WIDTHS[0]} />
+                  {COLUMNS.map((column, i) => (
+                    <col key={column} className={COLUMN_WIDTHS[i + 1]} />
                   ))}
                 </colgroup>
 
