@@ -12,7 +12,7 @@ import { Icon } from '@/design-system'
  * The region stays mounted and eases from a `0fr` row to `1fr` rather than
  * appearing in one frame. While closed it is `inert`, so the table is neither
  * in the tab order nor in the accessibility tree — it is only out of sight.
- * The single `minmax(0, 1fr)` column is what keeps the 770px table from
+ * The single `minmax(0, 1fr)` column is what keeps the 720px table from
  * widening the page on a phone: it scrolls inside its own scroller instead.
  */
 export function MatrixDisclosure({ children }: { children: ReactNode }) {
