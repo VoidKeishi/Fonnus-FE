@@ -19,18 +19,19 @@ const BAND_MASK =
 export function Band() {
   return (
     <section
-      aria-label="Fonnus"
+      aria-labelledby="band-heading"
       className="relative isolate overflow-clip bg-surface-warm px-[clamp(20px,5vw,64px)] py-[clamp(44px,7vh,76px)] text-text-heading"
     >
       <Pattern name="band" style={{ zIndex: -1, maskImage: BAND_MASK, WebkitMaskImage: BAND_MASK }} />
       <div className={SECTION_INNER}>
-        <div
+        <p
           data-reveal="0"
           className="mb-4 text-eyebrow leading-(--leading-body) font-semibold tracking-eyebrow text-text-accent uppercase"
         >
           Fonnus cho phòng khám
-        </div>
+        </p>
         <h2
+          id="band-heading"
           data-reveal="1"
           className="m-0 max-w-[22ch] font-display text-[length:clamp(28px,3.6vw,44px)] leading-[1.2] font-semibold tracking-display text-pretty text-text-heading"
         >

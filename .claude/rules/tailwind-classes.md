@@ -27,6 +27,7 @@ off-brand. The theme names below are declared in `src/app/globals.css`
 | Blush `bg-surface-warm` | speech only: the assistant panel, the receptionist's line | a callout, a badge, a notice in a form |
 | Overflow | `overflow-x-clip` | `overflow-x-hidden`: it kills `position: sticky` |
 | Motion | wrap entrance animations in `motion-safe:` | an animation without that variant |
+| Element swap (`div` → `h3`, `p`, `address`, `ol`) | check `src/styles/tokens/base.css` as well as preflight: it gives `h1`–`h4` a font, a colour and `-0.01em` tracking (`tracking-normal` cancels it) and `p` a bottom margin; `address` is italic by default (`not-italic`) | assuming preflight alone neutralises the new element |
 | Comments | prose. Tailwind scans every non-ignored file, comments and these rules included: a token shaped like a variant plus a utility compiles into a rule. A draft comment in `billing-period.tsx` once emitted a junk selector for `data-billing` | class syntax inside a comment or a doc |
 
 Values live in `src/styles/tokens/*.css`. Never edit those files; re-copy them

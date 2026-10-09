@@ -21,12 +21,12 @@ const ROWS = [
  */
 export function Capabilities() {
   return (
-    <section id="kha-nang" className={SECTION_BAND}>
+    <section id="kha-nang" aria-labelledby="kha-nang-heading" className={SECTION_BAND}>
       <div className={SECTION_INNER}>
-        <div data-reveal="0" className={SECTION_EYEBROW}>
+        <p data-reveal="0" className={SECTION_EYEBROW}>
           Khả năng
-        </div>
-        <h2 data-reveal="1" className={`${SECTION_HEADING} mb-4 max-w-[22ch]`}>
+        </p>
+        <h2 id="kha-nang-heading" data-reveal="1" className={`${SECTION_HEADING} mb-4 max-w-[22ch]`}>
           Một lễ tân không nghỉ, không quên
         </h2>
         <p data-reveal="2" className="m-0 mb-16 max-w-[56ch] text-body-lg text-text-muted">

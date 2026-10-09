@@ -27,6 +27,7 @@ export function Hero() {
   return (
     <section
       id="hero"
+      aria-labelledby="hero-heading"
       className={[
         // Same side inset as every section below, so the headline shares their left edge.
         'relative isolate box-border flex min-h-screen items-center overflow-clip',
@@ -54,7 +55,10 @@ export function Hero() {
       {/* Same 1280px inner column every other section uses. */}
       <div className="relative z-1 mx-auto grid w-full max-w-[1280px] grid-cols-2 items-center gap-x-[clamp(32px,5vw,64px)] gap-y-0 [@media(max-width:900px)]:grid-cols-1 [@media(max-width:900px)]:justify-items-center [@media(max-width:900px)]:gap-0 [@media(max-width:900px)]:text-center">
         <div className="relative z-1 flex flex-col items-start [@media(max-width:900px)]:contents">
-          <h1 className="m-0 font-display text-[length:clamp(40px,4.7vw,68px)] leading-[1.2] font-semibold tracking-[-0.02em] text-balance text-text-heading [@media(max-width:900px)]:order-1">
+          <h1
+            id="hero-heading"
+            className="m-0 font-display text-[length:clamp(40px,4.7vw,68px)] leading-[1.2] font-semibold tracking-[-0.02em] text-balance text-text-heading [@media(max-width:900px)]:order-1"
+          >
             Không cuộc gọi
             <br />
             nào bị <span className="text-text-eyebrow">bỏ lỡ.</span>

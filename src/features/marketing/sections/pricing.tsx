@@ -15,15 +15,15 @@ import { SECTION_BAND, SECTION_EYEBROW, SECTION_HEADING, SECTION_INNER } from '.
  */
 export function Pricing() {
   return (
-    <section id="bang-gia" className={`${SECTION_BAND} bg-surface-card`}>
+    <section id="bang-gia" aria-labelledby="bang-gia-heading" className={`${SECTION_BAND} bg-surface-card`}>
       <div className={SECTION_INNER}>
         <BillingPeriodProvider>
           <div className="mb-12 flex flex-wrap items-end justify-between gap-8">
             <div>
-              <div data-reveal="0" className={SECTION_EYEBROW}>
+              <p data-reveal="0" className={SECTION_EYEBROW}>
                 Bảng giá
-              </div>
-              <h2 data-reveal="1" className={`${SECTION_HEADING} max-w-[24ch]`}>
+              </p>
+              <h2 id="bang-gia-heading" data-reveal="1" className={`${SECTION_HEADING} max-w-[24ch]`}>
                 Giá minh bạch, không ràng buộc
               </h2>
             </div>
