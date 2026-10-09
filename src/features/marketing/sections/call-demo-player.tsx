@@ -236,7 +236,7 @@ export function CallDemoPlayer({ demo, action }: CallDemoPlayerProps) {
   }
 
   const progress = progressAt(demo, elapsed)
-  const heard = turnsHeard(demo, elapsed)
+  const heard = new Set(turnsHeard(demo, elapsed))
 
   return (
     <div className="overflow-clip rounded-lg bg-surface-card shadow-[inset_0_0_0_1px_var(--border-hairline),0_14px_40px_color-mix(in_srgb,var(--text-heading)_7%,transparent)]">
@@ -298,18 +298,24 @@ export function CallDemoPlayer({ demo, action }: CallDemoPlayerProps) {
         />
       </div>
 
-      {/* Turns and the action land here one after another as the call plays. */}
+      {/* Turns and the action land here one after another as the call plays.
+          Every one is in the server HTML, so a crawler that runs no JavaScript
+          reads the whole call; those not reached yet are display none, out of
+          the accessibility tree too. Un-hiding one is an addition the live
+          region announces, and it restarts the rise animation, which is the
+          roll-in. */}
       <div aria-live="polite" className="flex flex-col gap-3 p-[18px]">
-        {heard.length === 0 ? (
+        {heard.size === 0 ? (
           <p className="m-0 px-0.5 py-2.5 text-body-sm leading-(--leading-body) text-text-muted">
             Bấm ▶ để nghe lại một cuộc gọi Fonnus đã xử lý.
           </p>
         ) : null}
 
-        {heard.map((turn) => (
+        {demo.turns.map((turn) => (
           <div
             key={turn.at}
             className={[
+              heard.has(turn) ? '' : 'hidden',
               'max-w-[92%] rounded-md px-[15px] py-[13px] max-[561px]:max-w-full',
               'motion-safe:animate-[fnRise_320ms_var(--ease-out)_both]',
               turn.role === 'linh'
@@ -326,9 +332,11 @@ export function CallDemoPlayer({ demo, action }: CallDemoPlayerProps) {
           </div>
         ))}
 
-        {actionReached(demo, elapsed) ? (
-          <div className="mt-1 motion-safe:animate-[fnRise_420ms_var(--ease-out)_both]">{action}</div>
-        ) : null}
+        <div
+          className={`mt-1 motion-safe:animate-[fnRise_420ms_var(--ease-out)_both] ${actionReached(demo, elapsed) ? '' : 'hidden'}`}
+        >
+          {action}
+        </div>
       </div>
     </div>
   )

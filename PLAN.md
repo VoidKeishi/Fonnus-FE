@@ -80,12 +80,15 @@ Each blocks nothing today and has a default that applies if nothing is said.
 
 ## Backlog
 
-- **A server-render test for `PlanPrice`** (S, waits on the go-ahead for a new kind of test):
-  render the component with `react-dom/server` under Vitest and assert that, for every paid
-  plan in `PLANS`, both periods' price and note strings are in the output and each block
-  carries its hide-the-other-period variant and its `sr-only` label. It would stop a future
-  change from bringing back the single-period render that hid the annual total from crawlers
-  that run no JavaScript. The repo has no component test yet, so it is a decision, not a chore.
+- **Server-render tests for the content the landing page hides by state** (S, waits on the
+  go-ahead for a new kind of test): render `PlanPrice` and `CallDemoPlayer` with
+  `react-dom/server` under Vitest and assert that the output holds, for every paid plan in
+  `PLANS`, both periods' price and note strings, and for each of the three sample calls every
+  turn's text and the action card — with the not-yet-shown items carrying their hiding class
+  and the price blocks their `sr-only` label. It would stop a future change from bringing back
+  a render that only shows what the visitor has reached, which hid the annual total and the
+  transcripts from crawlers that run no JavaScript. The repo has no component test yet, so it
+  is a decision, not a chore.
 - **The text of the two legal pages** (M, waits on the text): the footer's "Chính sách bảo
   mật" and "Điều khoản dịch vụ" link to `/chinh-sach-bao-mat` and `/dieu-khoan-dich-vu`,
   which today say only that the document is being finalised and whom to ask, and are kept
