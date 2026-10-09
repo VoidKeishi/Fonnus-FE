@@ -8,14 +8,14 @@ import { SECTION_BAND, SECTION_EYEBROW, SECTION_HEADING, SECTION_INNER } from '.
  */
 export function Testimonials() {
   return (
-    <section id="phong-kham" className={SECTION_BAND}>
+    <section id="phong-kham" aria-labelledby="phong-kham-heading" className={SECTION_BAND}>
       <div className={SECTION_INNER}>
         <div className="mb-12 flex items-end justify-between gap-8">
           <div>
-            <div data-reveal="0" className={SECTION_EYEBROW}>
+            <p data-reveal="0" className={SECTION_EYEBROW}>
               Phòng khám đang dùng
-            </div>
-            <h2 data-reveal="1" className={`${SECTION_HEADING} max-w-[24ch]`}>
+            </p>
+            <h2 id="phong-kham-heading" data-reveal="1" className={`${SECTION_HEADING} max-w-[24ch]`}>
               Mười phòng khám đầu tiên
             </h2>
           </div>

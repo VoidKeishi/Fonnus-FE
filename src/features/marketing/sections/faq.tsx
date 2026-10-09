@@ -9,12 +9,12 @@ import { SECTION_BAND, SECTION_EYEBROW, SECTION_HEADING } from './section-chrome
  */
 export function Faq() {
   return (
-    <section id="faq" className={SECTION_BAND}>
+    <section id="faq" aria-labelledby="faq-heading" className={SECTION_BAND}>
       <div className="mx-auto max-w-[900px]">
-        <div data-reveal="0" className={SECTION_EYEBROW}>
+        <p data-reveal="0" className={SECTION_EYEBROW}>
           Câu hỏi thường gặp
-        </div>
-        <h2 data-reveal="1" className={`${SECTION_HEADING} mb-12`}>
+        </p>
+        <h2 id="faq-heading" data-reveal="1" className={`${SECTION_HEADING} mb-12`}>
           Những điều chủ phòng khám hỏi trước
         </h2>
 

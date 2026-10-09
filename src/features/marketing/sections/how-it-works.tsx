@@ -119,18 +119,22 @@ const COUNT = [
  */
 export function HowItWorks() {
   return (
-    <section id="cach-hoat-dong" className={`${SECTION_BAND} bg-surface-card`}>
+    <section id="cach-hoat-dong" aria-labelledby="cach-hoat-dong-heading" className={`${SECTION_BAND} bg-surface-card`}>
       <div className={SECTION_INNER}>
-        <div data-reveal="0" className={SECTION_EYEBROW}>
+        <p data-reveal="0" className={SECTION_EYEBROW}>
           Cách hoạt động
-        </div>
-        <h2 data-reveal="1" className={`${SECTION_HEADING} mb-[clamp(32px,5vh,56px)] max-w-[22ch]`}>
+        </p>
+        <h2
+          id="cach-hoat-dong-heading"
+          data-reveal="1"
+          className={`${SECTION_HEADING} mb-[clamp(32px,5vh,56px)] max-w-[22ch]`}
+        >
           Sẵn sàng nhận cuộc gọi trong chưa đầy 5 phút
         </h2>
 
-        <div className={STACK}>
+        <ol role="list" className={STACK}>
           {STEPS.map((step, i) => (
-            <div key={step.title} className={SLOT} style={{ '--i': i } as CSSProperties}>
+            <li key={step.title} className={SLOT} style={{ '--i': i } as CSSProperties}>
               <article className={CARD}>
                 <div className={COPY}>
                   <span className={i === STEPS.length - 1 ? BULLET_LIVE : BULLET_QUIET}>
@@ -152,7 +156,7 @@ export function HowItWorks() {
 
                 <div className="flex h-full min-w-0 items-stretch">{step.scene}</div>
               </article>
-            </div>
+            </li>
           ))}
           {/*
             Scroll runway under the last card. A real element, not padding on
@@ -160,8 +164,8 @@ export function HowItWorks() {
             which padding does not extend — with padding alone the third card
             never reaches its pin and the first releases early.
           */}
-          <div aria-hidden="true" className="h-[clamp(180px,50vh,520px)] flex-none" />
-        </div>
+          <li aria-hidden="true" className="h-[clamp(180px,50vh,520px)] flex-none" />
+        </ol>
       </div>
     </section>
   )

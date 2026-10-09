@@ -52,13 +52,17 @@ const CARD_RINGED = `${CARD} shadow-[inset_0_0_0_1.5px_var(--text-eyebrow)]`
  */
 export function Security() {
   return (
-    <section id="bao-mat" className={`${SECTION_BAND} relative isolate overflow-clip bg-surface-warm`}>
+    <section
+      id="bao-mat"
+      aria-labelledby="bao-mat-heading"
+      className={`${SECTION_BAND} relative isolate overflow-clip bg-surface-warm`}
+    >
       <Pattern name="arcs" style={{ zIndex: -1, maskImage: ARCS_MASK, WebkitMaskImage: ARCS_MASK }} />
       <div className={SECTION_INNER}>
-        <div data-reveal="0" className={SECTION_EYEBROW_DEEP}>
+        <p data-reveal="0" className={SECTION_EYEBROW_DEEP}>
           Bảo mật &amp; dữ liệu
-        </div>
-        <h2 data-reveal="1" className={`${SECTION_HEADING} mb-6 max-w-[26ch]`}>
+        </p>
+        <h2 id="bao-mat-heading" data-reveal="1" className={`${SECTION_HEADING} mb-6 max-w-[26ch]`}>
           Người gọi biết mình đang nói với trợ lý AI
         </h2>
         <p data-reveal="2" className="m-0 mb-12 max-w-[62ch] text-body-lg text-text-muted">
@@ -82,11 +86,12 @@ export function Security() {
                   <Icon name={promise.art.icon} size={56} />
                 )}
               </div>
-              <div
-                className={`mb-2.5 font-display text-subheading font-semibold ${promise.ringed ? 'text-text-accent' : ''}`}
+              {/* The base stylesheet tightens the tracking of every heading; these titles keep the body's. */}
+              <h3
+                className={`m-0 mb-2.5 font-display text-subheading font-semibold tracking-normal ${promise.ringed ? 'text-text-accent' : ''}`}
               >
                 {promise.title}
-              </div>
+              </h3>
               <p className="m-0 text-body-sm text-text-muted">{promise.body}</p>
             </div>
           ))}

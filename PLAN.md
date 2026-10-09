@@ -89,6 +89,11 @@ Each blocks nothing today and has a default that applies if nothing is said.
   a render that only shows what the visitor has reached, which hid the annual total and the
   transcripts from crawlers that run no JavaScript. The repo has no component test yet, so it
   is a decision, not a chore.
+- **Quote markup for the testimonials once they are real** (S): the six quotes in "Mười phòng
+  khám đầu tiên" are placeholders, so they stay plain `<p>` + attribution on purpose — a
+  `<figure>`/`<blockquote>`/`<figcaption>` would tell a crawler they are attributed quotes.
+  When real clinics replace them, switch `src/features/marketing/sections/testimonials.tsx` to
+  that markup in the same change.
 - **The text of the two legal pages** (M, waits on the text): the footer's "Chính sách bảo
   mật" and "Điều khoản dịch vụ" link to `/chinh-sach-bao-mat` and `/dieu-khoan-dich-vu`,
   which today say only that the document is being finalised and whom to ask, and are kept

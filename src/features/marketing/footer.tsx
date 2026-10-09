@@ -37,16 +37,17 @@ export function Footer() {
 
         <div className="flex flex-wrap gap-[clamp(32px,5vw,72px)] text-body-sm leading-(--leading-body)">
           {FOOTER_PAGE_LINKS.length > 0 ? (
-            <div className="flex flex-col gap-2.5">
+            <nav aria-label="Trang" className="flex flex-col gap-2.5">
               <span className="text-eyebrow leading-(--leading-body) tracking-eyebrow text-text-eyebrow uppercase">Trang</span>
               {FOOTER_PAGE_LINKS.map((link) => (
                 <Link key={link.href} href={link.href} className={LINK}>
                   {link.label}
                 </Link>
               ))}
-            </div>
+            </nav>
           ) : null}
-          <div className="flex flex-col gap-2.5">
+          {/* The user agent italicises an address; the column is set upright like its neighbour. */}
+          <address className="flex flex-col gap-2.5 not-italic">
             <span className="text-eyebrow leading-(--leading-body) tracking-eyebrow text-text-eyebrow uppercase">Liên hệ</span>
             <a href={CONTACT.phoneHref} className={`${LINK} font-num tabular-nums`}>
               {CONTACT.phone}
@@ -55,7 +56,7 @@ export function Footer() {
               {CONTACT.email}
             </a>
             <span className="text-text-muted-on-inverse">{CONTACT.site}</span>
-          </div>
+          </address>
         </div>
       </div>
 

@@ -79,14 +79,14 @@ const STEP_ICON: Record<Variant, [string, string, string]> = {
  */
 export function MissedCalls() {
   return (
-    <section id="vi-sao" className={SECTION_BAND}>
+    <section id="vi-sao" aria-labelledby="vi-sao-heading" className={SECTION_BAND}>
       <div className={SECTION_INNER}>
         <div className="mb-11 flex items-end justify-between gap-8">
           <div>
-            <div data-reveal="0" className={SECTION_EYEBROW}>
+            <p data-reveal="0" className={SECTION_EYEBROW}>
               Cái giá của một cuộc gọi nhỡ
-            </div>
-            <h2 data-reveal="1" className={`${SECTION_HEADING} mb-5 max-w-[26ch]`}>
+            </p>
+            <h2 id="vi-sao-heading" data-reveal="1" className={`${SECTION_HEADING} mb-5 max-w-[26ch]`}>
               Người gọi không để lại lời nhắn. Họ gọi phòng khám tiếp theo.
             </h2>
             <p data-reveal="2" className="m-0 max-w-[60ch] text-body-lg text-text-muted">

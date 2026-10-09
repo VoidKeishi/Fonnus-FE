@@ -18,11 +18,13 @@ const POINTS = [
  */
 export function Contact() {
   return (
-    <section id="lien-he" className={`${SECTION_BAND} bg-surface-card`}>
+    <section id="lien-he" aria-labelledby="lien-he-heading" className={`${SECTION_BAND} bg-surface-card`}>
       <div className="mx-auto grid max-w-[1280px] grid-cols-[repeat(auto-fit,minmax(300px,1fr))] items-start gap-[clamp(32px,6vw,80px)]">
         <div data-reveal="0" data-reveal-from="left">
-          <div className={SECTION_EYEBROW}>Liên hệ</div>
-          <h2 className={`${SECTION_HEADING} mb-6 max-w-[22ch]`}>Cần tư vấn trước khi bắt đầu?</h2>
+          <p className={SECTION_EYEBROW}>Liên hệ</p>
+          <h2 id="lien-he-heading" className={`${SECTION_HEADING} mb-6 max-w-[22ch]`}>
+            Cần tư vấn trước khi bắt đầu?
+          </h2>
           <p className="m-0 mb-8 max-w-[48ch] text-body-lg text-text-muted">
             Để lại số điện thoại, chúng tôi gọi lại trong 24 giờ — xem phòng khám bạn cần gì và cài đặt cùng bạn.
             Chuỗi phòng khám và bệnh viện cũng liên hệ ở đây để nhận báo giá riêng.
@@ -38,7 +40,8 @@ export function Contact() {
             ))}
           </ul>
 
-          <div className="mt-10 flex flex-wrap gap-8 pt-8 text-body-sm leading-(--leading-body) shadow-[inset_0_1px_0_var(--border-hairline)]">
+          {/* The user agent italicises an address; these lines are set upright like the rest of the column. */}
+          <address className="mt-10 flex flex-wrap gap-8 pt-8 text-body-sm leading-(--leading-body) not-italic shadow-[inset_0_1px_0_var(--border-hairline)]">
             <div>
               <div className="mb-1 text-text-muted">Điện thoại · Zalo</div>
               <a href={CONTACT.phoneHref} className={`${TEXT_LINK} font-num tabular-nums`}>
@@ -51,7 +54,7 @@ export function Contact() {
                 {CONTACT.email}
               </a>
             </div>
-          </div>
+          </address>
         </div>
 
         <div

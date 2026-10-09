@@ -147,7 +147,7 @@ export function Header() {
   return (
     <>
       {/* Same inset as a landing section, so the pill shares the content column. */}
-      <div className="pointer-events-none fixed inset-x-0 top-0 z-40 flex justify-center px-[clamp(20px,5vw,64px)] pt-[22px]">
+      <header className="pointer-events-none fixed inset-x-0 top-0 z-40 flex justify-center px-[clamp(20px,5vw,64px)] pt-[22px]">
         <div
           className={[
             'pointer-events-auto box-border flex items-center gap-[clamp(12px,2vw,28px)] rounded-pill pr-3 pl-[26px]',
@@ -165,7 +165,11 @@ export function Header() {
             <Logo variant="horizontal" height={scrolled ? 23 : 26} />
           </Link>
 
-          <nav className="mx-auto hidden items-center gap-0.5 nav:flex" onMouseLeave={menus.release}>
+          <nav
+            aria-label="Điều hướng chính"
+            className="mx-auto hidden items-center gap-0.5 nav:flex"
+            onMouseLeave={menus.release}
+          >
             {NAV_GROUPS.map((group) => (
               <GroupTrigger
                 key={group.label}
@@ -187,7 +191,7 @@ export function Header() {
 
           <Actions drawerOpen={menus.menuOpen} onToggleDrawer={menus.toggleDrawer} toggleRef={drawerToggleRef} />
         </div>
-      </div>
+      </header>
 
       {menus.menuOpen ? (
         <Drawer
@@ -362,7 +366,8 @@ const DRAWER_ROW =
 /** A second glass sheet under the pill, one row per destination. */
 function Drawer({ pathname, onPick, onDemo }: { pathname: string; onPick: () => void; onDemo: OnDemo }) {
   return (
-    <div
+    <nav
+      aria-label="Menu"
       className={[
         // Tracks the rail's inset so the drawer's edges sit under the pill's.
         'fixed top-[96px] right-[clamp(20px,5vw,64px)] left-[clamp(20px,5vw,64px)] z-[39] nav:hidden',
@@ -407,6 +412,6 @@ function Drawer({ pathname, onPick, onDemo }: { pathname: string; onPick: () => 
       >
         Đăng nhập
       </Link>
-    </div>
+    </nav>
   )
 }

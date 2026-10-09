@@ -24,24 +24,27 @@ export function FaqList({ items }: { items: readonly FaqItem[] }) {
         const panelId = `${baseId}-panel-${String(i)}`
         return (
           <div key={item.q} className="rounded-lg bg-surface-card px-6 py-1">
-            <button
-              type="button"
-              onClick={() => {
-                setOpenIndex(open ? null : i)
-              }}
-              aria-expanded={open}
-              aria-controls={panelId}
-              className="flex w-full cursor-pointer items-center justify-between gap-4 border-none bg-transparent px-0 py-5 text-left font-display text-body-lg leading-[1.4] font-semibold text-text-heading"
-            >
-              <span>{item.q}</span>
-              {/* The plus turns into the close cross by rotating: one glyph, two states. */}
-              <span
-                aria-hidden="true"
-                className={`inline-flex flex-none text-text-eyebrow transition-transform duration-(--duration-base) ease-out motion-reduce:transition-none ${open ? 'rotate-45' : ''}`}
+            {/* The button inherits its letter spacing, and the base stylesheet tightens every heading's. */}
+            <h3 className="m-0 tracking-normal">
+              <button
+                type="button"
+                onClick={() => {
+                  setOpenIndex(open ? null : i)
+                }}
+                aria-expanded={open}
+                aria-controls={panelId}
+                className="flex w-full cursor-pointer items-center justify-between gap-4 border-none bg-transparent px-0 py-5 text-left font-display text-body-lg leading-[1.4] font-semibold text-text-heading"
               >
-                <Icon name="plus" size={18} />
-              </span>
-            </button>
+                <span>{item.q}</span>
+                {/* The plus turns into the close cross by rotating: one glyph, two states. */}
+                <span
+                  aria-hidden="true"
+                  className={`inline-flex flex-none text-text-eyebrow transition-transform duration-(--duration-base) ease-out motion-reduce:transition-none ${open ? 'rotate-45' : ''}`}
+                >
+                  <Icon name="plus" size={18} />
+                </span>
+              </button>
+            </h3>
             <div
               id={panelId}
               inert={!open}
