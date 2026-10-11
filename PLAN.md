@@ -14,6 +14,7 @@ Status: ⬜ not started · 🔨 in progress · ✅ done, with the date.
 | **F3 · Lễ tân** — the hub and the three tabs (Hồ sơ, Kiến thức, Kỹ năng), the shared section frame, the save stack, the try-out panel. Brings `src/features/receptionist/model.ts` and `docs/field-catalogue-mapping.md` into force | ⬜ | The largest single step: ~60 fields across 13 forms |
 | **F4 · Landing page** — the landing page at `/` and the "Chấm điểm hotline" page at `/cham-diem-hotline`, ported from `../Fonnus-Web-UI` in nine stacked pull requests: the marketing frame, the hero, the voice orb and its call demo, pricing, how it works, capabilities, FAQ with security and testimonials, the contact form against `POST /leads`, and the hotline page against `POST /leads/hotline-report` | ✅ | Server-rendered; this is the acquisition surface. The header always shows "Đăng nhập" and "Dùng thử miễn phí", as the prototype does, and reads no session. The call demo runs in the browser with no `voice` group until Q21 is answered. A nav or footer link appears only in the pull request that lands its section |
 | **F4b · Leads to a Google Sheet** — the contact form and the "Chấm điểm hotline" request stop waiting on `../Fonnus-BE`: this app receives them in two route handlers and appends them to a Google Sheet (ADR 0005). Four stacked pull requests: the decision, `POST /api/leads`, `POST /api/leads/hotline-report`, then both forms switched to them | ✅ 2026-09-30 | Built and gated by typecheck, lint, test and build only: no request has reached a real sheet yet. `NEXT_PUBLIC_API_LIVE_GROUPS=leads` turns both forms live at once. What remains is the owner's setup and the first live append; see Backlog |
+| **F4c · The voice demo answers** — the "Nghe thử" orb opens a real three-minute conversation with a private ElevenLabs agent, as a stand-in for the pipeline behind the `voice` seam (ADR 0006). Four stacked pull requests: the decision, the `voice` seam with today's recording as its scripted implementation, `POST /api/voice-demo/token`, then the live implementation and the call screen's new states | 🔨 | Q21 answered. The dependency `@elevenlabs/client` arrives in the last pull request, loaded on the first click only. The Firewall rule and the agent's three settings are the owner's setup; see Backlog |
 | **F5 · Cuộc gọi** — the clinic's own call history | ⬜ | Blocked: `GET /calls` is "specified later" in `docs/api-contract.md` §7 and has no agreed shape |
 | **F6 · Lịch hẹn, Số điện thoại, Cài đặt** | ⬜ | |
 | **F7 · Deployment** — an ADR on how this runs on Vercel: the domain, the environments, CI, and the cookie posture towards Fonnus-BE | ⬜ | The host is Vercel (the owner's choice, and the premise of ADR 0005); everything else is undecided. The build SHA on `/api/healthz` waits here |
@@ -80,6 +81,23 @@ Each blocks nothing today and has a default that applies if nothing is said.
 
 ## Backlog
 
+- **The voice picker comes back when the agent has a second voice** (M): the call screen's
+  "Chọn giọng nói của trợ lý" menu with its five names was removed in F4c because the
+  ElevenLabs agent has one voice and the control changed nothing (ADR 0006 point 10). When a
+  second Vietnamese voice exists, the menu returns mapped to voice ids through
+  `overrides.tts.voiceId`, and the five names are reconciled with the four ids of
+  `docs/field-catalogue-mapping.md`.
+- **The owner's setup for the live voice demo** (owner's setup, then nothing): in the
+  ElevenLabs dashboard, `max_duration_seconds` = 180, Authentication on with an empty
+  allowlist, audio and transcript retention off under Privacy, and a first message that says
+  it is an AI with a closing line around 2:50; in Vercel, `ELEVENLABS_API_KEY` and
+  `ELEVENLABS_AGENT_ID` as Sensitive variables, and one Firewall rate-limit rule. The Hobby
+  plan allows one rate-limit rule per project, so it is one rule over both `/api/leads*` and
+  `/api/voice-demo/token`, keyed on IP, with a window of at most ten minutes. Deferred by the
+  owner's call until the demo is live; `NEXT_PUBLIC_API_LIVE_GROUPS=voice` turns it on.
+- **Vercel's Hobby plan is for non-commercial use** (F7): the landing page sells a product,
+  which Vercel's terms place outside Hobby. Not a code question; it belongs to the deployment
+  ADR and is noted here so F7 does not forget it.
 - **Server-render tests for the content the landing page hides by state** (S, waits on the
   go-ahead for a new kind of test): render `PlanPrice` and `CallDemoPlayer` with
   `react-dom/server` under Vitest and assert that the output holds, for every paid plan in

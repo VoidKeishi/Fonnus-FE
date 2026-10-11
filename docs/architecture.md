@@ -208,14 +208,27 @@ No gate enforces these; the pm's review does.
 
 ### `src/server/` — what runs only in a route handler
 
-- It exists for the `leads` group (ADR 0005). A second use needs its own decision.
-- A module that reads a secret or opens a connection starts with `import 'server-only'`.
-  The pure modules do not: Vitest cannot resolve that import, and they are the tested ones.
-- `env.ts` reads the environment inside a function, per request, so `next build` needs no
-  secret. A missing variable is a `503`, not a crash.
+Two things live here: the `leads` handlers that append to a Google Sheet (ADR 0005) and the
+route that mints the landing voice demo's ticket (ADR 0006). The rules below were written when
+the second arrived (ADR 0006 point 9); a third use follows them, it does not need its own.
+
+- One module per upstream service — `sheets.ts`, `elevenlabs-token.ts` — and it starts with
+  `import 'server-only'`, as does anything that reads a secret. The pure modules (checking
+  input, shaping rows) do not: Vitest cannot resolve that import, and they are the tested ones.
+- `env.ts` exposes one function per group of variables, read inside the function, per
+  request, so `next build` needs no secret. It returns `null` when the group is incomplete,
+  and the handler answers `503`, never crashes.
+- Every handler is a status ladder that ends in one upstream call under one deadline, and
+  the deadline sits under the browser's own timeout so the server always answers first.
+- A response carries a status and, for a `422`, the field list. Never text from the upstream
+  service: the frontend owns every sentence the visitor reads, and a vendor's prose would not
+  be Vietnamese.
 - A log line carries the step and the upstream status. Never a field a visitor typed, never
-  the key or a token.
-- A response carries a status and, for a `422`, the field list. Never text from Google.
+  a key, never a token.
+- Rate limiting is a Vercel Firewall rule on the route's path, not code: function instances
+  share no memory. The rule lives in the Vercel project and `README.md` records it.
+- The lint fence stands: only `src/app/` imports `src/server/`, and `src/server/` imports only
+  itself, the four pure `src/api/` files named in `eslint.config.mjs`, and `node:` built-ins.
 
 ### `src/api/` — the door to the network
 
