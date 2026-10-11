@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { api, isApiError, isLive, scriptedVoiceSession } from '@/api'
-import type { VoiceEndReason, VoiceSession } from '@/api'
+import { api, isApiError, isLive, primeGreeting, scriptedVoiceSession } from '@/api'
+import type { PrimedGreeting, VoiceEndReason, VoiceSession } from '@/api'
 import type { AgentState } from './call-state'
 
 /*
@@ -17,7 +17,9 @@ import type { AgentState } from './call-state'
  *   scripted session: the visitor has not been promised anything a recording
  *   cannot keep (ADR 0006 point 7). The one reason the screen names is a
  *   refused microphone, because otherwise a recording answering would read
- *   as Linh ignoring them.
+ *   as Linh ignoring them. The fallback's greeting is primed inside the tap,
+ *   before anything is awaited: by the time `connect` rejects, Safari no
+ *   longer counts the tap as the gesture its autoplay needs.
  * - A session that ends on its own — the agent hung up, the duration cap, a
  *   dropped connection — leaves the screen open on its ending, which offers
  *   to call again.
@@ -88,8 +90,12 @@ export function useCallDemoState(): CallDemo {
     session.current = null
   }, [])
 
-  /** Connects a new session for the open call, replacing whatever was there. */
-  const startCall = useCallback(() => {
+  /**
+   * Connects a new session for the open call, replacing whatever was there.
+   * `greeting` is the fallback's, primed by the caller inside the tap; it is
+   * released unused when `connect` resolves.
+   */
+  const connectCall = useCallback((greeting: PrimedGreeting) => {
     endSession()
     const id = turn.current
     const controller = new AbortController()
@@ -128,12 +134,25 @@ export function useCallDemoState(): CallDemo {
 
     // Called in the tap's own turn: the scripted session starts the greeting
     // synchronously inside `connect`, while the gesture still counts.
-    void api.voice.connect({ mode: 'landing-demo', signal: controller.signal }).then(attach, (err: unknown) => {
-      if (turn.current !== id) return
-      if (isApiError(err) && err.code === 'microphone_denied') setMicDenied(true)
-      attach(scriptedVoiceSession())
-    })
+    void api.voice.connect({ mode: 'landing-demo', signal: controller.signal }).then(
+      (next) => {
+        greeting.dispose()
+        attach(next)
+      },
+      (err: unknown) => {
+        if (turn.current !== id) {
+          greeting.dispose()
+          return
+        }
+        if (isApiError(err) && err.code === 'microphone_denied') setMicDenied(true)
+        attach(scriptedVoiceSession({ createPlayer: greeting.createPlayer }))
+      },
+    )
   }, [endSession])
+
+  const startCall = useCallback(() => {
+    connectCall(primeGreeting())
+  }, [connectCall])
 
   const openCall = useCallback(
     (returnFocusTo?: HTMLElement | null) => {
@@ -151,9 +170,9 @@ export function useCallDemoState(): CallDemo {
         setAwaitingConsent(true)
         return
       }
-      startCall()
+      connectCall(primeGreeting())
     },
-    [open, endSession, startCall],
+    [open, endSession, connectCall],
   )
 
   const closeCall = useCallback(() => {

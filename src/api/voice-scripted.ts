@@ -8,7 +8,8 @@
  * exported from `index.ts` rather than living behind the mock alone.
  *
  * Imports neither `http.ts` nor `mock-support.ts`, and touches no browser API
- * until a session is created — inside the click that opens the call.
+ * until a session is created or a greeting primed — inside the tap that opens
+ * or connects the call.
  */
 import type { VoiceAgentState, VoiceEvent, VoiceSession } from './contracts'
 import { createVoiceEvents } from './voice-events'
@@ -36,6 +37,39 @@ export interface ScriptedPlayer {
 export interface ScriptedDeps {
   /** Builds the player; `onEnded` fires once when the greeting has played to its end. */
   createPlayer?: (onEnded: () => void) => ScriptedPlayer
+}
+
+/**
+ * The greeting, readied inside a tap for a session that may only be created
+ * after an `await` — the live call's fallback, which Safari would otherwise
+ * refuse to play once the tap's activation has lapsed.
+ */
+export interface PrimedGreeting {
+  /** The factory for `scriptedVoiceSession`: hands over the primed player. */
+  createPlayer: (onEnded: () => void) => ScriptedPlayer
+  /** Releases the player when no session took it. */
+  dispose(): void
+}
+
+/**
+ * Call synchronously inside the tap, before any `await`: builds the player,
+ * resumes its AudioContext and unlocks its media element, without a sound.
+ */
+export function primeGreeting(): PrimedGreeting {
+  let onEnded: (() => void) | null = null
+  const player = new GreetingPlayer(() => {
+    onEnded?.()
+  })
+  player.prime()
+  return {
+    createPlayer(listener) {
+      onEnded = listener
+      return player
+    },
+    dispose() {
+      player.dispose()
+    },
+  }
 }
 
 /**
@@ -192,6 +226,21 @@ class GreetingPlayer implements ScriptedPlayer {
   private attempt = 0
 
   constructor(private readonly onEnded: () => void) {}
+
+  /**
+   * Unlocks playback while the tap still counts, for a `play()` that comes
+   * later: the context resumed, the element played muted and paused at once —
+   * the unlock Safari accepts. The pause rejects that play; nothing hears it.
+   */
+  prime(): void {
+    const audio = this.element()
+    this.connect(audio)
+    void this.ctx?.resume().catch(() => undefined)
+    audio.muted = true
+    audio.play().catch(() => undefined)
+    audio.pause()
+    audio.muted = false
+  }
 
   play(): Promise<boolean> {
     const audio = this.element()

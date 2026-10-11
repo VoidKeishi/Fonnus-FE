@@ -11,8 +11,9 @@
  *
  * `connect` rejects, and the call demo falls back to the scripted session, for
  * everything that goes wrong before the conversation starts (ADR 0006 point 7):
- * `microphone_denied`, `voice_unavailable` (no microphone API, the SDK failed
- * to load or start, or no connection within 10 seconds), and whatever
+ * `microphone_denied` (the visitor or the page's permissions refused it),
+ * `voice_unavailable` (no microphone API or no microphone, the SDK failed to
+ * load or start, or no connection within the budget below), and whatever
  * `http.ts` makes of the token route's refusal.
  */
 import type { VoiceAgentState, VoiceApi, VoiceEndReason, VoiceEvent, VoiceSession } from './contracts'
@@ -20,14 +21,17 @@ import { ApiError } from './errors'
 import { request } from './http'
 import { createVoiceEvents } from './voice-events'
 
-/** How long `startSession` may take before the demo falls back to the recording. */
-const CONNECT_TIMEOUT_MS = 10_000
+/*
+ * How long the token, the SDK and the connection may take together before the
+ * demo falls back to the recording. Counted from the microphone grant: the
+ * prompt waits on a person, not on the network.
+ */
+const CONNECT_BUDGET_MS = 15_000
 /*
  * The agent's own `max_duration_seconds` is 180. Closing first keeps the
  * ending the app's, with the app's words (ADR 0006 point 6).
  */
 const MAX_CALL_MS = 175_000
-/** While she listens, the caller's own voice drives a quieter pulse: she hears you. */
 
 /**
  * The part of the SDK's `VoiceConversation` this file uses, written out so the
@@ -48,6 +52,12 @@ function throwIfAborted(signal: AbortSignal | undefined): void {
   if (signal?.aborted) throw canceled()
 }
 
+/** A refusal by the visitor or by the page's permissions; a missing or busy device is not one. */
+function isRefusal(cause: unknown): boolean {
+  const name = typeof cause === 'object' && cause !== null && 'name' in cause ? cause.name : undefined
+  return name === 'NotAllowedError' || name === 'SecurityError'
+}
+
 export const voiceLive: VoiceApi = {
   async connect({ signal }) {
     throwIfAborted(signal)
@@ -63,10 +73,19 @@ export const voiceLive: VoiceApi = {
     try {
       stream = await media.getUserMedia({ audio: true })
     } catch (cause) {
-      throw new ApiError({ kind: 'unknown', code: 'microphone_denied', cause })
+      throw isRefusal(cause) ? new ApiError({ kind: 'unknown', code: 'microphone_denied', cause }) : unavailable(cause)
     }
     for (const track of stream.getTracks()) track.stop()
     throwIfAborted(signal)
+
+    // One budget for everything from here: the caller's abort, or the time running out.
+    const timeout = AbortSignal.timeout(CONNECT_BUDGET_MS)
+    const budget = signal ? AbortSignal.any([signal, timeout]) : timeout
+    /** The caller's abort stays `canceled`; the budget running out is `voice_unavailable`. */
+    const throwIfSpent = () => {
+      throwIfAborted(signal)
+      if (budget.aborted) throw unavailable()
+    }
 
     // An empty JSON body on purpose: the route answers 415 to anything that is
     // not `application/json` (docs/api-contract.md §5).
@@ -74,17 +93,36 @@ export const voiceLive: VoiceApi = {
       method: 'POST',
       body: {},
       ownOrigin: true,
-      signal,
+      signal: budget,
+    }).catch((cause: unknown) => {
+      // `http.ts` reports the budget's abort as its own timeout; it is this one.
+      throwIfSpent()
+      throw cause
     })
-    throwIfAborted(signal)
+    throwIfSpent()
 
-    const { VoiceConversation } = await import('@elevenlabs/client').catch((cause: unknown) => {
-      throw unavailable(cause)
+    // A dynamic import takes no signal, so a chunk that never arrives is raced
+    // against the budget by hand; otherwise it alone could outlast the fifteen seconds.
+    const spent = new Promise<never>((_, reject) => {
+      budget.addEventListener(
+        'abort',
+        () => {
+          reject(signal?.aborted ? canceled() : unavailable())
+        },
+        { once: true },
+      )
     })
-    throwIfAborted(signal)
+    const { VoiceConversation } = await Promise.race([
+      import('@elevenlabs/client').catch((cause: unknown) => {
+        throw unavailable(cause)
+      }),
+      spent,
+    ])
+    throwIfSpent()
 
     return startSession(
       (callbacks) => VoiceConversation.startSession({ conversationToken: token, connectionType: 'webrtc', ...callbacks }),
+      budget,
       signal,
     )
   },
@@ -100,12 +138,14 @@ interface Callbacks {
 }
 
 /**
- * Starts the conversation under the connect deadline and wraps it as a
- * `VoiceSession`. A conversation that arrives after the deadline or an abort
- * is ended unheard, and its callbacks change nothing.
+ * Starts the conversation under what is left of the connect budget and wraps
+ * it as a `VoiceSession`. A conversation that arrives after the budget fired
+ * is ended unheard, and its callbacks change nothing. `signal` is the caller's
+ * own, read only to tell an abort from the budget running out.
  */
 function startSession(
   start: (callbacks: Callbacks) => Promise<Conversation>,
+  budget: AbortSignal,
   signal: AbortSignal | undefined,
 ): Promise<VoiceSession> {
   const events = createVoiceEvents<VoiceEvent>({ type: 'state', state: 'connecting' })
@@ -170,17 +210,13 @@ function startSession(
       if (settled) return
       settled = true
       discarded = true
-      clearTimeout(deadline)
-      signal?.removeEventListener('abort', onAbort)
+      budget.removeEventListener('abort', onAbort)
       reject(error)
     }
     const onAbort = () => {
-      fail(canceled())
+      fail(signal?.aborted ? canceled() : unavailable())
     }
-    const deadline = setTimeout(() => {
-      fail(unavailable())
-    }, CONNECT_TIMEOUT_MS)
-    signal?.addEventListener('abort', onAbort, { once: true })
+    budget.addEventListener('abort', onAbort, { once: true })
 
     start({
       onStatusChange({ status }) {
@@ -222,8 +258,7 @@ function startSession(
           return
         }
         settled = true
-        clearTimeout(deadline)
-        signal?.removeEventListener('abort', onAbort)
+        budget.removeEventListener('abort', onAbort)
         conversation = started
         capTimer = setTimeout(() => {
           end('timeout')

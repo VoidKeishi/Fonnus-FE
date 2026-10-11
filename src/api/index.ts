@@ -56,6 +56,7 @@ export {
 } from './phone';
 export { stashPhone, takePhone } from './sign-up-handoff';
 // The call demo's fallback whenever `api.voice.connect` rejects (ADR 0006 point 7).
-export { scriptedVoiceSession } from './voice-scripted';
+export { primeGreeting, scriptedVoiceSession } from './voice-scripted';
+export type { PrimedGreeting } from './voice-scripted';
 export { MAX_ADDRESS_LENGTH, MAX_EMAIL_LENGTH, MAX_LOCATIONS, MAX_NAME_LENGTH } from './lead-limits';
 export * from './contracts';

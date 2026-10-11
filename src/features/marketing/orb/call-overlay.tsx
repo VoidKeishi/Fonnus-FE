@@ -62,6 +62,9 @@ export function CallOverlay({ spotRef, orbRef }: CallOverlayProps) {
   const dialogRef = useRef<HTMLDivElement>(null)
   const actionsRef = useRef<HTMLDivElement>(null)
   const titleId = useId()
+  // The slot's line describes its first action, which takes focus when the
+  // slot appears, so a screen reader landing there hears why.
+  const slotLineId = useId()
   const { awaitingConsent, ended } = demo
   const showsControls = !awaitingConsent && !ended
 
@@ -130,21 +133,29 @@ export function CallOverlay({ spotRef, orbRef }: CallOverlayProps) {
           <div ref={spotRef} aria-hidden="true" className="size-[clamp(200px,32vh,320px)]" />
           {awaitingConsent ? (
             <div ref={actionsRef} className="flex flex-col items-center gap-4 text-center">
-              <p className={SLOT_LINE}>{CONSENT_LINE}</p>
-              <Button variant="primary" onClick={demo.startCall}>
+              <p id={slotLineId} className={SLOT_LINE}>
+                {CONSENT_LINE}
+              </p>
+              <Button variant="primary" onClick={demo.startCall} aria-describedby={slotLineId}>
                 {START_LABEL}
               </Button>
             </div>
           ) : ended ? (
             <div ref={actionsRef} className="flex flex-col items-center gap-4 text-center">
-              <p className={SLOT_LINE}>{endedLine(ended)}</p>
+              <p id={slotLineId} role="status" className={SLOT_LINE}>
+                {endedLine(ended)}
+              </p>
               <div className="flex flex-wrap justify-center gap-3">
                 {ended === 'error' ? null : (
-                  <Link href="/dang-ky" className={buttonClassName({ variant: 'primary' })}>
+                  <Link href="/dang-ky" aria-describedby={slotLineId} className={buttonClassName({ variant: 'primary' })}>
                     {TRY_FREE_LABEL}
                   </Link>
                 )}
-                <Button variant="secondary" onClick={demo.startCall}>
+                <Button
+                  variant="secondary"
+                  onClick={demo.startCall}
+                  aria-describedby={ended === 'error' ? slotLineId : undefined}
+                >
                   {CALL_AGAIN_LABEL}
                 </Button>
               </div>

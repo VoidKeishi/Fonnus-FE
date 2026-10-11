@@ -444,9 +444,11 @@ the page. What the client does:
   posts to `POST /api/voice-demo/token`, then loads the SDK and starts the session.
 - **Two codes of its own.** Besides whatever `http.ts` makes of the token route's answer,
   `connect` rejects with `ApiError { kind: 'unknown', code }`: `microphone_denied` when the
-  browser refuses the microphone, and `voice_unavailable` when there is no microphone API (an
-  insecure context), the SDK fails to load or to start, or the session is not connected within
-  **10 seconds**. Every rejection falls back to the scripted session; `microphone_denied` alone
+  visitor or the page's permissions refuse the microphone (`getUserMedia` rejects with
+  `NotAllowedError` or `SecurityError`), and `voice_unavailable` when there is no microphone API
+  (an insecure context), `getUserMedia` fails for any other reason (no microphone, a busy one),
+  the SDK fails to load or to start, or the token, the SDK and the connection together take more
+  than **fifteen seconds**, counted from the microphone grant. Every rejection falls back to the scripted session; `microphone_denied` alone
   adds a line under the state line saying the visitor is hearing a recording because the
   microphone was not allowed. Neither code is ever rendered through `messageFor`.
 - **A 175-second cap**, under the agent's own 180, so the ending is the app's: the session

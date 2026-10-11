@@ -58,9 +58,10 @@ exists, one file changes and no screen does.
    token is valid for fifteen minutes and is not single-use, so the rate limit protects
    minting, and the duration cap and concurrency protect everything after.
 7. **Failure is handled in two ways, by when it happens.** Before the conversation has
-   started — token refused, SDK failed to load, connection not established within ten
-   seconds, microphone refused — the hook opens the scripted session instead, silently,
-   because the visitor has not yet been promised anything a recording cannot keep. Once the
+   started — microphone refused, token refused, SDK failed to load, or no connection within
+   fifteen seconds of the microphone being granted (token, SDK and WebRTC together) — the
+   hook opens the scripted session instead, silently, because the visitor has not yet been
+   promised anything a recording cannot keep. Once the
    agent has spoken and the connection drops, the screen says so and offers to call again,
    because silence there reads as the product failing. (`docs/ui-ux-principles.md` §4: a
    state that cannot be used still has to teach.)
@@ -131,6 +132,11 @@ exists, one file changes and no screen does.
 
 ## Assumed, to confirm during the build
 
+- When the fifteen-second budget fires while the WebRTC room is still negotiating, the SDK
+  keeps the microphone open until its own connection attempt settles — a few seconds in which
+  the microphone indicator is on while the screen plays the recording. The session ends that
+  conversation as soon as it resolves; there is no cheaper handle in the SDK. Settled by
+  watching the indicator on a throttled connection; if it matters, the budget grows.
 - The agent's privacy settings — Retention at 0 days and Audio Saving off, both documented
   by ElevenLabs — are what keeps the landing page's promise "Xin phép trước khi ghi âm".
   Settled when the owner sets them; the demo must not go live before.
