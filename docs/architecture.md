@@ -58,10 +58,10 @@ src/
     auth.mock.ts · auth.live.ts
     leads.mock.ts · leads.live.ts  The contact form and the hotline report. Live posts to this app's own /api/leads… (ADR 0005)
     lead-limits.ts              The length caps and the 20-location limit, read by the forms and by server/
-    voice-events.ts             The event stream every voice session shares: the latest event handed to a new listener, nothing after close. Pure, imports nothing
+    voice-events.ts (+test)     The event stream every voice session shares: the latest event handed to a new listener, nothing after close. Pure, imports nothing
     voice-scripted.ts (+test)   The scripted voice session: Linh's recorded greeting, then a script. The mock, and the fallback whenever connect rejects
     voice.mock.ts               The landing call demo's mock: the scripted session behind maybeFail
-    voice.live.ts               The ElevenLabs session, loaded on the first call (ADR 0006): microphone, token, SDK, 10 s deadline, 175 s cap
+    voice.live.ts (+test)       The ElevenLabs session, loaded on the first call (ADR 0006): microphone, token, SDK, 15 s connect budget, 175 s cap
     tenant.* (F3) · receptionist.* · shell.* · insights.* (Tổng quan) · calls.* (F5) · appointments.* · numbers.* · account.* (F6)
 
   server/                       Code that runs only in a route handler (ADR 0005). Only src/app/ imports it
