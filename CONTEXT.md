@@ -117,8 +117,9 @@ redesigning a screen, and add to it after.
 | Data | `fetch` in the browser against Fonnus-BE, behind `src/api/` | No database, no server-side fetching, no backend-for-frontend (ADR 0003). The exception is the two lead route handlers, which write to a Google Sheet (ADR 0005) |
 | Toolchain | pnpm 11, Node 22, ESLint flat config with `strictTypeChecked`, Vitest | Same as `../Fonnus/app` and `../Fonnus-Admin` |
 
-Three runtime dependencies: `next`, `react`, `react-dom`. The HTTP client, the error type,
-the mock layer and the icons are hand-written.
+Four runtime dependencies: `next`, `react`, `react-dom`, and `@elevenlabs/client` for the
+landing page's live voice demo, loaded on the first click of the orb and never with the page
+(ADR 0006). The HTTP client, the error type, the mock layer and the icons are hand-written.
 
 ## Deployment
 
