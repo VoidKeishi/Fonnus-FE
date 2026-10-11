@@ -1,14 +1,15 @@
 /**
  * The voice demo against a real receptionist: the ElevenLabs stand-in of
- * ADR 0006. The browser talks to a private ElevenLabs agent over WebRTC, with
- * a conversation token this app's own route mints (`POST /api/voice-demo/token`).
+ * ADR 0006. The browser talks to a private ElevenLabs agent, with a ticket
+ * this app's own route mints (`POST /api/voice-demo/token`).
  * When Fonnus-BE serves a web voice gateway, this file dials it instead and
  * nothing above the `VoiceSession` interface changes. It is the `voice` group's
  * only implementation: there is no mock (ADR 0007).
  *
- * Two inputs share the token, the route and the transport (ADR 0007 point 2).
- * `voice` asks for the microphone first; `text` never opens one and starts the
- * SDK's text-only conversation, whose lines arrive as `message` events.
+ * Two inputs share the route and the agent (ADR 0007). `voice` asks for the
+ * microphone first and calls over WebRTC with a conversation token; `text`
+ * never opens one and starts the SDK's text-only conversation over a
+ * WebSocket with a signed URL, whose lines arrive as `message` events.
  *
  * `@elevenlabs/client` (and `livekit-client` under it) is imported dynamically
  * inside `connect`, never at module scope: the landing page's first load must
@@ -26,7 +27,7 @@ import { request } from './http'
 import { createVoiceEvents } from './voice-events'
 
 /*
- * How long the token, the SDK and the connection may take together before the
+ * How long the ticket, the SDK and the connection may take together before the
  * call is shown as failed. Counted from the microphone grant for a voice call
  * (the prompt waits on a person, not on the network) and from `connect` for a
  * text one.
@@ -37,6 +38,8 @@ const CONNECT_BUDGET_MS = 15_000
  * ending the app's, with the app's words (ADR 0006 point 6). Exported for the tests.
  */
 export const MAX_CALL_MS = 175_000
+
+const TICKET_PATH = '/api/voice-demo/token'
 
 /**
  * The part of the SDK's `VoiceConversation` and `TextConversation` this file
@@ -78,14 +81,7 @@ export const voiceLive: VoiceApi = {
       if (budget.aborted) throw unavailable()
     }
 
-    // An empty JSON body on purpose: the route answers 415 to anything that is
-    // not `application/json` (docs/api-contract.md §5).
-    const { token } = await request<{ token: string }>('/api/voice-demo/token', {
-      method: 'POST',
-      body: {},
-      ownOrigin: true,
-      signal: budget,
-    }).catch((cause: unknown) => {
+    const ticket = await requestTicket(input, budget).catch((cause: unknown) => {
       // `http.ts` reports the budget's abort as `canceled` or `timeout`; both are this budget's.
       throwIfSpent()
       throw cause
@@ -111,24 +107,46 @@ export const voiceLive: VoiceApi = {
     ])
     throwIfSpent()
 
-    // The same conversation token and WebRTC transport for both. `textOnly`
-    // with an explicit `connectionType` skips the microphone and keeps the
-    // token, where the SDK's default for text would want a WebSocket signed URL.
+    // Text goes over the WebSocket, not WebRTC: there the text-only override is
+    // sent before the conversation starts and no audio is created, where the
+    // WebRTC transport joins in voice, plays her voice, and switches too late.
     return startSession(
       input,
       (callbacks) =>
         input === 'text'
           ? sdk.Conversation.startSession({
-              conversationToken: token,
-              connectionType: 'webrtc',
+              signedUrl: ticket,
+              connectionType: 'websocket',
               textOnly: true,
               ...callbacks,
             })
-          : sdk.VoiceConversation.startSession({ conversationToken: token, connectionType: 'webrtc', ...callbacks }),
+          : sdk.VoiceConversation.startSession({ conversationToken: ticket, connectionType: 'webrtc', ...callbacks }),
       budget,
       signal,
     )
   },
+}
+
+/** A call's WebRTC conversation token, or a typed conversation's WebSocket signed URL. */
+async function requestTicket(input: VoiceInput, signal: AbortSignal): Promise<string> {
+  if (input === 'text') {
+    const answer = await request<{ signed_url: string }>(TICKET_PATH, {
+      method: 'POST',
+      body: { input: 'text' },
+      ownOrigin: true,
+      signal,
+    })
+    return answer.signed_url
+  }
+  // An empty JSON body on purpose: the route answers 415 to anything that is
+  // not `application/json` (docs/api-contract.md §5), and `{}` is a call.
+  const { token } = await request<{ token: string }>(TICKET_PATH, {
+    method: 'POST',
+    body: {},
+    ownOrigin: true,
+    signal,
+  })
+  return token
 }
 
 /**

@@ -18,7 +18,7 @@ import { MAX_CALL_MS, startSession, voiceLive } from './voice.live'
  */
 
 const stubs = vi.hoisted(() => ({
-  request: vi.fn<(path: string, opts: Record<string, unknown>) => Promise<{ token: string }>>(),
+  request: vi.fn<(path: string, opts: Record<string, unknown>) => Promise<Record<string, string>>>(),
   textStart: vi.fn<(options: Record<string, unknown>) => Promise<unknown>>(),
   voiceStart: vi.fn<(options: Record<string, unknown>) => Promise<unknown>>(),
 }))
@@ -362,17 +362,36 @@ describe('connect', () => {
     vi.resetAllMocks()
   })
 
-  it('starts a typed conversation on the same token and transport, without asking for the microphone', async () => {
+  it('starts a typed conversation on a signed URL over the WebSocket, without asking for the microphone', async () => {
+    stubs.request.mockResolvedValue({ signed_url: 'wss://api.elevenlabs.io/v1/convai/conversation?signed' })
     const session = await voiceLive.connect({ mode: 'landing-demo', input: 'text' })
     expect(getUserMedia).not.toHaveBeenCalled()
     expect(stubs.request).toHaveBeenCalledWith(
       '/api/voice-demo/token',
-      expect.objectContaining({ method: 'POST', ownOrigin: true }),
+      expect.objectContaining({ method: 'POST', body: { input: 'text' }, ownOrigin: true }),
     )
     expect(stubs.voiceStart).not.toHaveBeenCalled()
     expect(stubs.textStart).toHaveBeenCalledWith(
-      expect.objectContaining({ conversationToken: 'conversation-token', connectionType: 'webrtc', textOnly: true }),
+      expect.objectContaining({
+        signedUrl: 'wss://api.elevenlabs.io/v1/convai/conversation?signed',
+        connectionType: 'websocket',
+        textOnly: true,
+      }),
     )
+    // The WebRTC room joins in voice and plays her audio whatever `textOnly` says.
+    expect(stubs.textStart.mock.calls[0]?.[0]).not.toHaveProperty('conversationToken')
+    await session.close()
+  })
+
+  it('asks for a call’s token with the empty body it has always sent', async () => {
+    getUserMedia.mockResolvedValue({ getTracks: () => [] } as unknown as MediaStream)
+    const session = await voiceLive.connect({ mode: 'landing-demo', input: 'voice' })
+    expect(stubs.request).toHaveBeenCalledWith('/api/voice-demo/token', {
+      method: 'POST',
+      body: {},
+      ownOrigin: true,
+      signal: expect.any(AbortSignal),
+    })
     await session.close()
   })
 
