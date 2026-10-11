@@ -11,11 +11,16 @@ import {
   ENDED_AGENT_LINE,
   ENDED_ERROR_LINE,
   ENDED_TIMEOUT_LINE,
+  SPEAKER_LABELS,
   START_LABEL,
+  TEXT_FOOTNOTE,
+  TEXT_MODE_LINE,
+  TEXT_PLACEHOLDER,
   TRY_FREE_LABEL,
 } from '@/data/call-demo'
 import { useCallDemo } from './call-demo-provider'
 import { stateLabel } from './call-state'
+import type { ThreadLine } from './use-call-demo'
 
 /*
  * The call screen. Three things and nothing else: the orb, a way to type, and a
@@ -34,6 +39,14 @@ import { stateLabel } from './call-state'
  * ended on its own, and a call that could not connect. The last three hide the
  * controls, which have nothing to talk to, but keep the room reserved for them
  * so the orb does not move.
+ *
+ * A typed conversation (ADR 0007 point 4) is the same screen with a smaller
+ * orb, a line saying why it is typed, and the thread of lines between the
+ * state line and the controls; the microphone toggle goes. An ending replaces
+ * only the state lines there, and the thread stays. It is anchored to
+ * the top rather than centred: the orb is placed on its slot when the slot
+ * changes size, not when it moves, so a thread that grows must not push the
+ * slot about.
  */
 
 /* Same treatment as the hero: Chấm nhịp behind the orb only, centred on its slot. */
@@ -66,8 +79,11 @@ export function CallOverlay({ spotRef, orbRef }: CallOverlayProps) {
   // The slot's line describes its first action, which takes focus when the
   // slot appears, so a screen reader landing there hears why.
   const slotLineId = useId()
+  const threadRef = useRef<HTMLDivElement>(null)
   const { awaitingConsent, ended, failed } = demo
   const showsControls = !awaitingConsent && !ended && !failed
+  const typing = demo.input === 'text'
+  const lineCount = demo.messages.length
 
   useEffect(() => {
     const dialog = dialogRef.current
@@ -91,14 +107,21 @@ export function CallOverlay({ spotRef, orbRef }: CallOverlayProps) {
   // Declared after the effect above, so on open it runs second and wins over
   // the dialog's own focus. A slot that swaps out takes the focused control
   // with it; focus moves to the new slot's first action, or back to the dialog
-  // once a call starts, instead of falling to the page under it.
+  // once a call starts, instead of falling to the page under it. A call that
+  // turns typed takes the microphone toggle with it, which may have had focus.
   useEffect(() => {
     if (awaitingConsent || ended || failed) {
       actionsRef.current?.querySelector<HTMLElement>('a, button')?.focus({ preventScroll: true })
       return
     }
     if (document.activeElement === document.body) dialogRef.current?.focus({ preventScroll: true })
-  }, [awaitingConsent, ended, failed])
+  }, [awaitingConsent, ended, failed, typing])
+
+  // The newest line is the one to read; the thread scrolls inside itself.
+  useEffect(() => {
+    const thread = threadRef.current
+    if (thread) thread.scrollTop = thread.scrollHeight
+  }, [lineCount])
 
   const send = () => {
     if (!typed.trim()) return
@@ -162,9 +185,20 @@ export function CallOverlay({ spotRef, orbRef }: CallOverlayProps) {
           </button>
         </div>
 
-        <div className="grid place-items-center content-center gap-[60px]">
-          {/* Wide gap: the waves finish fading before they reach the label. */}
-          <div ref={spotRef} aria-hidden="true" className="size-[clamp(200px,32vh,320px)]" />
+        <div
+          className={
+            typing
+              ? 'flex min-h-0 flex-col items-center gap-6 pt-4'
+              : 'grid place-items-center content-center gap-[60px]'
+          }
+        >
+          {/* Wide gap: the waves finish fading before they reach the label. Typed,
+              the orb is smaller and gives its room to the thread. */}
+          <div
+            ref={spotRef}
+            aria-hidden="true"
+            className={typing ? 'size-[clamp(120px,18vh,180px)] flex-none' : 'size-[clamp(200px,32vh,320px)]'}
+          />
           {awaitingConsent ? (
             <div ref={actionsRef} className="flex flex-col items-center gap-4 text-center">
               <p id={slotLineId} className={SLOT_LINE}>
@@ -174,11 +208,37 @@ export function CallOverlay({ spotRef, orbRef }: CallOverlayProps) {
                 {START_LABEL}
               </Button>
             </div>
+          ) : typing ? (
+            // An ending replaces the state lines only: in a typed conversation
+            // the thread is what the visitor came for, so it stays (ADR 0007).
+            <div className="flex min-h-0 w-[min(560px,100%)] flex-col items-center gap-4">
+              {ending ?? (
+                <div className="flex flex-col items-center gap-1 text-center">
+                  <div role="status" className={`min-h-[22px] ${LABEL}`}>
+                    {stateLabel(demo.agent, demo.mic, 'text')}
+                  </div>
+                  <p className={`m-0 max-w-[36ch] ${LABEL}`}>{TEXT_MODE_LINE}</p>
+                </div>
+              )}
+              {/* Kept while the conversation runs, empty or not, so the live
+                  region exists before her first line arrives. */}
+              {ending && lineCount === 0 ? null : (
+                <div
+                  ref={threadRef}
+                  aria-live="polite"
+                  className="flex min-h-0 w-full flex-col gap-3 overflow-y-auto overscroll-contain"
+                >
+                  {demo.messages.map((line) => (
+                    <ThreadTurn key={line.id} line={line} />
+                  ))}
+                </div>
+              )}
+            </div>
           ) : (
             ending ?? (
               <div className="flex flex-col items-center gap-1 text-center">
                 <div role="status" className={`min-h-[22px] ${LABEL}`}>
-                  {stateLabel(demo.agent, demo.mic)}
+                  {stateLabel(demo.agent, demo.mic, 'voice')}
                 </div>
               </div>
             )
@@ -186,8 +246,9 @@ export function CallOverlay({ spotRef, orbRef }: CallOverlayProps) {
         </div>
 
         {/* Reserves room under the orb for the controls, which are fixed. Kept
-            while they are hidden, so the orb stays where it was. */}
-        <div className="h-[170px]" />
+            while they are hidden, so the orb stays where it was. Typed, the
+            footnote is longer and wraps to a second line on a phone. */}
+        <div className={typing ? 'h-[192px]' : 'h-[170px]'} />
       </div>
 
       {showsControls ? (
@@ -211,7 +272,7 @@ export function CallOverlay({ spotRef, orbRef }: CallOverlayProps) {
             {/* The pill carries the hairline and the shadow; the global
                 :focus-visible ring would draw a square inside it. */}
             <input
-              placeholder="Gõ câu hỏi nếu bạn không muốn nói…"
+              placeholder={typing ? TEXT_PLACEHOLDER : 'Gõ câu hỏi nếu bạn không muốn nói…'}
               value={typed}
               onChange={(e) => {
                 setTyped(e.target.value)
@@ -225,15 +286,17 @@ export function CallOverlay({ spotRef, orbRef }: CallOverlayProps) {
               className="min-w-0 flex-1 border-none bg-transparent font-ui text-body-sm text-text-body outline-none placeholder:text-text-muted focus-visible:outline-none"
             />
 
-            <button
-              type="button"
-              onClick={demo.toggleMic}
-              aria-label="Bật tắt micro"
-              aria-pressed={!demo.mic}
-              className={`${ROUND} ${demo.mic ? IDLE : ACTIVE}`}
-            >
-              <Icon name={demo.mic ? 'voice' : 'voice-off'} size={18} />
-            </button>
+            {typing ? null : (
+              <button
+                type="button"
+                onClick={demo.toggleMic}
+                aria-label="Bật tắt micro"
+                aria-pressed={!demo.mic}
+                className={`${ROUND} ${demo.mic ? IDLE : ACTIVE}`}
+              >
+                <Icon name={demo.mic ? 'voice' : 'voice-off'} size={18} />
+              </button>
+            )}
 
             <button
               type="button"
@@ -246,7 +309,7 @@ export function CallOverlay({ spotRef, orbRef }: CallOverlayProps) {
           </div>
 
           <p className="m-0 text-center text-ui leading-(--leading-body) text-text-muted">
-            Fonnus luôn trả lời bằng giọng nói. Bấm ✕ để thoát.
+            {typing ? TEXT_FOOTNOTE : 'Fonnus luôn trả lời bằng giọng nói. Bấm ✕ để thoát.'}
           </p>
         </div>
       ) : null}
@@ -259,6 +322,31 @@ function endedLine(reason: VoiceEndReason): string {
   if (reason === 'timeout') return ENDED_TIMEOUT_LINE
   if (reason === 'agent') return ENDED_AGENT_LINE
   return ENDED_ERROR_LINE
+}
+
+/**
+ * One line of a typed conversation, in the landing page's one transcript shape:
+ * the turns of the "Khả năng" sample calls (`call-demo-player.tsx`), whose
+ * classes these repeat. Her lines sit on blush, because blush means speech.
+ */
+function ThreadTurn({ line }: { line: ThreadLine }) {
+  const hers = line.from === 'agent'
+  return (
+    <div
+      className={[
+        'max-w-[92%] rounded-md px-[15px] py-[13px] max-[561px]:max-w-full',
+        'motion-safe:animate-[fnRise_320ms_var(--ease-out)_both]',
+        hers ? 'self-end bg-surface-warm' : 'self-start bg-surface-page shadow-[inset_0_0_0_1px_var(--border-hairline)]',
+      ].join(' ')}
+    >
+      <span
+        className={`mb-[5px] block text-eyebrow leading-(--leading-body) font-semibold tracking-[0.06em] uppercase ${hers ? 'text-text-accent' : 'text-text-muted'}`}
+      >
+        {SPEAKER_LABELS[line.from]}
+      </span>
+      <p className="m-0 text-body-sm leading-[1.55] text-text-body">{line.text}</p>
+    </div>
+  )
 }
 
 /**

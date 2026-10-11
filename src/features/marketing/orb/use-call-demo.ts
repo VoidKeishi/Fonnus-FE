@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { api } from '@/api'
-import type { VoiceEndReason, VoiceSession } from '@/api'
+import { api, isApiError } from '@/api'
+import type { VoiceEndReason, VoiceInput, VoiceSession } from '@/api'
 import type { AgentState } from './call-state'
 
 /*
@@ -12,7 +12,11 @@ import type { AgentState } from './call-state'
  *   visitor's voice is personal data and leaves the country, so the
  *   microphone prompt and the token request start inside that tap, never on
  *   the orb click (ADR 0006 point 8).
- * - Any rejection is a failed call, and the screen says so; nothing
+ * - A browser that gives no microphone, for any reason, gets the same agent
+ *   typed: `connect` rejects with `microphone_unavailable` and the call
+ *   connects again with `input: 'text'`, inside the same tap and without a
+ *   second consent (ADR 0007 point 3).
+ * - Any other rejection is a failed call, and the screen says so; nothing
  *   stands in for the agent.
  * - A session that ends on its own — the agent hung up, the duration cap, a
  *   dropped connection — leaves the screen open on its ending, which offers
@@ -22,6 +26,14 @@ import type { AgentState } from './call-state'
 /** Set on <html> while the call is open; `globals.css` turns it into the scroll lock. */
 const SCROLL_LOCK = 'data-scroll-lock'
 
+/** One line of a typed conversation. */
+export interface ThreadLine {
+  /** The hook's own counter, for the list key; the session's events carry none. */
+  id: number
+  from: 'agent' | 'visitor'
+  text: string
+}
+
 export interface CallDemo {
   open: boolean
   agent: AgentState
@@ -30,6 +42,13 @@ export interface CallDemo {
   ended: VoiceEndReason | null
   /** The call is open on the consent line and nothing is connected yet. */
   awaitingConsent: boolean
+  /**
+   * How the visitor talks to her: null while the call is being tried, `text`
+   * from the moment the browser gives no microphone, `voice` once a call is attached.
+   */
+  input: VoiceInput | null
+  /** The typed conversation so far, oldest first. Empty in a voice call. */
+  messages: readonly ThreadLine[]
   /** Nothing could connect: the screen says so and offers to call again. */
   failed: boolean
   /**
@@ -63,6 +82,8 @@ export function useCallDemoState(): CallDemo {
   const [mic, setMic] = useState(true)
   const [ended, setEnded] = useState<VoiceEndReason | null>(null)
   const [awaitingConsent, setAwaitingConsent] = useState(false)
+  const [input, setInput] = useState<VoiceInput | null>(null)
+  const [messages, setMessages] = useState<readonly ThreadLine[]>([])
   const [failed, setFailed] = useState(false)
 
   const session = useRef<VoiceSession | null>(null)
@@ -73,6 +94,8 @@ export function useCallDemoState(): CallDemo {
   const micRef = useRef(true)
   /** Bumped by every open, connect and close, so a session that arrives for an earlier call is closed unheard. */
   const turn = useRef(0)
+  /** The next thread line's id. Never reset: ids only have to differ within one call. */
+  const nextLineId = useRef(0)
 
   const endSession = useCallback(() => {
     turn.current += 1
@@ -84,11 +107,13 @@ export function useCallDemoState(): CallDemo {
     session.current = null
   }, [])
 
-  /** Back to the screen before anything connected, with no ending and no failure. */
+  /** Back to the screen before anything connected, with no ending, no failure and no thread. */
   const resetCall = useCallback(() => {
     setAgent('connecting')
     setEnded(null)
     setFailed(false)
+    setInput(null)
+    setMessages([])
   }, [])
 
   const startCall = useCallback(() => {
@@ -99,16 +124,22 @@ export function useCallDemoState(): CallDemo {
     setAwaitingConsent(false)
     resetCall()
 
-    const attach = (next: VoiceSession) => {
+    const attach = (next: VoiceSession, nextInput: VoiceInput) => {
       if (turn.current !== id) {
         void next.close()
         return
       }
       connecting.current = null
       session.current = next
+      setInput(nextInput)
       unsubscribe.current = next.subscribe((event) => {
         if (event.type === 'state') {
           setAgent(event.state)
+          return
+        }
+        if (event.type === 'message') {
+          const id = nextLineId.current++
+          setMessages((lines) => [...lines, { id, from: event.from, text: event.text }])
           return
         }
         if (event.reason === 'user') return
@@ -132,12 +163,30 @@ export function useCallDemoState(): CallDemo {
       setFailed(true)
     }
 
+    const connect = (nextInput: VoiceInput) =>
+      api.voice.connect({ mode: 'landing-demo', input: nextInput, signal: controller.signal })
+
     // Called in the tap's own turn: the microphone prompt needs the gesture.
-    void api.voice.connect({ mode: 'landing-demo', signal: controller.signal }).then(
+    void connect('voice').then(
       (next) => {
-        attach(next)
+        attach(next, 'voice')
       },
-      fail,
+      (err: unknown) => {
+        if (turn.current !== id) return
+        if (!isApiError(err) || err.code !== 'microphone_unavailable') {
+          fail()
+          return
+        }
+        // The screen turns typed now, not once the text session arrives: a
+        // visitor about to type is never shown the call's "always by voice" line.
+        setInput('text')
+        void connect('text').then(
+          (next) => {
+            attach(next, 'text')
+          },
+          fail,
+        )
+      },
     )
   }, [endSession, resetCall])
 
@@ -213,6 +262,8 @@ export function useCallDemoState(): CallDemo {
       mic,
       ended,
       awaitingConsent,
+      input,
+      messages,
       failed,
       openCall,
       startCall,
@@ -228,6 +279,8 @@ export function useCallDemoState(): CallDemo {
       mic,
       ended,
       awaitingConsent,
+      input,
+      messages,
       failed,
       openCall,
       startCall,

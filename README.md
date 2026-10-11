@@ -90,7 +90,8 @@ voice agent hosted on ElevenLabs Conversational AI
 mock: the visitor's browser talks to ElevenLabs directly, but only with a short-lived ticket,
 which this app's `POST /api/voice-demo/token` obtains from ElevenLabs with a secret API key.
 With no setup that route answers `503` and the call screen says it could not connect, which
-is also what `pnpm dev` shows on a machine without the two variables below.
+is also what `pnpm dev` shows on a machine without the two variables below. A visitor whose
+browser gives no microphone talks to the same agent by typing, and reads the replies.
 
 1. In the ElevenLabs dashboard, open the agent and set it up as follows.
    - Under Advanced → Call limits, set `max_duration_seconds` to 180. The landing page ends
@@ -98,6 +99,10 @@ is also what `pnpm dev` shows on a machine without the two variables below.
    - Under Security, turn Authentication on and leave the allowlist empty. Authentication
      makes the agent private, so only a ticket minted with your API key can start a
      conversation. ElevenLabs advises against combining authentication with an allowlist.
+   - Under Security → Overrides, enable **Text-only mode**. The text session for a visitor
+     without a microphone is sent as a per-conversation override, and ElevenLabs refuses an
+     override whose field is not enabled. Do not enable text-only under Advanced: that
+     would make every call text.
    - Under Privacy, set Retention to 0 days and turn Audio Saving off, so the demo keeps
      the landing page's promise to ask before recording. Both settings are documented on
      ElevenLabs's privacy page.
