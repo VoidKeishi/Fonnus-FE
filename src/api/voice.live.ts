@@ -27,11 +27,11 @@ import { createVoiceEvents } from './voice-events'
  * prompt waits on a person, not on the network.
  */
 const CONNECT_BUDGET_MS = 15_000
-/*
+/**
  * The agent's own `max_duration_seconds` is 180. Closing first keeps the
- * ending the app's, with the app's words (ADR 0006 point 6).
+ * ending the app's, with the app's words (ADR 0006 point 6). Exported for the tests.
  */
-const MAX_CALL_MS = 175_000
+export const MAX_CALL_MS = 175_000
 
 /**
  * The part of the SDK's `VoiceConversation` this file uses, written out so the
@@ -52,8 +52,11 @@ function throwIfAborted(signal: AbortSignal | undefined): void {
   if (signal?.aborted) throw canceled()
 }
 
-/** A refusal by the visitor or by the page's permissions; a missing or busy device is not one. */
-function isRefusal(cause: unknown): boolean {
+/**
+ * A refusal by the visitor or by the page's permissions; a missing or busy device is not one.
+ * Exported for the tests.
+ */
+export function isRefusal(cause: unknown): boolean {
   const name = typeof cause === 'object' && cause !== null && 'name' in cause ? cause.name : undefined
   return name === 'NotAllowedError' || name === 'SecurityError'
 }
@@ -141,9 +144,9 @@ interface Callbacks {
  * Starts the conversation under what is left of the connect budget and wraps
  * it as a `VoiceSession`. A conversation that arrives after the budget fired
  * is ended unheard, and its callbacks change nothing. `signal` is the caller's
- * own, read only to tell an abort from the budget running out.
+ * own, read only to tell an abort from the budget running out. Exported for the tests.
  */
-function startSession(
+export function startSession(
   start: (callbacks: Callbacks) => Promise<Conversation>,
   budget: AbortSignal,
   signal: AbortSignal | undefined,
@@ -253,8 +256,10 @@ function startSession(
         }
         if (droppedEarly) {
           // Gone before it was handed over: still "before the conversation
-          // started", so the recording takes over silently.
+          // started", so the recording takes over silently. Ended anyway, so
+          // a half-closed peer never stays open behind the recording.
           fail(unavailable())
+          void started.endSession().catch(() => undefined)
           return
         }
         settled = true
