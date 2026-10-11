@@ -96,7 +96,9 @@ Each blocks nothing today and has a default that applies if nothing is said.
   plan allows one rate-limit rule per project, so it is one rule over both `/api/leads*` and
   `/api/voice-demo/token`, keyed on IP, with a window of at most ten minutes; and, since
   F4d, the **Text-only mode** override enabled under the agent's Security tab, or the text
-  session of a visitor without a microphone is refused. Deferred by the owner's call until
+  session of a visitor without a microphone is refused, a first message that does not say
+  the call is recorded, and a turn timeout long enough to type a sentence (the first text
+  session ended on the 7-second default). Deferred by the owner's call until
   the demo is live; setting the two variables is what turns it on (there is no group
   switch since F4d).
 - **"Nhắn tin thay vì gọi" as a choice on the consent screen** (S, after the first live text

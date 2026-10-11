@@ -67,6 +67,8 @@ export interface CallDemo {
   returnFocusTo: () => HTMLElement | null
   /** A suggestion chip or the typed box. */
   ask: (text: string) => void
+  /** The visitor is typing in the box; keeps her from ending a conversation she thinks is silent. */
+  noteActivity: () => void
   toggleMic: () => void
   /**
    * Live loudness of her voice, 0–1, or null when nothing is playing.
@@ -217,6 +219,10 @@ export function useCallDemoState(): CallDemo {
     session.current?.sendText(text)
   }, [])
 
+  const noteActivity = useCallback(() => {
+    session.current?.noteActivity()
+  }, [])
+
   const toggleMic = useCallback(() => {
     const next = !micRef.current
     micRef.current = next
@@ -270,6 +276,7 @@ export function useCallDemoState(): CallDemo {
       closeCall,
       returnFocusTo,
       ask,
+      noteActivity,
       toggleMic,
       getAmplitude,
     }),
@@ -287,6 +294,7 @@ export function useCallDemoState(): CallDemo {
       closeCall,
       returnFocusTo,
       ask,
+      noteActivity,
       toggleMic,
       getAmplitude,
     ],

@@ -107,8 +107,14 @@ browser gives no microphone talks to the same agent by typing, and reads the rep
      the landing page's promise to ask before recording. Both settings are documented on
      ElevenLabs's privacy page.
    - Write the agent's first message so that it says the receptionist is an AI, which
-     Vietnamese law requires (Law 134/2025/QH15). Write its prompt so that it brings the
-     call to a close at around two minutes and fifty seconds, before the limit cuts it off.
+     Vietnamese law requires (Law 134/2025/QH15), and so that it does **not** say the call
+     is recorded: the landing page promises the opposite, and the Privacy settings above
+     make it true. Write its prompt so that it brings the call to a close at around two
+     minutes and fifty seconds, before the limit cuts it off.
+   - Under Advanced → Turn timeout, consider more than the default 7 seconds. A visitor
+     without a microphone types, and a Vietnamese sentence takes 15–30 seconds; the page
+     tells the agent the visitor is typing, but a longer timeout is the backstop. The
+     setting applies to voice calls too, where it is how long Linh waits in silence.
 2. In the Vercel project, put the rate limit on first, because the route serves anyone as
    soon as the variables below are set. The Hobby plan allows one rate-limit rule per
    project, so a single rule covers both this route and the marketing forms: Firewall → a

@@ -192,6 +192,14 @@ export interface VoiceSession {
   sendText(text: string): void;
 
   /**
+   * The visitor is doing something that is not yet a line: typing in the box.
+   * Without it the agent hears silence, and her turn timeout can end the
+   * conversation while the visitor is still typing. Call it on every input
+   * change; the implementation throttles it. Inert once the session has ended.
+   */
+  noteActivity(): void;
+
+  /**
    * Output loudness 0..1, or null when silent, which a text session always
    * is. Polled from the orb's requestAnimationFrame loop, never pushed
    * through React state: a 60fps signal there would re-render every consumer

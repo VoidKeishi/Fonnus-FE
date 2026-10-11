@@ -276,6 +276,7 @@ export function CallOverlay({ spotRef, orbRef }: CallOverlayProps) {
               value={typed}
               onChange={(e) => {
                 setTyped(e.target.value)
+                demo.noteActivity()
               }}
               onKeyDown={(e) => {
                 // Enter that confirms a Vietnamese IME composition is not a send.

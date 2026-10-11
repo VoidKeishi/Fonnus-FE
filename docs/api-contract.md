@@ -414,6 +414,7 @@ microphone prompt needs that gesture. The session has:
 | `subscribe(listener)` | Delivers events and returns the unsubscribe. A new listener is first handed, synchronously, every `message` so far and then the latest of the other events. Nothing is delivered after `close()` resolves |
 | `setMicEnabled(on)` | The screen's entire microphone surface. The session owns `getUserMedia` and everything downstream of it. A no-op in a text session |
 | `sendText(text)` | A chip or a typed line. A text session also emits it back as the visitor's `message` |
+| `noteActivity()` | The visitor is typing a line not yet sent. The screen calls it on every change to the typed box, in both inputs, so the agent's turn timeout does not end the conversation while the visitor types; the live session forwards it to the SDK's `sendUserActivity()`, which throttles it. Inert once the session has ended |
 | `getAmplitude()` | Output loudness `0..1`, or `null` when silent. Polled by the orb on every animation frame, never pushed as an event. Always `null` in a text session |
 | `close()` | Idempotent. Emits `ended { reason: 'user' }` once, unless the session had already ended |
 
