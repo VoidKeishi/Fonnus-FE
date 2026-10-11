@@ -1,12 +1,12 @@
 /**
  * Copy for the "Nghe thử" call screen on the landing page: the suggestion
- * chips, and the lines and buttons of the states the live call adds — consent
- * before the microphone, the endings, the refused microphone (ADR 0006).
+ * chips, and the lines and buttons of the states around the conversation —
+ * consent before the microphone, the endings, a call that could not connect
+ * (ADR 0006, ADR 0007).
  *
  * A chip is a question the caller asks, handled exactly as a typed line is:
- * handed to the voice session (`api.voice`). The scripted session, which is
- * also the fallback whenever a live one cannot connect, answers every question
- * with the same timed beat (`src/api/voice-scripted.ts`).
+ * handed to the voice session (`api.voice`), which is always the ElevenLabs
+ * agent. Nothing here is answered by a script.
  */
 export interface SuggestionChip {
   label: string
@@ -18,7 +18,7 @@ export const CHIPS: SuggestionChip[] = [
   { label: 'Phòng khám ở đâu?' },
 ]
 
-/** Live only, before anything connects: what happens to the visitor's voice (ADR 0006 point 8). */
+/** Before anything connects: what happens to the visitor's voice (ADR 0006 point 8). */
 export const CONSENT_LINE =
   'Bạn sắp nói chuyện với Linh — một trợ lý AI. Giọng của bạn được xử lý trực tiếp để Linh trả lời, không lưu lại.'
 export const START_LABEL = 'Bắt đầu gọi'
@@ -29,5 +29,5 @@ export const ENDED_ERROR_LINE = 'Mất kết nối với Linh.'
 export const CALL_AGAIN_LABEL = 'Gọi lại'
 export const TRY_FREE_LABEL = 'Dùng thử miễn phí'
 
-/** Under the state line when the fallback is answering because the microphone was refused. */
-export const MIC_DENIED_LINE = 'Trình duyệt chưa cho phép dùng micro, nên bạn đang nghe bản thu sẵn.'
+/** Nothing could connect: no microphone, the token route refused, the SDK failed, or the time ran out (ADR 0007 point 5). */
+export const CONNECT_FAILED_LINE = 'Không kết nối được với Linh lúc này. Bạn thử gọi lại sau một lát.'

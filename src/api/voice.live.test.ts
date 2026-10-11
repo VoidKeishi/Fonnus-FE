@@ -2,17 +2,29 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Mock } from 'vitest'
 import type { VoiceEvent, VoiceSession } from './contracts'
 import { ApiError } from './errors'
-import { MAX_CALL_MS, isRefusal, startSession } from './voice.live'
+import { MAX_CALL_MS, startSession, voiceLive } from './voice.live'
 
 /*
- * The live session decides two things the visitor feels at once. Before the
- * conversation starts, every failure must reject, so the call carries on with
- * Linh's recording instead of a dead screen — and a conversation that turns up
- * after that must be hung up, or she answers in the background of a recording.
- * After it starts, the SDK's disconnect has to become the one ending the screen
- * shows, said once and with the right reason. None of it needs a microphone:
- * the SDK's `startSession` is stubbed and its callbacks are called by hand.
+ * The live session decides what the visitor feels at once. Before the
+ * conversation starts, every failure must reject, so the screen says the call
+ * could not connect instead of hanging on "Đang kết nối…" — and a conversation
+ * that turns up after that must be hung up, or she answers in the background
+ * of a failed call. A browser that gives no microphone, for any reason, must
+ * reject with one code and mint no token. After it starts, the
+ * SDK's disconnect has to become the one ending the screen shows, said once
+ * and with the right reason. None of it needs a microphone or a network: the
+ * SDK and the token request are stubbed and their callbacks called by hand.
  */
+
+const stubs = vi.hoisted(() => ({
+  request: vi.fn<(path: string, opts: Record<string, unknown>) => Promise<{ token: string }>>(),
+  voiceStart: vi.fn<(options: Record<string, unknown>) => Promise<unknown>>(),
+}))
+
+vi.mock('./http', () => ({ request: stubs.request }))
+vi.mock('@elevenlabs/client', () => ({
+  VoiceConversation: { startSession: stubs.voiceStart },
+}))
 
 type Start = Parameters<typeof startSession>[0]
 type Callbacks = Parameters<Start>[0]
@@ -224,18 +236,57 @@ describe('startSession, once the conversation has started', () => {
   })
 })
 
-describe('isRefusal', () => {
-  it.each([{ name: 'NotAllowedError' }, { name: 'SecurityError' }])('is a refusal: $name', (cause) => {
-    expect(isRefusal(cause)).toBe(true)
+describe('connect', () => {
+  const getUserMedia = vi.fn<(constraints: MediaStreamConstraints) => Promise<MediaStream>>()
+
+  beforeEach(() => {
+    vi.useRealTimers()
+    vi.stubGlobal('navigator', { mediaDevices: { getUserMedia } })
+    stubs.request.mockResolvedValue({ token: 'conversation-token' })
+    stubs.voiceStart.mockImplementation(() => Promise.resolve(stubConversation()))
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.resetAllMocks()
+  })
+
+  it('asks for the microphone first, releases it, and starts a voice conversation', async () => {
+    const track = { stop: vi.fn<() => void>() }
+    getUserMedia.mockResolvedValue({ getTracks: () => [track] } as unknown as MediaStream)
+    const session = await voiceLive.connect({ mode: 'landing-demo' })
+    expect(track.stop).toHaveBeenCalledTimes(1)
+    expect(stubs.voiceStart).toHaveBeenCalledWith(
+      expect.objectContaining({ conversationToken: 'conversation-token', connectionType: 'webrtc' }),
+    )
+    await session.close()
   })
 
   it.each([
+    ['refused by the visitor', { name: 'NotAllowedError' }],
+    ['refused by the page', { name: 'SecurityError' }],
     ['no microphone', { name: 'NotFoundError' }],
     ['a busy microphone', { name: 'NotReadableError' }],
-    ['a TypeError', new TypeError('getUserMedia is not a function')],
-    ['undefined', undefined],
-    ['null', null],
-  ])('is not a refusal: %s', (_, cause) => {
-    expect(isRefusal(cause)).toBe(false)
+  ])('rejects as microphone unavailable, minting no token: %s', async (_, cause) => {
+    getUserMedia.mockRejectedValue(cause)
+    const connecting = voiceLive.connect({ mode: 'landing-demo' })
+    await expect(connecting).rejects.toBeInstanceOf(ApiError)
+    await expect(connecting).rejects.toMatchObject({ code: 'microphone_unavailable' })
+    expect(stubs.request).not.toHaveBeenCalled()
+  })
+
+  it('rejects as microphone unavailable when the browser has no media API at all', async () => {
+    vi.stubGlobal('navigator', {})
+    const connecting = voiceLive.connect({ mode: 'landing-demo' })
+    await expect(connecting).rejects.toMatchObject({ code: 'microphone_unavailable' })
+    expect(stubs.request).not.toHaveBeenCalled()
+  })
+
+  it('passes on the token route’s refusal, so the screen says the call could not connect', async () => {
+    const refusal = new ApiError({ kind: 'server', status: 503 })
+    stubs.request.mockRejectedValue(refusal)
+    getUserMedia.mockResolvedValue({ getTracks: () => [] } as unknown as MediaStream)
+    await expect(voiceLive.connect({ mode: 'landing-demo' })).rejects.toBe(refusal)
+    expect(stubs.voiceStart).not.toHaveBeenCalled()
   })
 })

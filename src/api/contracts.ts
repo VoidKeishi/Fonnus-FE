@@ -12,7 +12,8 @@
  *
  * The `auth`, `leads` and `voice` groups exist today. The other groups of the
  * contract — tenant, assistant, receptionist — arrive with the screens that
- * call them (PLAN.md); nothing ships ahead of its first consumer.
+ * call them (PLAN.md); nothing ships ahead of its first consumer. `voice` has
+ * no mock (ADR 0007), so it is the one group missing from `API_GROUPS`.
  */
 
 /** Every method takes this, so a caller can cancel on unmount. */
@@ -188,6 +189,10 @@ export interface VoiceApi {
   /**
    * Opens a session. Call it from inside the click that asked for the call:
    * an implementation that plays audio needs that gesture for autoplay.
+   *
+   * Rejects with `microphone_unavailable` when the browser gives no microphone,
+   * for any reason. Rejects with `voice_unavailable` when nothing could
+   * connect in time, or with whatever `http.ts` makes of the ticket's refusal.
    */
   connect(opts: { mode: 'landing-demo'; signal?: AbortSignal | undefined }): Promise<VoiceSession>;
 }
@@ -202,7 +207,10 @@ export interface FonnusApi {
   voice: VoiceApi;
 }
 
-/** The group names `NEXT_PUBLIC_API_LIVE_GROUPS` accepts. */
-export const API_GROUPS = ['auth', 'leads', 'voice'] as const;
+/**
+ * The group names `NEXT_PUBLIC_API_LIVE_GROUPS` accepts. Not `voice`: it has
+ * no mock and is always live (ADR 0007).
+ */
+export const API_GROUPS = ['auth', 'leads'] as const;
 
 export type ApiGroup = (typeof API_GROUPS)[number];
