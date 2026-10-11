@@ -49,6 +49,8 @@ interface Conversation {
   setMicMuted(isMuted: boolean): void
   getOutputVolume(): number
   sendUserMessage(text: string): void
+  /** Throttled by the SDK itself, so it may be called on every keystroke. */
+  sendUserActivity(): void
 }
 
 type Mode = Extract<VoiceAgentState, 'speaking' | 'listening'>
@@ -218,6 +220,10 @@ export function startSession(
         setMode('speaking')
       }
       conversation.sendUserMessage(line)
+    },
+
+    noteActivity() {
+      if (!ended) conversation?.sendUserActivity()
     },
 
     getAmplitude() {

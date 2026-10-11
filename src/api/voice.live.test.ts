@@ -37,6 +37,7 @@ interface StubConversation {
   setMicMuted: Mock<(isMuted: boolean) => void>
   getOutputVolume: Mock<() => number>
   sendUserMessage: Mock<(text: string) => void>
+  sendUserActivity: Mock<() => void>
 }
 
 function stubConversation(): StubConversation {
@@ -45,6 +46,7 @@ function stubConversation(): StubConversation {
     setMicMuted: vi.fn<(isMuted: boolean) => void>(),
     getOutputVolume: vi.fn<() => number>(() => 0.42),
     sendUserMessage: vi.fn<(text: string) => void>(),
+    sendUserActivity: vi.fn<() => void>(),
   }
 }
 
@@ -250,6 +252,27 @@ describe('startSession, once the conversation has started', () => {
     expect(conversation.setMicMuted).not.toHaveBeenCalled()
     expect(conversation.sendUserMessage).not.toHaveBeenCalled()
     expect(session.getAmplitude()).toBeNull()
+  })
+
+  it.each<VoiceInput>(['voice', 'text'])(
+    'tells her the visitor is typing, so she does not end a silent turn: %s',
+    async (input) => {
+      const { session, conversation } = await started(input)
+      session.noteActivity()
+      expect(conversation.sendUserActivity).toHaveBeenCalledTimes(1)
+    },
+  )
+
+  it('tells her nothing about typing once closed or ended', async () => {
+    const closed = await started('text')
+    await closed.session.close()
+    closed.session.noteActivity()
+    expect(closed.conversation.sendUserActivity).not.toHaveBeenCalled()
+
+    const hungUp = await started('text')
+    hungUp.callbacks.onDisconnect({ reason: 'agent' })
+    hungUp.session.noteActivity()
+    expect(hungUp.conversation.sendUserActivity).not.toHaveBeenCalled()
   })
 })
 

@@ -111,14 +111,21 @@ agent answers in text, because that is the only mode the vendor offers without a
   decision behind it.
 - **A WebSocket signed URL for the text session.** See "Why".
 
+## Settled by the first text session (2026-10-11, local, microphone blocked)
+
+- The SDK's text-only conversation over the WebRTC transport, on the same conversation
+  token the voice path uses, joins the room and delivers `agent_response` events: the
+  agent's first message arrived as the first line of the thread. No signed URL is needed.
+- What was not planned for: the agent's `turn_timeout` (7 s by default) counts while the
+  visitor types, and the agent ended the conversation before the first typed line was
+  sent. The session now reports typing through `noteActivity()` → the SDK's
+  `sendUserActivity()`, which the SDK documents as the way to tell the agent the visitor is
+  present and typing. Whether that alone holds the turn open for a slow typist is the next
+  thing a text session settles; raising the agent's turn timeout is the owner's lever if
+  not (README).
+
 ## Assumed, to confirm during the build
 
-- The SDK's text-only conversation over the WebRTC transport delivers `agent_response`
-  events, so `onMessage` fires with the agent's lines on the same conversation token the
-  voice path uses. Read from the SDK's connection factory (`textOnly` with an explicit
-  `connectionType: 'webrtc'` skips the microphone and keeps the data channel); settled by
-  the first text session on a preview deploy. If it does not hold, the route grows a second
-  ticket kind (a signed URL) and §5 of the contract changes with it.
 - A text-only session that ElevenLabs refuses because the override is not enabled does
   **not** surface as a failed `startSession`: the SDK resolves once the room is joined and
   the override is published, before the server has judged it, and the room closing
@@ -128,8 +135,6 @@ agent answers in text, because that is the only mode the vendor offers without a
   code; whether the refusal looks like that, or like a connection that never joins and
   therefore does fail, is settled by starting one text session before the owner enables
   the override.
-- The agent's first message is delivered in a text session as an `agent_response`, so the
-  thread opens with it. Settled by the same first text session.
 - The orb's placement re-measures its slot when the slot changes size, so the smaller orb
   of the text shape lands where the slot is and not where the voice slot was.
 
