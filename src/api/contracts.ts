@@ -12,7 +12,8 @@
  *
  * The `auth`, `leads` and `voice` groups exist today. The other groups of the
  * contract — tenant, assistant, receptionist — arrive with the screens that
- * call them (PLAN.md); nothing ships ahead of its first consumer.
+ * call them (PLAN.md); nothing ships ahead of its first consumer. `voice` has
+ * no mock (ADR 0007), so it is the one group missing from `API_GROUPS`.
  */
 
 /** Every method takes this, so a caller can cancel on unmount. */
@@ -145,9 +146,20 @@ export type VoiceAgentState = 'connecting' | 'speaking' | 'listening';
 /** `user` closed it; `agent` ended the call; `timeout` is the duration cap; `error` is anything else. */
 export type VoiceEndReason = 'user' | 'agent' | 'error' | 'timeout';
 
-/** Only what the screen reads. Audio and loudness are deliberately not events — see `getAmplitude`. */
+/**
+ * How the visitor talks to the receptionist. `voice` is a call; `text` is the
+ * same conversation typed, for a browser that gives no microphone (ADR 0007).
+ */
+export type VoiceInput = 'voice' | 'text';
+
+/**
+ * Only what the screen reads. Audio and loudness are deliberately not events —
+ * see `getAmplitude`. `message` is a line of the conversation, and only a text
+ * session sends it: the voice screen shows no transcript.
+ */
 export type VoiceEvent =
   | { type: 'state'; state: VoiceAgentState }
+  | { type: 'message'; from: 'agent' | 'visitor'; text: string }
   | { type: 'ended'; reason: VoiceEndReason };
 
 /**
@@ -156,10 +168,11 @@ export type VoiceEvent =
  */
 export interface VoiceSession {
   /**
-   * Returns the unsubscribe. A new listener is first handed the latest event,
-   * synchronously, so a caller that subscribes after `connect` resolves still
-   * learns that she is already speaking. Nothing is delivered after `close()`
-   * resolves.
+   * Returns the unsubscribe. A new listener is first handed, synchronously,
+   * every `message` so far and then the latest of the other events, so a
+   * caller that subscribes after `connect` resolves still learns that she is
+   * already speaking, and still reads her first line. Nothing is delivered
+   * after `close()` resolves.
    */
   subscribe(listener: (event: VoiceEvent) => void): () => void;
 
@@ -167,16 +180,22 @@ export interface VoiceSession {
    * The UI's entire microphone surface. The session owns getUserMedia and
    * everything downstream of it — sample rate, framing and codec are exactly
    * what changes with the transport, and no component should have to know.
+   * A no-op in a text session, which has no microphone.
    */
   setMicEnabled(on: boolean): Promise<void>;
 
-  /** For callers who would rather type: a chip or the typed line. */
+  /**
+   * For callers who would rather type: a chip or the typed line. A text
+   * session also emits it back as the visitor's `message`, so the thread has
+   * one source whether or not the vendor echoes typed input.
+   */
   sendText(text: string): void;
 
   /**
-   * Output loudness 0..1, or null when silent. Polled from the orb's
-   * requestAnimationFrame loop, never pushed through React state: a 60fps
-   * signal there would re-render every consumer each frame.
+   * Output loudness 0..1, or null when silent, which a text session always
+   * is. Polled from the orb's requestAnimationFrame loop, never pushed
+   * through React state: a 60fps signal there would re-render every consumer
+   * each frame.
    */
   getAmplitude(): number | null;
 
@@ -188,8 +207,13 @@ export interface VoiceApi {
   /**
    * Opens a session. Call it from inside the click that asked for the call:
    * an implementation that plays audio needs that gesture for autoplay.
+   *
+   * Rejects with `microphone_unavailable` when `input` is `voice` and the
+   * browser gives no microphone, for any reason; the caller then connects
+   * again with `text`. Rejects with `voice_unavailable` when nothing could
+   * connect in time, or with whatever `http.ts` makes of the ticket's refusal.
    */
-  connect(opts: { mode: 'landing-demo'; signal?: AbortSignal | undefined }): Promise<VoiceSession>;
+  connect(opts: { mode: 'landing-demo'; input: VoiceInput; signal?: AbortSignal | undefined }): Promise<VoiceSession>;
 }
 
 // ---------------------------------------------------------------------------
@@ -202,7 +226,10 @@ export interface FonnusApi {
   voice: VoiceApi;
 }
 
-/** The group names `NEXT_PUBLIC_API_LIVE_GROUPS` accepts. */
-export const API_GROUPS = ['auth', 'leads', 'voice'] as const;
+/**
+ * The group names `NEXT_PUBLIC_API_LIVE_GROUPS` accepts. Not `voice`: it has
+ * no mock and is always live (ADR 0007).
+ */
+export const API_GROUPS = ['auth', 'leads'] as const;
 
 export type ApiGroup = (typeof API_GROUPS)[number];

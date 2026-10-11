@@ -44,7 +44,7 @@ before code.
    anonymous".
 4. `docs/ui-ux-principles.md` — before designing or redesigning any screen. It is a living
    document: add to it at the end of a session that taught something.
-5. `docs/adr/` — six decisions, each with what was rejected and what would reopen it.
+5. `docs/adr/` — seven decisions, each with what was rejected and what would reopen it.
 6. `docs/architecture.md` — before adding, moving or naming a file under `src/`: the tree,
    the import direction, and the "where does X go" table.
 
@@ -144,7 +144,7 @@ Three more that Next.js adds:
 |---|---|
 | `PLAN.md` | Roadmap, what Fonnus-BE is blocking, and the backlog — the single live tracker, updated in the finishing commit |
 | `CONTEXT.md` | Product, users, the legal constraints, stack, deployment posture |
-| `docs/adr/` | The six decisions with rationale and revisit triggers: the stack, the design system by copy, the backend boundary, the source layout, the marketing forms writing to a Google Sheet, the landing voice demo talking to an ElevenLabs agent behind the `voice` seam |
+| `docs/adr/` | The seven decisions with rationale and revisit triggers: the stack, the design system by copy, the backend boundary, the source layout, the marketing forms writing to a Google Sheet, the landing voice demo talking to an ElevenLabs agent behind the `voice` seam, and that demo answering with the agent or not at all, in text when there is no microphone |
 | `docs/architecture.md` | The `src/` tree as it is and as the roadmap completes it, the import direction, the rules per directory, and where a new file goes. Living document |
 | `docs/api-contract.md` | The HTTP contract Fonnus-BE implements. This repo is its authority |
 | `docs/open-questions.md` | The questions Fonnus-BE has to answer, with recommendations; answers are written in place |

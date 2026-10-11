@@ -83,12 +83,15 @@ and redeploy after changing any of the three: a variable applies only to new dep
 
 ## Turn on the live voice demo
 
-Out of the box, the voice orb on the landing page plays a recorded greeting. Turned live, it
-holds a real conversation of up to three minutes with a voice agent hosted on ElevenLabs
-Conversational AI (`docs/adr/0006-elevenlabs-landing-voice-demo.md`). The visitor's browser
-talks to ElevenLabs directly, but only with a short-lived ticket, which this app's
-`POST /api/voice-demo/token` obtains from ElevenLabs with a secret API key. With no setup
-that route answers `503` and the orb keeps playing the recording.
+The voice orb on the landing page holds a real conversation of up to three minutes with a
+voice agent hosted on ElevenLabs Conversational AI
+(`docs/adr/0006-elevenlabs-landing-voice-demo.md`, amended by
+`docs/adr/0007-voice-demo-agent-only-and-text-fallback.md`). There is no recording and no
+mock: the visitor's browser talks to ElevenLabs directly, but only with a short-lived ticket,
+which this app's `POST /api/voice-demo/token` obtains from ElevenLabs with a secret API key.
+With no setup that route answers `503` and the call screen says it could not connect, which
+is also what `pnpm dev` shows on a machine without the two variables below. A visitor whose
+browser gives no microphone talks to the same agent by typing, and reads the replies.
 
 1. In the ElevenLabs dashboard, open the agent and set it up as follows.
    - Under Advanced → Call limits, set `max_duration_seconds` to 180. The landing page ends
@@ -96,6 +99,10 @@ that route answers `503` and the orb keeps playing the recording.
    - Under Security, turn Authentication on and leave the allowlist empty. Authentication
      makes the agent private, so only a ticket minted with your API key can start a
      conversation. ElevenLabs advises against combining authentication with an allowlist.
+   - Under Security → Overrides, enable **Text-only mode**. The text session for a visitor
+     without a microphone is sent as a per-conversation override, and ElevenLabs refuses an
+     override whose field is not enabled. Do not enable text-only under Advanced: that
+     would make every call text.
    - Under Privacy, set Retention to 0 days and turn Audio Saving off, so the demo keeps
      the landing page's promise to ask before recording. Both settings are documented on
      ElevenLabs's privacy page.
@@ -119,10 +126,9 @@ ELEVENLABS_API_KEY=    # an API key from the ElevenLabs dashboard, restricted to
 ELEVENLABS_AGENT_ID=   # the agent's id; the browser never sees it
 ```
 
-3. Turn the demo live with `NEXT_PUBLIC_API_LIVE_GROUPS=voice`, or
-   `NEXT_PUBLIC_API_LIVE_GROUPS=leads,voice` if the forms are live too. To turn it off
-   again, unset `ELEVENLABS_API_KEY` and redeploy: the route answers `503` and the orb falls
-   back to the recording with no visible break, so the live groups can stay as they are.
+3. There is no switch: the demo is live as soon as both variables are set and deployed.
+   To turn it off again, unset `ELEVENLABS_API_KEY` and redeploy: the route answers `503`
+   and the call screen tells the visitor it could not connect and offers to call again.
 
 ## Layout
 
@@ -139,7 +145,7 @@ src/
   data/           Copy with no markup around it
   styles/tokens/  The design tokens, copied verbatim from ../Fonnus-Web-UI
 docs/             The API contract, the field catalogue mapping, the UI rules, the ADRs
-public/           Logo assets, the greeting clip and the three sample-call recordings the landing page plays
+public/           Logo assets and the three sample-call recordings the "Khả năng" section plays
 ```
 
 The rules behind this tree — which directory imports which, how files are named, where a

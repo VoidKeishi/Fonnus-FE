@@ -408,6 +408,17 @@ works (`0914378064` / `111002`).
 
 Newest first. One line per session that taught something; the rule itself goes above.
 
+- **2026-10-11 (landing page, the call screen gets a text shape)** — Two things from giving
+  the "Nghe thử" call a second shape for a visitor without a microphone. The orb lands on a
+  slot by *size*: `use-orb-placement` re-measures on a ResizeObserver, so a slot that moves
+  without changing size — a centred column that grows as a thread fills — leaves the orb
+  behind; the text shape is anchored to the top for that reason, and any slot the orb sits
+  on must change size or stay put. And a session's replay rule — "a new listener gets the
+  latest event" — is right for state and wrong for a transcript: the agent's first line
+  arrives before `startSession` resolves, so `voice-events.ts` now keeps every `message`
+  for a new listener and only the latest of the rest. Neither is visual; the second extends
+  `.claude/rules/next-code.md` §State.
+
 - **2026-10-11 (landing page, the call screen goes live)** — Two things from giving the
   "Nghe thử" call its real states. A screen that was one modal with one label became a small
   state machine (consent → connecting → speaking/listening → ended), and every state needed

@@ -10,8 +10,9 @@ opened this repo.
 either side. This document lives in Fonnus-FE and Fonnus-FE is its authority
 until `../Fonnus-BE` implements it. The frontend runs against in-browser mocks
 (`NEXT_PUBLIC_API_MODE=mock`, the committed default) that implement exactly these signatures,
-so the shapes below are already exercised — but outside §6 no HTTP request has ever been
-made. Treat everything outside §6 as a specification to agree on, not a description of a
+so the shapes below are already exercised — but outside §5's voice session and §6 no HTTP
+request has ever been made. The `voice` group of §5 is the one group with no mock: it is
+always the ElevenLabs implementation (ADR 0007). Treat everything outside §6 as a specification to agree on, not a description of a
 running system. Where a decision is genuinely open, it is marked and listed in
 [`open-questions.md`](./open-questions.md).
 
@@ -403,62 +404,80 @@ Not an HTTP endpoint: the interface the landing page's "Nghe thử" call screen 
 `voice` group in `src/api/contracts.ts`. Whatever carries the audio sits behind it, so the
 screen and its hook never change when the transport does.
 
-`api.voice.connect({ mode: 'landing-demo', signal })` resolves a `VoiceSession`. The caller
-invokes it inside the click that opened the call, because an implementation that plays audio
-needs that gesture for autoplay. The session has:
+`api.voice.connect({ mode: 'landing-demo', input, signal })` resolves a `VoiceSession`.
+`input` is `voice` (a call) or `text` (the same conversation typed, for a browser that gives no
+microphone). The caller invokes it inside the tap that started the call, because the
+microphone prompt needs that gesture. The session has:
 
 | Member | What it does |
 |---|---|
-| `subscribe(listener)` | Delivers events and returns the unsubscribe. A new listener is first handed the latest event, synchronously. Nothing is delivered after `close()` resolves |
-| `setMicEnabled(on)` | The screen's entire microphone surface. The session owns `getUserMedia` and everything downstream of it |
-| `sendText(text)` | A chip or a typed line, for callers who would rather type |
-| `getAmplitude()` | Output loudness `0..1`, or `null` when silent. Polled by the orb on every animation frame, never pushed as an event |
+| `subscribe(listener)` | Delivers events and returns the unsubscribe. A new listener is first handed, synchronously, every `message` so far and then the latest of the other events. Nothing is delivered after `close()` resolves |
+| `setMicEnabled(on)` | The screen's entire microphone surface. The session owns `getUserMedia` and everything downstream of it. A no-op in a text session |
+| `sendText(text)` | A chip or a typed line. A text session also emits it back as the visitor's `message` |
+| `getAmplitude()` | Output loudness `0..1`, or `null` when silent. Polled by the orb on every animation frame, never pushed as an event. Always `null` in a text session |
 | `close()` | Idempotent. Emits `ended { reason: 'user' }` once, unless the session had already ended |
 
 Events are only what the screen reads:
 
-- `{ type: 'state', state }`, with `state` ∈ `connecting` · `speaking` · `listening`. The line
-  under the orb renders them as "Đang kết nối…", "Fonnus đang nói" and "Fonnus đang nghe" (or
-  "Micro đang tắt — bạn có thể gõ chữ" while the microphone is off).
+- `{ type: 'state', state }`, with `state` ∈ `connecting` · `speaking` · `listening`. In a call
+  the line under the orb renders them as "Đang kết nối…", "Fonnus đang nói" and "Fonnus đang
+  nghe" (or "Micro đang tắt — bạn có thể gõ chữ" while the microphone is off). In a text session
+  `speaking` means her reply is on its way and `listening` that she waits for the visitor:
+  "Đang kết nối…", "Linh đang trả lời…", "Linh đang chờ bạn nhắn".
+- `{ type: 'message', from, text }`, with `from` ∈ `agent` · `visitor`: one line of a text
+  session, in order. A call sends none: the voice screen shows no transcript.
 - `{ type: 'ended', reason }`, with `reason` ∈ `user` (the visitor closed it) · `agent` (the
   receptionist ended the call) · `timeout` (the duration cap) · `error` (anything else).
 
-There is no transcript event and no voice choice: the screen shows neither.
+There is no voice choice: the screen shows none.
 
-Three implementations stand behind the interface. The **scripted session**
-(`src/api/voice-scripted.ts`) plays Linh's recorded greeting and then listens; a question
-makes her "speak" for 4.4 seconds. It is the mock, and it is also the fallback: whenever
-`connect` rejects, for any reason, the call carries on with the scripted session, silently
-unless the reason is a refused microphone (below).
-The **live implementation** (`voice.live.ts`) is the ElevenLabs session of
+One implementation stands behind the interface, and there is no mock
+([ADR 0007](./adr/0007-voice-demo-agent-only-and-text-fallback.md)): a faked conversation is a
+recording, and the demo answers with the agent or not at all. `voice` is therefore not in
+`API_GROUPS`, and `NEXT_PUBLIC_MOCK_FAILURE_RATE` does not reach it; its error paths are reached
+by unsetting `ELEVENLABS_API_KEY` (the token route's `503`) and by the unit tests of
+`voice.live.ts`. That **live implementation** is the ElevenLabs session of
 [ADR 0006](./adr/0006-elevenlabs-landing-voice-demo.md), not Fonnus-BE's: the browser connects
 over WebRTC to a private ElevenLabs agent with the conversation token this app mints (below).
 `@elevenlabs/client` is imported inside `connect`, so it loads on the first call and never with
 the page. What the client does:
 
-- **Consent first.** With the group live, the call screen opens on one line saying what happens
-  to the visitor's voice and one button, "Bắt đầu gọi"; `connect` runs inside that tap, never on
-  the orb click (ADR 0006 point 8). The mock opens no microphone and skips this step.
-- **Microphone before token.** `connect` asks for the microphone first and releases the stream
-  at once (the SDK opens its own), so no token is minted for a visitor who refuses. Then it
-  posts to `POST /api/voice-demo/token`, then loads the SDK and starts the session.
+- **Consent first.** The call screen opens on one line saying what happens to what the visitor
+  says or types, and one button, "Bắt đầu gọi"; `connect` runs inside that tap, never on the orb
+  click (ADR 0006 point 8). The line names both inputs, because it is shown before the browser
+  has answered about the microphone.
+- **Microphone before token, for a call.** With `input: 'voice'`, `connect` asks for the
+  microphone first and releases the stream at once (the SDK opens its own), so no token is
+  minted for a visitor who refuses. Then it posts to `POST /api/voice-demo/token`, loads the SDK
+  and starts the session.
+- **No microphone, same agent.** With `input: 'text'`, `connect` skips the microphone, mints the
+  same token from the same route, and starts the SDK's text-only conversation over the same
+  WebRTC transport (`textOnly: true`, `connectionType: 'webrtc'`). It plays no audio; the agent's
+  replies arrive as `message` events.
 - **Two codes of its own.** Besides whatever `http.ts` makes of the token route's answer,
-  `connect` rejects with `ApiError { kind: 'unknown', code }`: `microphone_denied` when the
-  visitor or the page's permissions refuse the microphone (`getUserMedia` rejects with
-  `NotAllowedError` or `SecurityError`), and `voice_unavailable` when there is no microphone API
-  (an insecure context), `getUserMedia` fails for any other reason (no microphone, a busy one),
-  the SDK fails to load or to start, or the token, the SDK and the connection together take more
-  than **fifteen seconds**, counted from the microphone grant. Every rejection falls back to the scripted session; `microphone_denied` alone
-  adds a line under the state line saying the visitor is hearing a recording because the
-  microphone was not allowed. Neither code is ever rendered through `messageFor`.
+  `connect` rejects with `ApiError { kind: 'unknown', code }`: `microphone_unavailable` when
+  `input` is `voice` and the browser gives no microphone for any reason (`getUserMedia` refused
+  by the visitor or the page's permissions, no microphone, a busy one, or no media API at all in
+  an insecure context), and `voice_unavailable` when the SDK fails to load or to start, or the
+  token, the SDK and the connection together take more than **fifteen seconds**, counted from
+  the microphone grant for a call and from `connect` for a text session. Neither code is ever
+  rendered through `messageFor`.
+- **What the screen does with a rejection.** `microphone_unavailable` makes the hook connect
+  again with `input: 'text'`, inside the same tap and without a second consent; the screen then
+  shows the typed shape: a smaller orb, the line "Không dùng được micro trên thiết bị này, nên
+  bạn nhắn và Linh trả lời bằng chữ.", the thread, the chips and the typed line without the
+  microphone toggle. Every other rejection, of either attempt, is a failed call: "Không kết nối
+  được với Linh lúc này. Bạn thử gọi lại sau một lát." and "Gọi lại", with no sign-up link.
+  Nothing stands in for the agent.
 - **A 175-second cap**, under the agent's own 180, so the ending is the app's: the session
-  emits `ended { reason: 'timeout' }` and closes itself.
+  emits `ended { reason: 'timeout' }` and closes itself. It applies to a text session unchanged.
 - **Endings.** `agent` (the receptionist hung up) and `timeout` show a closing line with
   "Dùng thử miễn phí" (to `/dang-ky`) and "Gọi lại"; `error` (the connection dropped after the
-  call started) shows "Mất kết nối với Linh." and "Gọi lại". "Gọi lại" connects again without a
-  second consent. `user` is the visitor closing the screen and shows nothing.
-- **Loudness.** `getAmplitude()` is the agent's output volume while she speaks, and `null`
-  otherwise or once the session has ended; the orb draws its own idle pulse while she listens.
+  call started) shows "Mất kết nối với Linh." and "Gọi lại". "Gọi lại" connects again, a call
+  first, without a second consent. `user` is the visitor closing the screen and shows nothing.
+- **Loudness.** `getAmplitude()` is the agent's output volume while she speaks in a call, and
+  `null` otherwise, in a text session, or once the session has ended; the orb draws its own idle
+  pulse while she listens.
 - **The agent's own cap.** When ElevenLabs ends the call at its 180 s `max_duration_seconds`
   before the client's 175 s timer does, the disconnect arrives as an error with the context
   `max_duration_exceeded`; the session reports it as `timeout`, not `error`.
@@ -486,8 +505,9 @@ ElevenLabs, using a key that never reaches the browser.
 - **Never upstream text.** A refusal has no body, and nothing ElevenLabs said reaches the
   response.
 
-Every refusal makes `connect` reject, and the call screen carries on with the scripted
-session, silently (ADR 0006 point 7).
+The route serves both inputs of the session with the same token. Every refusal makes
+`connect` reject, and the call screen says it could not connect to Linh and offers to call
+again ([ADR 0007](./adr/0007-voice-demo-agent-only-and-text-fallback.md) point 5).
 
 | Status | Body | Meaning |
 |---|---|---|

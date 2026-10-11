@@ -3,28 +3,33 @@
  * ADR 0006. The browser talks to a private ElevenLabs agent over WebRTC, with
  * a conversation token this app's own route mints (`POST /api/voice-demo/token`).
  * When Fonnus-BE serves a web voice gateway, this file dials it instead and
- * nothing above the `VoiceSession` interface changes.
+ * nothing above the `VoiceSession` interface changes. It is the `voice` group's
+ * only implementation: there is no mock (ADR 0007).
+ *
+ * Two inputs share the token, the route and the transport (ADR 0007 point 2).
+ * `voice` asks for the microphone first; `text` never opens one and starts the
+ * SDK's text-only conversation, whose lines arrive as `message` events.
  *
  * `@elevenlabs/client` (and `livekit-client` under it) is imported dynamically
  * inside `connect`, never at module scope: the landing page's first load must
  * not carry it, and nothing here may run at import time.
  *
- * `connect` rejects, and the call demo falls back to the scripted session, for
- * everything that goes wrong before the conversation starts (ADR 0006 point 7):
- * `microphone_denied` (the visitor or the page's permissions refused it),
- * `voice_unavailable` (no microphone API or no microphone, the SDK failed to
- * load or start, or no connection within the budget below), and whatever
- * `http.ts` makes of the token route's refusal.
+ * `connect` rejects for everything that goes wrong before the conversation
+ * starts: `microphone_unavailable` (voice only: the browser gave no microphone,
+ * for any reason, and the caller connects again with `text`),
+ * `voice_unavailable` (the SDK failed to load or start, or no connection within
+ * the budget below), and whatever `http.ts` makes of the token route's refusal.
  */
-import type { VoiceAgentState, VoiceApi, VoiceEndReason, VoiceEvent, VoiceSession } from './contracts'
+import type { VoiceAgentState, VoiceApi, VoiceEndReason, VoiceEvent, VoiceInput, VoiceSession } from './contracts'
 import { ApiError } from './errors'
 import { request } from './http'
 import { createVoiceEvents } from './voice-events'
 
 /*
  * How long the token, the SDK and the connection may take together before the
- * demo falls back to the recording. Counted from the microphone grant: the
- * prompt waits on a person, not on the network.
+ * call is shown as failed. Counted from the microphone grant for a voice call
+ * (the prompt waits on a person, not on the network) and from `connect` for a
+ * text one.
  */
 const CONNECT_BUDGET_MS = 15_000
 /**
@@ -34,52 +39,33 @@ const CONNECT_BUDGET_MS = 15_000
 export const MAX_CALL_MS = 175_000
 
 /**
- * The part of the SDK's `VoiceConversation` this file uses, written out so the
- * package's types are named nowhere at module scope. The dynamic import's real
- * type is checked against it.
+ * The part of the SDK's `VoiceConversation` and `TextConversation` this file
+ * uses, written out so the package's types are named nowhere at module scope.
+ * The dynamic import's real type is checked against it.
  */
 interface Conversation {
   endSession(): Promise<void>
+  /** Throws on a text conversation, so it is called for voice only. */
   setMicMuted(isMuted: boolean): void
   getOutputVolume(): number
   sendUserMessage(text: string): void
 }
 
+type Mode = Extract<VoiceAgentState, 'speaking' | 'listening'>
+
 const canceled = (cause?: unknown) => new ApiError({ kind: 'canceled', cause })
 const unavailable = (cause?: unknown) => new ApiError({ kind: 'unknown', code: 'voice_unavailable', cause })
+const microphoneUnavailable = (cause?: unknown) =>
+  new ApiError({ kind: 'unknown', code: 'microphone_unavailable', cause })
 
 function throwIfAborted(signal: AbortSignal | undefined): void {
   if (signal?.aborted) throw canceled()
 }
 
-/**
- * A refusal by the visitor or by the page's permissions; a missing or busy device is not one.
- * Exported for the tests.
- */
-export function isRefusal(cause: unknown): boolean {
-  const name = typeof cause === 'object' && cause !== null && 'name' in cause ? cause.name : undefined
-  return name === 'NotAllowedError' || name === 'SecurityError'
-}
-
 export const voiceLive: VoiceApi = {
-  async connect({ signal }) {
+  async connect({ input, signal }) {
     throwIfAborted(signal)
-
-    // Absent outside a secure context (plain http on a LAN address) and in old browsers.
-    const media = navigator.mediaDevices as MediaDevices | undefined
-    if (typeof media?.getUserMedia !== 'function') throw unavailable()
-
-    // First, because it is the one step that shows the browser's prompt: no
-    // token is minted for a visitor who refuses. The SDK opens its own stream,
-    // so this one only asks the question and is released at once.
-    let stream: MediaStream
-    try {
-      stream = await media.getUserMedia({ audio: true })
-    } catch (cause) {
-      throw isRefusal(cause) ? new ApiError({ kind: 'unknown', code: 'microphone_denied', cause }) : unavailable(cause)
-    }
-    for (const track of stream.getTracks()) track.stop()
-    throwIfAborted(signal)
+    if (input === 'voice') await askForMicrophone(signal)
 
     // One budget for everything from here: the caller's abort, or the time running out.
     const timeout = AbortSignal.timeout(CONNECT_BUDGET_MS)
@@ -115,7 +101,7 @@ export const voiceLive: VoiceApi = {
         { once: true },
       )
     })
-    const { VoiceConversation } = await Promise.race([
+    const sdk = await Promise.race([
       import('@elevenlabs/client').catch((cause: unknown) => {
         throw unavailable(cause)
       }),
@@ -123,18 +109,52 @@ export const voiceLive: VoiceApi = {
     ])
     throwIfSpent()
 
+    // The same conversation token and WebRTC transport for both. `textOnly`
+    // with an explicit `connectionType` skips the microphone and keeps the
+    // token, where the SDK's default for text would want a WebSocket signed URL.
     return startSession(
-      (callbacks) => VoiceConversation.startSession({ conversationToken: token, connectionType: 'webrtc', ...callbacks }),
+      input,
+      (callbacks) =>
+        input === 'text'
+          ? sdk.Conversation.startSession({
+              conversationToken: token,
+              connectionType: 'webrtc',
+              textOnly: true,
+              ...callbacks,
+            })
+          : sdk.VoiceConversation.startSession({ conversationToken: token, connectionType: 'webrtc', ...callbacks }),
       budget,
       signal,
     )
   },
 }
 
+/**
+ * First, because it is the one step that shows the browser's prompt: no token
+ * is minted for a visitor who refuses. The SDK opens its own stream, so this
+ * one only asks the question and is released at once. A refusal, no
+ * microphone, a busy one and no media API at all (plain http on a LAN address,
+ * an old browser) have one outcome, the visitor types, so they share one code.
+ */
+async function askForMicrophone(signal: AbortSignal | undefined): Promise<void> {
+  const media = navigator.mediaDevices as MediaDevices | undefined
+  if (typeof media?.getUserMedia !== 'function') throw microphoneUnavailable()
+  let stream: MediaStream
+  try {
+    stream = await media.getUserMedia({ audio: true })
+  } catch (cause) {
+    throwIfAborted(signal)
+    throw microphoneUnavailable(cause)
+  }
+  for (const track of stream.getTracks()) track.stop()
+  throwIfAborted(signal)
+}
+
 /** The SDK callbacks this file listens to, in the SDK's own shapes. */
 interface Callbacks {
   onStatusChange: (prop: { status: 'disconnected' | 'connecting' | 'connected' | 'disconnecting' }) => void
-  onModeChange: (prop: { mode: 'speaking' | 'listening' }) => void
+  onModeChange: (prop: { mode: Mode }) => void
+  onMessage: (prop: { role: 'agent' | 'user'; message: string }) => void
   onDisconnect: (details: { reason: 'error' | 'agent' | 'user'; context?: { type: string } | undefined }) => void
   // No `onError`: the vendor's wording is never shown, and not logged either.
   // The SDK's default handler does nothing.
@@ -147,14 +167,18 @@ interface Callbacks {
  * own, read only to tell an abort from the budget running out. Exported for the tests.
  */
 export function startSession(
+  input: VoiceInput,
   start: (callbacks: Callbacks) => Promise<Conversation>,
   budget: AbortSignal,
   signal: AbortSignal | undefined,
 ): Promise<VoiceSession> {
-  const events = createVoiceEvents<VoiceEvent>({ type: 'state', state: 'connecting' })
+  // A text conversation's lines are kept, not replaced by the next event: the
+  // SDK may deliver her first one before this resolves and anyone subscribes.
+  const events = createVoiceEvents<VoiceEvent>({ type: 'state', state: 'connecting' }, (e) => e.type === 'message')
+  const text = input === 'text'
   let conversation: Conversation | null = null
   /** Unknown until the first mode change; the SDK does not announce its starting mode. */
-  let mode: Extract<VoiceAgentState, 'speaking' | 'listening'> | null = null
+  let mode: Mode | null = null
   let ended = false
   let closing = false
   /** `connect` has rejected: whatever the SDK still reports belongs to no one. */
@@ -162,6 +186,11 @@ export function startSession(
   /** The SDK reported a disconnect before `startSession` resolved. */
   let droppedEarly = false
   let capTimer: ReturnType<typeof setTimeout> | undefined
+
+  const setMode = (next: Mode) => {
+    mode = next
+    events.emit({ type: 'state', state: next })
+  }
 
   const end = (reason: VoiceEndReason) => {
     if (ended) return
@@ -176,18 +205,23 @@ export function startSession(
     },
 
     setMicEnabled(on) {
-      if (!ended) conversation?.setMicMuted(!on)
+      if (!ended && !text) conversation?.setMicMuted(!on)
       return Promise.resolve()
     },
 
-    sendText(text) {
-      const line = text.trim()
-      if (!line || ended) return
-      conversation?.sendUserMessage(line)
+    sendText(typed) {
+      const line = typed.trim()
+      if (!line || ended || !conversation) return
+      if (text) {
+        // Her reply ends the wait: `onMessage` sets her back to listening.
+        events.emit({ type: 'message', from: 'visitor', text: line })
+        setMode('speaking')
+      }
+      conversation.sendUserMessage(line)
     },
 
     getAmplitude() {
-      if (ended || !conversation) return null
+      if (ended || !conversation || text) return null
       // Her voice only: the orb reads the amplitude while she speaks and draws its
       // own idle pulse otherwise, so a listening level would be dead weight.
       return mode === 'speaking' ? conversation.getOutputVolume() : null
@@ -228,9 +262,17 @@ export function startSession(
         if (status === 'connecting') events.emit({ type: 'state', state: 'connecting' })
       },
       onModeChange({ mode: next }) {
-        if (discarded || ended) return
-        mode = next
-        events.emit({ type: 'state', state: next })
+        // In a text conversation the SDK's mode is who is audible in the room,
+        // and nobody is; the lines decide instead.
+        if (discarded || ended || text) return
+        setMode(next)
+      },
+      onMessage({ role, message }) {
+        // A voice call shows no transcript. The visitor's own line was emitted
+        // by `sendText`, whether or not the vendor echoes it.
+        if (discarded || ended || !text || role !== 'agent') return
+        events.emit({ type: 'message', from: 'agent', text: message })
+        setMode('listening')
       },
       onDisconnect(details) {
         if (discarded) return
@@ -256,8 +298,8 @@ export function startSession(
         }
         if (droppedEarly) {
           // Gone before it was handed over: still "before the conversation
-          // started", so the recording takes over silently. Ended anyway, so
-          // a half-closed peer never stays open behind the recording.
+          // started", so `connect` rejects and the screen says it could not
+          // connect. Ended anyway, so a half-closed peer never stays open.
           fail(unavailable())
           void started.endSession().catch(() => undefined)
           return
@@ -265,6 +307,9 @@ export function startSession(
         settled = true
         budget.removeEventListener('abort', onAbort)
         conversation = started
+        // Connected and nothing said yet: she waits for the visitor, rather
+        // than the line sitting on "connecting" until her first message.
+        if (text && mode === null) setMode('listening')
         capTimer = setTimeout(() => {
           end('timeout')
           void started.endSession().catch(() => undefined)
