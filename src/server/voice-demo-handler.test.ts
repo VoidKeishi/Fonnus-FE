@@ -61,6 +61,15 @@ describe('handleVoiceDemoToken', () => {
     expect(JSON.stringify(logged.mock.calls)).not.toContain(CONFIG.apiKey)
   })
 
+  it('answers 502 on a failure that is not an ElevenLabs answer, logging only its name', async () => {
+    const bug = new TypeError(`unexpected ${CONFIG.apiKey}`)
+    const response = await handleVoiceDemoToken(post('{}'), deps({ mint: () => Promise.reject(bug) }))
+    expect(response.status).toBe(502)
+    expect(await response.text()).toBe('')
+    expect(logged).toHaveBeenCalledWith('POST /api/voice-demo/token: ElevenLabs token failed (TypeError)')
+    expect(JSON.stringify(logged.mock.calls)).not.toContain(CONFIG.apiKey)
+  })
+
   it('answers 502 when ElevenLabs does not answer in time', async () => {
     const timedOut = new ElevenLabsRequestError('token', null, { cause: new DOMException('timed out', 'TimeoutError') })
     const response = await handleVoiceDemoToken(post('{}'), deps({ mint: () => Promise.reject(timedOut) }))
