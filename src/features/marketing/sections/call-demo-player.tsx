@@ -20,7 +20,7 @@ const TICK_MS = 100
 
 /*
  * How long a recording may take to start before the call carries on without
- * it, as the orb's greeting does (`../orb/greeting-player.ts`): `play()` on a
+ * it, as the orb's greeting does (`src/api/voice-scripted.ts`): `play()` on a
  * download that stalls before its first frame never settles at all.
  */
 const START_TIMEOUT_MS = 4000

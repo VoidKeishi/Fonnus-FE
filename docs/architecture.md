@@ -38,6 +38,7 @@ src/
     api/healthz/route.ts        Liveness of this server. Build SHA added at F7
     api/leads/route.ts          POST /api/leads: the contact form, appended to a Google Sheet (ADR 0005)
     api/leads/hotline-report/route.ts   POST /api/leads/hotline-report: one row per location
+    api/voice-demo/token/route.ts       POST: the live demo's conversation token (ADR 0006)
     (marketing)/                F4. layout (header, footer, the call demo's provider), page, cham-diem-hotline/page.tsx (static, the hotline report), chinh-sach-bao-mat/ and dieu-khoan-dich-vu/ (static, noindex: the notice that each legal text is not published yet), error.tsx
     (auth)/                     layout (AuthShell, F1b), dang-nhap/, dang-ky/ (F1b), error.tsx [backlog]
     app/                        layout: RequireSession → AppShell (→ ConfigProvider, F3). error.tsx [backlog]
@@ -57,10 +58,12 @@ src/
     auth.mock.ts · auth.live.ts
     leads.mock.ts · leads.live.ts  The contact form and the hotline report. Live posts to this app's own /api/leads… (ADR 0005)
     lead-limits.ts              The length caps and the 20-location limit, read by the forms and by server/
-    tenant.* (F3) · receptionist.* · voice.* (F3 try-out) · shell.* · insights.* (Tổng quan) · calls.* (F5) · appointments.* · numbers.* · account.* (F6)
+    voice-scripted.ts (+test)   The scripted voice session: Linh's recorded greeting, then a script. The mock, and the fallback whenever connect rejects
+    voice.mock.ts · voice.live.ts  The landing call demo's session. Mock is the scripted one; live is ElevenLabs (ADR 0006), a stub that rejects until it lands
+    tenant.* (F3) · receptionist.* · shell.* · insights.* (Tổng quan) · calls.* (F5) · appointments.* · numbers.* · account.* (F6)
 
   server/                       Code that runs only in a route handler (ADR 0005). Only src/app/ imports it
-    env.ts                      The three Google variables, read per request. The only file here that reads process.env
+    env.ts                      The three Google variables and the two ElevenLabs ones, read per request. The only file here that reads process.env
     leads-input.ts (+test)      Checks a posted body again, with the forms' own rules
     lead-rows.ts (+test)        A checked lead as a spreadsheet row, a hotline report as one row per location, stamped in Vietnam time
     google-jwt.ts (+test)       The signed assertion a service account trades for an access token
@@ -68,6 +71,9 @@ src/
     sheets.ts                   appendRows: one call to spreadsheets.values.append
     request-body.ts (+test)     The JSON media-type check and the body reader capped at 48 KB, sized from api/lead-limits.ts
     leads-handler.ts            Request in, Response out: 415, 413, 400, 422, 503, 202
+    elevenlabs-token.ts         mintConversationToken: one GET to ElevenLabs with the key
+    voice-demo-handler.ts (+test)  Request in, Response out: 415, 413, 400, 503, 502, 200
+    voice-demo.ts               Binds the handler to the real env and the real mint; the one function the route imports
 
   session/                      Who is signed in
     session.ts                  The localStorage hint, through useSyncExternalStore
@@ -87,7 +93,7 @@ src/
                                 hero/ (hero, sign-up-form, clinic-logos)
                                 legal/ (legal-notice-page: one server component for both legal routes, copy from LEGAL_PAGES in data/)
                                 orb/ (voice-orb, orb, orb-field, use-orb-placement, orb-motion, call-overlay,
-                                call-demo-provider, use-call-demo, greeting-player, call-state)
+                                call-demo-provider, use-call-demo, call-state)
                                 sections/ (section-chrome, missed-calls, how-it-works, how-it-works-visuals,
                                 play-when-seen, capabilities, capability-row, capability-actions,
                                 capability-visuals, call-demo-player, call-demo-timeline, band, pricing,
@@ -109,7 +115,7 @@ src/
     choice · chips · tiles · rows · save-bar · tabs · disclosure · slider · icon-button · play-button ·
     token-area · charts · table · use-appear · use-element-width · speak · index.ts   each with its first consumer
 
-  data/                         Copy with no markup: auth.ts, content.ts, call-demo.ts (the call screen's chips and voices), pricing.ts, call-demos.ts (the scripted calls under "Khả năng"), hotline-report.ts (the figures and sample report of /cham-diem-hotline)
+  data/                         Copy with no markup: auth.ts, content.ts, call-demo.ts (the call screen's chips), pricing.ts, call-demos.ts (the scripted calls under "Khả năng"), hotline-report.ts (the figures and sample report of /cham-diem-hotline)
   styles/tokens/                Byte copies from ../Fonnus-Web-UI (ADR 0002)
 ```
 
@@ -125,7 +131,7 @@ app  →  features/*  →  { shell, session }  →  { ui, design-system, api, da
 |---|---|
 | Two directories under `features/` never import each other. | The only two channels between tabs are `session.patchMe()` (a page changes what the sidebar shows: the name, the plan) and `markSummaryStale()` from `shell/summary.ts` (a page makes the sidebar's numbers stale). The prototype ran the whole product on exactly those two. Needing a third means something is in the wrong directory. Keeping every feature under one parent is what lets this rule be one `no-restricted-imports` glob. |
 | `ui/` and `design-system/` never import a feature, `api/`, `session/` or `shell/`. | A control receives its data through props. A control that knows about the API cannot be reused and cannot be tested as a pure function. |
-| `features/marketing/` never imports `ui/`, `session/` or `shell/`. | The landing page is a server component so a crawler can read it. `ui/` is the client kit; pulling it in drags `'use client'` into the acquisition surface. Marketing uses `design-system/`, `data/`, and `api.leads` in the contact form and the hotline report form. |
+| `features/marketing/` never imports `ui/`, `session/` or `shell/`. | The landing page is a server component so a crawler can read it. `ui/` is the client kit; pulling it in drags `'use client'` into the acquisition surface. Marketing uses `design-system/`, `data/`, `api.leads` in the contact form and the hotline report form, and `api.voice` in the call demo. |
 | `api/` imports nothing outside itself and no React. | `http.ts` exposes its 401 hook through a module-level setter instead of importing `session/`. The other direction is the cycle `session → api → session`. |
 | `session/` and `shell/` import `api/`, `ui/`, `design-system/`; never a feature. | The sidebar shows numbers from `api.shell`, not the state of one tab. |
 | Only `app/` imports `server/`. `server/` imports itself, `api/phone`, `api/contracts`, `api/errors`, `api/lead-limits` and Node built-ins. | `server/` holds the Google credential and runs only inside a route handler. It shares the forms' rules and caps through the four pure `api/` files, never through `api/index.ts`, which pulls in the mocks. |
@@ -202,9 +208,10 @@ No gate enforces these; the pm's review does.
   it runs when the root layout itself has failed.
 - No `loading.tsx` under `/app`: a client page draws its own skeleton from its state, and
   `RequireSession` already draws the shell's.
-- Two kinds of `route.ts` exist: `healthz`, and the `leads` handlers of ADR 0005. A
-  `route.ts` exports the method and hands the request to one function in `src/server/`. No
-  route handler proxies Fonnus-BE, and there is no server action (ADR 0003 point 5).
+- Three kinds of `route.ts` exist: `healthz`, the `leads` handlers of ADR 0005, and the voice
+  demo's token of ADR 0006. A `route.ts` exports the method and hands the request to one
+  function in `src/server/`. No route handler proxies Fonnus-BE, and there is no server action
+  (ADR 0003 point 5).
 
 ### `src/server/` — what runs only in a route handler
 
@@ -350,9 +357,9 @@ the second arrived (ADR 0006 point 9); a third use follows them, it does not nee
   unmounts it and closes any open call. It is never on `/cham-diem-hotline`, whose header
   sends "Nghe thử Linh" back to `/#hero` instead. The call's state lives one level up, in
   `CallDemoProvider` in the marketing layout, because the header opens the same call as the
-  orb. The call demo runs entirely in the browser — the recorded greeting and a script, no
-  `voice` group — until Fonnus-BE has a per-IP budget and a kill switch
-  (`docs/open-questions.md` Q21).
+  orb. The call goes through `api.voice`: the scripted session — the recorded greeting and a
+  script — by default and whenever `connect` rejects, an ElevenLabs agent when the group is
+  live (ADR 0006).
 - A night surface (the footer) renders inside a `data-theme="dark"` scope, so every alias
   inside it resolves to the night palette `colors.css` already defines. This is a night
   island in a light page, not a dark mode: nothing switches it.

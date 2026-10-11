@@ -7,9 +7,9 @@ import { stateLabel } from './call-state'
  */
 
 describe('stateLabel', () => {
-  it('says the call is connecting while it rings, whatever the microphone', () => {
-    expect(stateLabel('ringing', true)).toBe('Đang kết nối…')
-    expect(stateLabel('ringing', false)).toBe('Đang kết nối…')
+  it('says the call is connecting while it connects, whatever the microphone', () => {
+    expect(stateLabel('connecting', true)).toBe('Đang kết nối…')
+    expect(stateLabel('connecting', false)).toBe('Đang kết nối…')
   })
 
   it('says she is speaking while she speaks', () => {

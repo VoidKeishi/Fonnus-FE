@@ -1,24 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { TYPED_SPEAK_MS, VOICE_PREVIEW_MS } from '@/data/call-demo'
+import { api, scriptedVoiceSession } from '@/api'
+import type { VoiceEndReason, VoiceSession } from '@/api'
 import type { AgentState } from './call-state'
-import { GreetingPlayer } from './greeting-player'
 
 /*
- * The "Nghe thử" call, entirely in the browser: Linh's recorded greeting, then
- * a script. There is no voice session behind it and no network call — Fonnus-BE
- * has no endpoint, and none is built until a per-IP budget exists
- * (`docs/open-questions.md` Q21). A question only decides how long she stays in
- * `speaking`.
+ * The "Nghe thử" call. Everything the receptionist does comes from a
+ * `VoiceSession` (`api.voice`): the scripted one — Linh's recorded greeting,
+ * then a script — in mock mode, a live one when the group is live. When
+ * `connect` rejects, for any reason, the call carries on with the scripted
+ * session, silently: the visitor has not been promised anything a recording
+ * cannot keep (ADR 0006 point 7). Neither this hook nor the screen knows which
+ * session it got.
  */
-
-/*
- * The fallback beat, used only when the greeting does not play: the browser
- * refused it (autoplay policy, missing codec) or it did not start in time (a
- * stalled download). With audio, the recording's own length decides how long
- * she speaks.
- */
-const GREETING_DELAY_MS = 1600
-const GREETING_HOLD_MS = 5200
 
 /** Set on <html> while the call is open; `globals.css` turns it into the scroll lock. */
 const SCROLL_LOCK = 'data-scroll-lock'
@@ -27,8 +20,8 @@ export interface CallDemo {
   open: boolean
   agent: AgentState
   mic: boolean
-  /** Index into `VOICES`. */
-  voice: number
+  /** Why the session ended on its own, or null while it has not. Not rendered yet. */
+  ended: VoiceEndReason | null
   /**
    * Call from inside the click: it is the gesture the greeting's autoplay needs.
    * `returnFocusTo` is the control focus goes back to when the call closes;
@@ -40,12 +33,9 @@ export interface CallDemo {
   returnFocusTo: () => HTMLElement | null
   /** A suggestion chip or the typed box. */
   ask: (text: string) => void
-  /** Auditions a voice without selecting it. */
-  previewVoice: () => void
   toggleMic: () => void
-  setVoice: (index: number) => void
   /**
-   * Live loudness of the greeting, 0–1, or null when no audio is playing.
+   * Live loudness of her voice, 0–1, or null when nothing is playing.
    * Polled from the orb's animation frame, never pushed through React state:
    * a 60fps signal there would re-render every consumer each frame.
    */
@@ -54,96 +44,81 @@ export interface CallDemo {
 
 export function useCallDemoState(): CallDemo {
   const [open, setOpen] = useState(false)
-  const [agent, setAgent] = useState<AgentState>('ringing')
+  const [agent, setAgent] = useState<AgentState>('connecting')
   const [mic, setMic] = useState(true)
-  const [voice, setVoice] = useState(0)
+  const [ended, setEnded] = useState<VoiceEndReason | null>(null)
 
-  const player = useRef<GreetingPlayer | null>(null)
+  const session = useRef<VoiceSession | null>(null)
+  const unsubscribe = useRef<(() => void) | null>(null)
+  const connecting = useRef<AbortController | null>(null)
   const opener = useRef<HTMLElement | null>(null)
-  const timers = useRef<ReturnType<typeof setTimeout>[]>([])
-  /** Bumped by every open, close and question, so a late answer to an earlier one is ignored. */
+  /** Bumped by every open and close, so a session that arrives for an earlier call is closed unheard. */
   const turn = useRef(0)
 
-  const after = useCallback((ms: number, then: () => void) => {
-    timers.current.push(setTimeout(then, ms))
-  }, [])
-
-  const clearTimers = useCallback(() => {
-    for (const timer of timers.current) clearTimeout(timer)
-    timers.current = []
-  }, [])
-
-  /** Cuts off whatever she is saying and starts a new turn. */
-  const interrupt = useCallback(() => {
+  const endSession = useCallback(() => {
     turn.current += 1
-    clearTimers()
-    player.current?.stop()
-    return turn.current
-  }, [clearTimers])
-
-  const speakFor = useCallback(
-    (ms: number) => {
-      interrupt()
-      setAgent('speaking')
-      after(ms, () => {
-        setAgent('listening')
-      })
-    },
-    [interrupt, after],
-  )
+    connecting.current?.abort()
+    connecting.current = null
+    unsubscribe.current?.()
+    unsubscribe.current = null
+    void session.current?.close()
+    session.current = null
+  }, [])
 
   const openCall = useCallback(
     (returnFocusTo?: HTMLElement | null) => {
       if (open) return
       opener.current = returnFocusTo ?? null
-      const id = interrupt()
+      endSession()
+      const id = turn.current
+      const controller = new AbortController()
+      connecting.current = controller
       setOpen(true)
-      // She is already talking: the click that opened the screen is the gesture
-      // autoplay needs, so there is nothing left to ask for.
-      setAgent('speaking')
-      player.current ??= new GreetingPlayer(() => {
-        setAgent('listening')
-      })
-      void player.current.play().then((started) => {
-        if (started || turn.current !== id) return
-        // Refused or stalled: ring, then speak for a scripted beat, so the
-        // screen is never both silent and frozen.
-        setAgent('ringing')
-        after(GREETING_DELAY_MS, () => {
-          setAgent('speaking')
-          after(GREETING_HOLD_MS, () => {
-            setAgent('listening')
-          })
+      setAgent('connecting')
+      setEnded(null)
+
+      const attach = (next: VoiceSession) => {
+        if (turn.current !== id) {
+          void next.close()
+          return
+        }
+        connecting.current = null
+        session.current = next
+        unsubscribe.current = next.subscribe((event) => {
+          if (event.type === 'state') setAgent(event.state)
+          else setEnded(event.reason)
         })
+      }
+
+      // Called in the click's own turn: the scripted session starts the
+      // greeting synchronously inside `connect`, while the gesture still counts.
+      void api.voice.connect({ mode: 'landing-demo', signal: controller.signal }).then(attach, () => {
+        if (turn.current !== id) return
+        attach(scriptedVoiceSession())
       })
     },
-    [open, interrupt, after],
+    [open, endSession],
   )
 
   const closeCall = useCallback(() => {
-    interrupt()
+    endSession()
     setOpen(false)
-    setAgent('ringing')
-  }, [interrupt])
+    setAgent('connecting')
+    setEnded(null)
+  }, [endSession])
 
-  const ask = useCallback(
-    (text: string) => {
-      if (!text.trim()) return
-      speakFor(TYPED_SPEAK_MS)
-    },
-    [speakFor],
-  )
-
-  const previewVoice = useCallback(() => {
-    speakFor(VOICE_PREVIEW_MS)
-  }, [speakFor])
-
-  // Nothing to switch on: the demo never opens a microphone. Only the label changes.
-  const toggleMic = useCallback(() => {
-    setMic((on) => !on)
+  const ask = useCallback((text: string) => {
+    if (!text.trim()) return
+    session.current?.sendText(text)
   }, [])
 
-  const getAmplitude = useCallback(() => player.current?.getAmplitude() ?? null, [])
+  const toggleMic = useCallback(() => {
+    const next = !mic
+    setMic(next)
+    void session.current?.setMicEnabled(next)
+  }, [mic])
+
+  const getAmplitude = useCallback(() => session.current?.getAmplitude() ?? null, [])
 
   const returnFocusTo = useCallback(() => opener.current, [])
 
@@ -171,31 +146,22 @@ export function useCallDemoState(): CallDemo {
     }
   }, [open])
 
-  // The one AudioContext is closed with the layout that owns it.
-  useEffect(() => {
-    const owned = player
-    return () => {
-      clearTimers()
-      owned.current?.dispose()
-      owned.current = null
-    }
-  }, [clearTimers])
+  // The session, and the AudioContext it may hold, close with the layout that owns them.
+  useEffect(() => endSession, [endSession])
 
   return useMemo(
     () => ({
       open,
       agent,
       mic,
-      voice,
+      ended,
       openCall,
       closeCall,
       returnFocusTo,
       ask,
-      previewVoice,
       toggleMic,
-      setVoice,
       getAmplitude,
     }),
-    [open, agent, mic, voice, openCall, closeCall, returnFocusTo, ask, previewVoice, toggleMic, getAmplitude],
+    [open, agent, mic, ended, openCall, closeCall, returnFocusTo, ask, toggleMic, getAmplitude],
   )
 }

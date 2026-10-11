@@ -94,24 +94,7 @@ export interface Envelope {
 
 /** The orb's own smoothing: waves snap open on a syllable and settle through a pause. */
 export const ORB_ENVELOPE: Envelope = { attack: 0.45, release: 0.1 }
-/** The greeting's loudness is smoothed once more before the orb sees it. */
-export const GREETING_ENVELOPE: Envelope = { attack: 0.5, release: 0.12 }
 
 export function envelopeStep(value: number, target: number, { attack, release }: Envelope): number {
   return value + (target - value) * (target > value ? attack : release)
-}
-
-/**
- * Loudness, 0–1, of one analyser frame of 8-bit samples centred on 128. Speech
- * RMS rarely passes ~0.35, so it is scaled before clamping or the waves would
- * barely move.
- */
-export function speechLevel(samples: ArrayLike<number>): number {
-  if (samples.length === 0) return 0
-  let sum = 0
-  for (let i = 0; i < samples.length; i += 1) {
-    const v = ((samples[i] ?? 128) - 128) / 128
-    sum += v * v
-  }
-  return Math.min(1, Math.sqrt(sum / samples.length) * 3.2)
 }

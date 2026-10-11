@@ -1,10 +1,10 @@
 /**
- * Copy and timings for the "Nghe thử" call screen on the landing page.
+ * Copy for the "Nghe thử" call screen on the landing page.
  *
- * A chip is a question the caller asks, handled exactly as a typed line is. The
- * demo has no pipeline behind it (`docs/open-questions.md` Q21), so how long the
- * receptionist then talks is the constant below rather than the length of a
- * real reply.
+ * A chip is a question the caller asks, handled exactly as a typed line is:
+ * handed to the voice session (`api.voice`). The scripted session, which is
+ * also the fallback whenever a live one cannot connect, answers every question
+ * with the same timed beat (`src/api/voice-scripted.ts`).
  */
 export interface SuggestionChip {
   label: string
@@ -15,21 +15,3 @@ export const CHIPS: SuggestionChip[] = [
   { label: '9h sáng thứ Bảy còn trống không?' },
   { label: 'Phòng khám ở đâu?' },
 ]
-
-export interface Voice {
-  name: string
-  desc: string
-}
-
-export const VOICES: Voice[] = [
-  { name: 'Linh', desc: 'Nữ · miền Nam, ấm áp' },
-  { name: 'Mai', desc: 'Nữ · miền Bắc, nhẹ nhàng' },
-  { name: 'An', desc: 'Nữ · trẻ trung, rõ ràng' },
-  { name: 'Minh', desc: 'Nam · trầm, điềm tĩnh' },
-  { name: 'Quân', desc: 'Nam · miền Nam, thân thiện' },
-]
-
-/** How long a typed question makes the receptionist speak. */
-export const TYPED_SPEAK_MS = 4400
-/** How long a voice preview plays. */
-export const VOICE_PREVIEW_MS = 2600
