@@ -305,7 +305,15 @@ be answered **before** the endpoint exists rather than after the first bill.
 **Recommendation:** per-IP budget, hard max call duration, and a kill switch that degrades to
 today's scripted demo.
 
-**Answer:**
+**Answer (2026-10-11, the owner; `docs/adr/0006-elevenlabs-landing-voice-demo.md`):** Yes,
+unauthenticated — and until Fonnus-BE has a web voice gateway, the demo does not go through
+Fonnus-BE at all. The browser talks to a private ElevenLabs agent the owner configured, and
+this app mints the conversation token in `POST /api/voice-demo/token`. All three
+recommendations hold, in layers: the agent's own `max_duration_seconds` is 180 and the client
+closes at 175 s; the per-IP budget is a Vercel Firewall rate-limit rule on the token route;
+the kill switch is unsetting `ELEVENLABS_API_KEY`, which makes the route answer `503` and the
+orb fall back to the scripted demo with no visible break. When the gateway exists, it takes
+over `voice.live.ts` and inherits the same three answers.
 
 ---
 
