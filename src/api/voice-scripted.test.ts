@@ -88,6 +88,19 @@ describe('scriptedVoiceSession', () => {
     expect(states(events).at(-1)).toBe('listening')
   })
 
+  it('lets a question asked at once win over a greeting that is then refused', async () => {
+    // The visitor taps a chip the moment the screen opens; the browser refuses
+    // autoplay a tick later. The refusal must not start the fallback beat over her answer.
+    const { session, events } = open(false)
+    session.sendText('Cạo vôi răng bao nhiêu?')
+    await vi.advanceTimersByTimeAsync(0)
+    expect(states(events)).toEqual(['speaking', 'speaking'])
+    await vi.advanceTimersByTimeAsync(4400)
+    expect(states(events)).toEqual(['speaking', 'speaking', 'listening'])
+    await vi.advanceTimersByTimeAsync(6800)
+    expect(states(events)).toEqual(['speaking', 'speaking', 'listening'])
+  })
+
   it('ignores a blank line', () => {
     const { session, events, player } = open(true)
     session.sendText('   ')

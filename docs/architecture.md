@@ -38,7 +38,6 @@ src/
     api/healthz/route.ts        Liveness of this server. Build SHA added at F7
     api/leads/route.ts          POST /api/leads: the contact form, appended to a Google Sheet (ADR 0005)
     api/leads/hotline-report/route.ts   POST /api/leads/hotline-report: one row per location
-    api/voice-demo/token/route.ts       POST: the live demo's conversation token (ADR 0006)
     (marketing)/                F4. layout (header, footer, the call demo's provider), page, cham-diem-hotline/page.tsx (static, the hotline report), chinh-sach-bao-mat/ and dieu-khoan-dich-vu/ (static, noindex: the notice that each legal text is not published yet), error.tsx
     (auth)/                     layout (AuthShell, F1b), dang-nhap/, dang-ky/ (F1b), error.tsx [backlog]
     app/                        layout: RequireSession → AppShell (→ ConfigProvider, F3). error.tsx [backlog]
@@ -63,7 +62,7 @@ src/
     tenant.* (F3) · receptionist.* · shell.* · insights.* (Tổng quan) · calls.* (F5) · appointments.* · numbers.* · account.* (F6)
 
   server/                       Code that runs only in a route handler (ADR 0005). Only src/app/ imports it
-    env.ts                      The three Google variables and the two ElevenLabs ones, read per request. The only file here that reads process.env
+    env.ts                      The three Google variables, read per request. The only file here that reads process.env
     leads-input.ts (+test)      Checks a posted body again, with the forms' own rules
     lead-rows.ts (+test)        A checked lead as a spreadsheet row, a hotline report as one row per location, stamped in Vietnam time
     google-jwt.ts (+test)       The signed assertion a service account trades for an access token
@@ -71,9 +70,6 @@ src/
     sheets.ts                   appendRows: one call to spreadsheets.values.append
     request-body.ts (+test)     The JSON media-type check and the body reader capped at 48 KB, sized from api/lead-limits.ts
     leads-handler.ts            Request in, Response out: 415, 413, 400, 422, 503, 202
-    elevenlabs-token.ts         mintConversationToken: one GET to ElevenLabs with the key
-    voice-demo-handler.ts (+test)  Request in, Response out: 415, 413, 400, 503, 502, 200
-    voice-demo.ts               Binds the handler to the real env and the real mint; the one function the route imports
 
   session/                      Who is signed in
     session.ts                  The localStorage hint, through useSyncExternalStore
@@ -208,8 +204,7 @@ No gate enforces these; the pm's review does.
   it runs when the root layout itself has failed.
 - No `loading.tsx` under `/app`: a client page draws its own skeleton from its state, and
   `RequireSession` already draws the shell's.
-- Three kinds of `route.ts` exist: `healthz`, the `leads` handlers of ADR 0005, and the voice
-  demo's token of ADR 0006. A `route.ts` exports the method and hands the request to one
+- Two kinds of `route.ts` exist: `healthz`, and the `leads` handlers of ADR 0005. A `route.ts` exports the method and hands the request to one
   function in `src/server/`. No route handler proxies Fonnus-BE, and there is no server action
   (ADR 0003 point 5).
 
