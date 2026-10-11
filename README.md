@@ -76,11 +76,53 @@ LEADS_SPREADSHEET_ID=           # the part of the sheet's URL between /d/ and /e
    Without it they keep using the mock, which stores nothing.
 
 On a public deployment the endpoints accept requests as soon as the three variables are set,
-so put the rate limit on first. In the Vercel project: Firewall → a new rule, condition
-"request path starts with `/api/leads`", action Rate Limit, fixed window, keyed on IP,
-answering `429`. The forms already show "Bạn thao tác hơi nhanh…" for that answer. Mark the
-private key as a Sensitive variable, and redeploy after changing any of the three: a
-variable applies only to new deployments.
+so put the rate limit on first. It is one Vercel Firewall rule that also covers the voice
+demo's token route, described in step 2 of the next section; the forms already show "Bạn
+thao tác hơi nhanh…" for the `429` it answers. Mark the private key as a Sensitive variable,
+and redeploy after changing any of the three: a variable applies only to new deployments.
+
+## Turn on the live voice demo
+
+Out of the box, the voice orb on the landing page plays a recorded greeting. Turned live, it
+holds a real conversation of up to three minutes with a voice agent hosted on ElevenLabs
+Conversational AI (`docs/adr/0006-elevenlabs-landing-voice-demo.md`). The visitor's browser
+talks to ElevenLabs directly, but only with a short-lived ticket, which this app's
+`POST /api/voice-demo/token` obtains from ElevenLabs with a secret API key. With no setup
+that route answers `503` and the orb keeps playing the recording.
+
+1. In the ElevenLabs dashboard, open the agent and set it up as follows.
+   - Under Advanced → Call limits, set `max_duration_seconds` to 180. The landing page ends
+     the call itself a few seconds earlier; this limit is the backstop.
+   - Under Security, turn Authentication on and leave the allowlist empty. Authentication
+     makes the agent private, so only a ticket minted with your API key can start a
+     conversation. ElevenLabs advises against combining authentication with an allowlist.
+   - Under Privacy, set Retention to 0 days and turn Audio Saving off, so the demo keeps
+     the landing page's promise to ask before recording. Both settings are documented on
+     ElevenLabs's privacy page.
+   - Write the agent's first message so that it says the receptionist is an AI, which
+     Vietnamese law requires (Law 134/2025/QH15). Write its prompt so that it brings the
+     call to a close at around two minutes and fifty seconds, before the limit cuts it off.
+2. In the Vercel project, put the rate limit on first, because the route serves anyone as
+   soon as the variables below are set. The Hobby plan allows one rate-limit rule per
+   project, so a single rule covers both this route and the marketing forms: Firewall → a
+   new rule with two conditions joined by "or", "request path starts with `/api/leads`" and
+   "request path equals `/api/voice-demo/token`", action Rate Limit, fixed window of ten
+   minutes or less, keyed on IP, answering `429`. Choose the number of requests per window
+   for the traffic you expect; a visitor needs one request per call and one per form sent.
+
+   Then add two environment variables, both marked Sensitive, and redeploy, because a
+   variable applies only to new deployments. For local development, put them in
+   `.env.local` instead.
+
+```bash
+ELEVENLABS_API_KEY=    # an API key from the ElevenLabs dashboard, restricted to Conversational AI if it offers scopes
+ELEVENLABS_AGENT_ID=   # the agent's id; the browser never sees it
+```
+
+3. Turn the demo live with `NEXT_PUBLIC_API_LIVE_GROUPS=voice`, or
+   `NEXT_PUBLIC_API_LIVE_GROUPS=leads,voice` if the forms are live too. To turn it off
+   again, unset `ELEVENLABS_API_KEY` and redeploy: the route answers `503` and the orb falls
+   back to the recording with no visible break, so the live groups can stay as they are.
 
 ## Layout
 
@@ -89,7 +131,7 @@ src/
   app/            The route tree only: Next.js convention files, each page returning one feature component
   features/       One directory per product surface: auth today; receptionist, marketing, calls, … as the roadmap lands them
   api/            The one door to the network: contracts, the mock/live switch, errors
-  server/         What runs only in a route handler: the marketing forms, written to a Google Sheet
+  server/         What runs only in a route handler: the marketing forms, written to a Google Sheet, and the live voice demo's token route
   session/        Who is signed in, and the gate on /app
   shell/          What every signed-in page shares: the frame and the nav
   design-system/  Brand primitives: drawn icons, logo, button, input
