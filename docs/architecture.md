@@ -38,7 +38,7 @@ src/
     api/healthz/route.ts        Liveness of this server. Build SHA added at F7
     api/leads/route.ts          POST /api/leads: the contact form, appended to a Google Sheet (ADR 0005)
     api/leads/hotline-report/route.ts   POST /api/leads/hotline-report: one row per location
-    api/voice-demo/token/route.ts       POST: the live demo's conversation token (ADR 0006)
+    api/voice-demo/token/route.ts       POST: the live demo's ticket — a WebRTC conversation token for a voice call, a WebSocket signed URL for a text session (ADR 0006, 0007)
     (marketing)/                F4. layout (header, footer, the call demo's provider), page, cham-diem-hotline/page.tsx (static, the hotline report), chinh-sach-bao-mat/ and dieu-khoan-dich-vu/ (static, noindex: the notice that each legal text is not published yet), error.tsx
     (auth)/                     layout (AuthShell, F1b), dang-nhap/, dang-ky/ (F1b), error.tsx [backlog]
     app/                        layout: RequireSession → AppShell (→ ConfigProvider, F3). error.tsx [backlog]
@@ -59,7 +59,7 @@ src/
     leads.mock.ts · leads.live.ts  The contact form and the hotline report. Live posts to this app's own /api/leads… (ADR 0005)
     lead-limits.ts              The length caps and the 20-location limit, read by the forms and by server/
     voice-events.ts (+test)     The event stream every voice session shares: the latest event handed to a new listener, nothing after close. Pure, imports nothing
-    voice.live.ts (+test)       The ElevenLabs session, loaded on the first call (ADR 0006, 0007): voice input (microphone, token, SDK, WebRTC) or text input (token, SDK, text-only), 15 s connect budget, 175 s cap. The one group with no mock: always live
+    voice.live.ts (+test)       The ElevenLabs session, loaded on the first call (ADR 0006, 0007): voice input (microphone, token, SDK, WebRTC) or text input (signed URL, SDK, text-only over WebSocket), 15 s connect budget, 175 s cap. The one group with no mock: always live
     tenant.* (F3) · receptionist.* · shell.* · insights.* (Tổng quan) · calls.* (F5) · appointments.* · numbers.* · account.* (F6)
 
   server/                       Code that runs only in a route handler (ADR 0005). Only src/app/ imports it
@@ -71,7 +71,7 @@ src/
     sheets.ts                   appendRows: one call to spreadsheets.values.append
     request-body.ts (+test)     The JSON media-type check and the body reader capped at 48 KB, sized from api/lead-limits.ts
     leads-handler.ts            Request in, Response out: 415, 413, 400, 422, 503, 202
-    elevenlabs-token.ts         mintConversationToken: one GET to ElevenLabs with the key
+    elevenlabs-token.ts         mintConversationToken and mintSignedUrl: one GET each to ElevenLabs with the key
     voice-demo-handler.ts (+test)  Request in, Response out: 415, 413, 400, 503, 502, 200
     voice-demo.ts               Binds the handler to the real env and the real mint; the one function the route imports
 

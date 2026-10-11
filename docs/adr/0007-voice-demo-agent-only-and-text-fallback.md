@@ -21,12 +21,17 @@ agent answers in text, because that is the only mode the vendor offers without a
    machine without the two variables, and `.env.local` is the way to hear the agent locally.
    `NEXT_PUBLIC_MOCK_FAILURE_RATE` does not apply to `voice`; its error paths are reached by
    unsetting the key (the `503`) and by the unit tests of `voice.live.ts`.
-2. **Two inputs, one session interface, one token.** `connect` takes `input: 'voice' |
-   'text'`. `voice` is ADR 0006's path unchanged: microphone first, then the token, the SDK
-   and a WebRTC conversation. `text` skips the microphone, mints the same token from the same
-   route, and starts the SDK's text-only conversation (`textOnly: true`, over the same WebRTC
-   transport, so `POST /api/voice-demo/token` and `docs/api-contract.md` §5's route do not
-   change). A text session never opens a microphone, plays no audio, reports `getAmplitude()`
+2. **Two inputs, one session interface, two tickets from one route.** `connect` takes
+   `input: 'voice' | 'text'`. `voice` is ADR 0006's path unchanged: microphone first, then
+   the WebRTC conversation token, the SDK and a WebRTC conversation. `text` skips the
+   microphone, asks the same route for a **signed URL** (`{ "input": "text" }` →
+   `{ "signed_url" }`), and starts the SDK's text-only conversation over **WebSocket**
+   (`textOnly: true`, `connectionType: 'websocket'`). Not WebRTC: the first real text
+   session showed that the SDK's WebRTC connection plays every agent audio track whatever
+   `textOnly` says, and sends the `text_only` override over the data channel only after the
+   room is joined, so the agent had already started in voice mode. Over WebSocket the
+   override is the first message on the socket and the text conversation owns no audio.
+   A text session never opens a microphone, plays no audio, reports `getAmplitude()`
    as `null`, treats `setMicEnabled` as a no-op, and delivers the conversation as `message`
    events: `{ type: 'message', from: 'agent' | 'visitor', text }`. The session emits the
    visitor's own line itself when `sendText` is called, so the screen has one source for the
@@ -82,10 +87,9 @@ agent answers in text, because that is the only mode the vendor offers without a
   `@elevenlabs/client` 1.27.0: no `getUserMedia`, no audio output, replies through
   `onMessage`); a path where the visitor types and the agent speaks does not exist, so the
   text shape has to show the agent's words.
-- The same token, route and transport for both inputs keeps `src/server/` untouched and the
-  contract's route section unchanged. The alternative — a WebSocket signed URL, the SDK's
-  default for text — would add a second ticket kind to the route for no gain the visitor can
-  see.
+- One route mints both tickets. A second ticket kind costs one more function in
+  `src/server/elevenlabs-token.ts` and one field in the request body; it is the SDK's own
+  default transport for text, and the only one on which "text-only" means no audio.
 - A group without a mock is a cost: a developer without the two variables cannot hear the
   demo, and the mock-only error walk of ADR 0003 point 4 is lost for this group. It is
   accepted because the only honest mock of a conversation is no conversation, and because
@@ -109,13 +113,18 @@ agent answers in text, because that is the only mode the vendor offers without a
 - **Treating a missing microphone differently from a refused one.** Two codes and two
   lines of copy for the same outcome — the visitor types — is a distinction without a
   decision behind it.
-- **A WebSocket signed URL for the text session.** See "Why".
+- **Text-only over the WebRTC conversation token**, so that the route and `src/server/`
+  stay untouched. It was the first build, and it was wrong in the browser: the agent spoke
+  and then hung up on a visitor who could not be heard. See "Settled" below.
 
 ## Settled by the first text session (2026-10-11, local, microphone blocked)
 
-- The SDK's text-only conversation over the WebRTC transport, on the same conversation
-  token the voice path uses, joins the room and delivers `agent_response` events: the
-  agent's first message arrived as the first line of the thread. No signed URL is needed.
+- Text over the WebRTC conversation token is **not** text-only: the agent's first message
+  did arrive as text, but its audio played too (the SDK attaches every agent audio track,
+  `WebRTCConnection.js` `TrackSubscribed`), and the `text_only` override reached the server
+  only after the room was joined, so the agent ran a voice conversation, heard nothing,
+  and ended it. The text input therefore moved to WebSocket with a signed URL (point 2),
+  where the override opens the socket and the text conversation owns no audio.
 - What was not planned for: the agent's `turn_timeout` (7 s by default) counts while the
   visitor types, and the agent ended the conversation before the first typed line was
   sent. The session now reports typing through `noteActivity()` → the SDK's
@@ -126,15 +135,16 @@ agent answers in text, because that is the only mode the vendor offers without a
 
 ## Assumed, to confirm during the build
 
-- A text-only session that ElevenLabs refuses because the override is not enabled does
-  **not** surface as a failed `startSession`: the SDK resolves once the room is joined and
-  the override is published, before the server has judged it, and the room closing
-  afterwards reaches the session as `onDisconnect({ reason: 'agent' })`. The screen would
-  then show "Linh đã kết thúc cuộc gọi thử…" with the sign-up link, not the failed state.
-  That is the misconfigured case only — point 8 is the fix — and it is not special-cased in
-  code; whether the refusal looks like that, or like a connection that never joins and
-  therefore does fail, is settled by starting one text session before the owner enables
-  the override.
+- A text session that ElevenLabs refuses because the override is not enabled surfaces as
+  a failed `startSession`: over WebSocket the override is the first message and the SDK
+  waits for the server's `conversation_initiation_metadata` before resolving, so a refusal
+  closes the socket and rejects (`SessionConnectionError` → `voice_unavailable` → the
+  failed slot). Read from `WebSocketConnection.js`; settled by one text session with the
+  override off. (The misconfigured case only — point 8 is the fix.)
+- The agent's turn timeout does not end a text conversation while the visitor types, now
+  that the server runs it as text rather than as a silent voice call. Settled by typing
+  slowly in the next text session; if it still ends, the owner's turn-timeout lever in
+  `README.md` is what remains.
 - The orb's placement re-measures its slot when the slot changes size, so the smaller orb
   of the text shape lands where the slot is and not where the voice slot was.
 

@@ -3,39 +3,58 @@ import { ElevenLabsRequestError } from './voice-demo-handler'
 import type { ElevenLabsConfig } from './env'
 
 /*
- * One WebRTC conversation token for the private landing-demo agent (ADR 0006
- * point 5), and the one way this directory talks to ElevenLabs. Never reused:
- * each call on the landing page gets its own.
+ * The two tickets for the private landing-demo agent (ADR 0006 point 5, ADR
+ * 0007), and the one way this directory talks to ElevenLabs: a WebRTC
+ * conversation token for a call, a WebSocket signed URL for a typed
+ * conversation. Never reused: each call on the landing page gets its own.
  */
 
 const TOKEN_URL = 'https://api.elevenlabs.io/v1/convai/conversation/token'
+const SIGNED_URL_URL = 'https://api.elevenlabs.io/v1/convai/conversation/get-signed-url'
 
 /*
- * The success body is `{ "token": "…", "conversation_id": "…" }` (the API
- * reference for this endpoint, read 2026-10-11). Only the token is needed. If the
- * field were ever renamed, every mint would fail with a 2xx upstream status in
- * the log, which is how it would show itself.
+ * The success bodies are `{ "token": "…", "conversation_id": "…" }` and
+ * `{ "signed_url": "wss://…" }` (the API reference for each endpoint, read
+ * 2026-10-11). Only the ticket is needed. If a field were ever renamed, every
+ * mint would fail with a 2xx upstream status in the log, which is how it
+ * would show itself.
  */
 const TOKEN_FIELD = 'token'
+const SIGNED_URL_FIELD = 'signed_url'
 
 /**
  * Throws `ElevenLabsRequestError` for the deadline, a network failure, any
- * non-2xx, or a 2xx without a token. A failure's body is discarded unread, so
+ * non-2xx, or a 2xx without the token. A failure's body is discarded unread, so
  * nothing ElevenLabs says can reach a log or a visitor.
  */
-export async function mintConversationToken(config: ElevenLabsConfig, signal: AbortSignal): Promise<string> {
+export function mintConversationToken(config: ElevenLabsConfig, signal: AbortSignal): Promise<string> {
+  return fetchTicket('token', TOKEN_URL, TOKEN_FIELD, config, signal)
+}
+
+/** The same, for the signed URL a text-only conversation opens its WebSocket with. */
+export function mintSignedUrl(config: ElevenLabsConfig, signal: AbortSignal): Promise<string> {
+  return fetchTicket('signed-url', SIGNED_URL_URL, SIGNED_URL_FIELD, config, signal)
+}
+
+async function fetchTicket(
+  step: ElevenLabsRequestError['step'],
+  url: string,
+  field: string,
+  config: ElevenLabsConfig,
+  signal: AbortSignal,
+): Promise<string> {
   let response: Response
   try {
-    response = await fetch(`${TOKEN_URL}?agent_id=${encodeURIComponent(config.agentId)}`, {
+    response = await fetch(`${url}?agent_id=${encodeURIComponent(config.agentId)}`, {
       headers: { 'xi-api-key': config.apiKey, Accept: 'application/json' },
       signal,
     })
   } catch (err) {
-    throw new ElevenLabsRequestError('token', null, { cause: err })
+    throw new ElevenLabsRequestError(step, null, { cause: err })
   }
   if (!response.ok) {
     await response.body?.cancel()
-    throw new ElevenLabsRequestError('token', response.status)
+    throw new ElevenLabsRequestError(step, response.status)
   }
 
   let body: unknown
@@ -43,9 +62,9 @@ export async function mintConversationToken(config: ElevenLabsConfig, signal: Ab
     body = await response.json()
   } catch {
     // No cause: a JSON syntax error quotes the start of the body it choked on.
-    throw new ElevenLabsRequestError('token', response.status)
+    throw new ElevenLabsRequestError(step, response.status)
   }
-  const token = typeof body === 'object' && body !== null ? (body as Record<string, unknown>)[TOKEN_FIELD] : undefined
-  if (typeof token !== 'string' || !token) throw new ElevenLabsRequestError('token', response.status)
-  return token
+  const ticket = typeof body === 'object' && body !== null ? (body as Record<string, unknown>)[field] : undefined
+  if (typeof ticket !== 'string' || !ticket) throw new ElevenLabsRequestError(step, response.status)
+  return ticket
 }

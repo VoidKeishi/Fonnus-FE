@@ -439,7 +439,8 @@ recording, and the demo answers with the agent or not at all. `voice` is therefo
 by unsetting `ELEVENLABS_API_KEY` (the token route's `503`) and by the unit tests of
 `voice.live.ts`. That **live implementation** is the ElevenLabs session of
 [ADR 0006](./adr/0006-elevenlabs-landing-voice-demo.md), not Fonnus-BE's: the browser connects
-over WebRTC to a private ElevenLabs agent with the conversation token this app mints (below).
+to a private ElevenLabs agent with a ticket this app mints (below) — a conversation token and
+WebRTC for a call, a signed URL and a WebSocket for a text session.
 `@elevenlabs/client` is imported inside `connect`, so it loads on the first call and never with
 the page. What the client does:
 
@@ -451,9 +452,13 @@ the page. What the client does:
   microphone first and releases the stream at once (the SDK opens its own), so no token is
   minted for a visitor who refuses. Then it posts to `POST /api/voice-demo/token`, loads the SDK
   and starts the session.
-- **No microphone, same agent.** With `input: 'text'`, `connect` skips the microphone, mints the
-  same token from the same route, and starts the SDK's text-only conversation over the same
-  WebRTC transport (`textOnly: true`, `connectionType: 'webrtc'`). It plays no audio; the agent's
+- **No microphone, same agent.** With `input: 'text'`, `connect` skips the microphone, posts
+  `{ "input": "text" }` to the same route for a signed URL, and starts the SDK's text-only
+  conversation over a WebSocket (`signedUrl`, `connectionType: 'websocket'`, `textOnly: true`).
+  Not WebRTC: there the SDK joins the room in voice, plays every agent audio track whatever
+  `textOnly` says, and sends the text-only override only after joining, so the agent speaks,
+  never hears the typed lines and ends on its turn timeout. Over the WebSocket the override goes
+  out as the socket opens, before the conversation starts, and no audio is created. The agent's
   replies arrive as `message` events.
 - **Two codes of its own.** Besides whatever `http.ts` makes of the token route's answer,
   `connect` rejects with `ApiError { kind: 'unknown', code }`: `microphone_unavailable` when
@@ -489,35 +494,42 @@ in `voice.live.ts` and the token route is deleted.
 ### `POST /api/voice-demo/token`
 
 **Not Fonnus-BE's.** This app's own route handler, on this app's origin and outside
-`/api/v1`, like §6. It mints the WebRTC conversation token the live voice session hands to
-ElevenLabs, using a key that never reaches the browser.
+`/api/v1`, like §6. It mints the ticket the live voice session hands to ElevenLabs, using a key
+that never reaches the browser: a WebRTC conversation token for a call, a WebSocket signed URL
+for a text session.
 
 ```jsonc
-// request — Content-Type: application/json
-{}
+// request, a call — Content-Type: application/json
+{}                      // or { "input": "voice" }
 // → 200, Cache-Control: no-store
 { "token": "<WebRTC conversation token>" }
+
+// request, a text session
+{ "input": "text" }
+// → 200, Cache-Control: no-store
+{ "signed_url": "wss://…" }
 ```
 
 - **Unauthenticated.** No cookie is read and a `401` is never answered.
-- **The request must be `Content-Type: application/json`.** The body is ignored, but JSON is
-  required so that another site cannot make a visitor's browser mint a token with a simple,
+- **The request must be `Content-Type: application/json`,** even for a call's empty body, so
+  that another site cannot make a visitor's browser mint a ticket with a simple,
   preflight-free request; the route sends no CORS headers.
+- **`input` is `voice` or `text`, or absent.** Absent is a call, which is what the live session
+  sends for one. Any other value, or a body that is not a JSON object, is a `400`.
 - **Never upstream text.** A refusal has no body, and nothing ElevenLabs said reaches the
   response.
 
-The route serves both inputs of the session with the same token. Every refusal makes
-`connect` reject, and the call screen says it could not connect to Linh and offers to call
-again ([ADR 0007](./adr/0007-voice-demo-agent-only-and-text-fallback.md) point 5).
+Every refusal makes `connect` reject, and the call screen says it could not connect to Linh and
+offers to call again ([ADR 0007](./adr/0007-voice-demo-agent-only-and-text-fallback.md) point 5).
 
 | Status | Body | Meaning |
 |---|---|---|
-| `200` | `{ "token": "…" }`, `Cache-Control: no-store` | A token, valid for fifteen minutes |
-| `400` | — | The body is not JSON |
+| `200` | `{ "token": "…" }` or `{ "signed_url": "…" }`, `Cache-Control: no-store` | A call's token, valid for fifteen minutes, or a text session's signed URL |
+| `400` | — | The body is not a JSON object, or `input` is neither `voice` nor `text` |
 | `413` | — | The body is over 48 KiB, the cap the `leads` routes share |
 | `415` | — | Not `application/json` |
 | `429` | — (from the Vercel Firewall) | Too many tokens from this IP |
-| `502` | — | ElevenLabs refused, or did not answer within the 8-second deadline |
+| `502` | — | ElevenLabs refused either ticket, or did not answer within the 8-second deadline |
 | `503` | — | `ELEVENLABS_API_KEY` or `ELEVENLABS_AGENT_ID` is not set. Unsetting the key is the kill switch |
 
 ---
