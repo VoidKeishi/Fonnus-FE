@@ -1,19 +1,18 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import type { RefObject } from 'react'
 import { Icon, Pattern } from '@/design-system'
-import { CHIPS, VOICES } from '@/data/call-demo'
+import { CHIPS } from '@/data/call-demo'
 import { useCallDemo } from './call-demo-provider'
 import { stateLabel } from './call-state'
-import type { CallDemo } from './use-call-demo'
 
 /*
  * The call screen. Three things and nothing else: the orb, a way to type, and a
  * way out. The orb itself is not rendered here — it flies in from the page and
  * lands on the slot (`spotRef`).
  *
- * The controls sit above the screen in their own layer so the voice menu can
- * never be painted under the orb (screen 60, orb 70, controls 80). They fade
- * in — no slide, which read as "frozen mid-air" during the orb's flight.
+ * The controls sit above the screen in their own layer so nothing in them can
+ * be painted under the orb (screen 60, orb 70, controls 80). They fade in — no
+ * slide, which read as "frozen mid-air" during the orb's flight.
  *
  * Modal by `inert`, not by `<dialog>.showModal()`: the top layer would paint
  * the panel over the orb, which has to sit between the screen and the controls.
@@ -41,7 +40,6 @@ export function CallOverlay({ spotRef, orbRef }: CallOverlayProps) {
   const demo = useCallDemo()
   const { returnFocusTo } = demo
   const [typed, setTyped] = useState('')
-  const [voiceOpen, setVoiceOpen] = useState(false)
   const dialogRef = useRef<HTMLDivElement>(null)
   const titleId = useId()
 
@@ -149,21 +147,6 @@ export function CallOverlay({ spotRef, orbRef }: CallOverlayProps) {
             <Icon name={demo.mic ? 'voice' : 'voice-off'} size={18} />
           </button>
 
-          <span className="relative inline-flex flex-none">
-            <button
-              type="button"
-              onClick={() => {
-                setVoiceOpen((v) => !v)
-              }}
-              aria-label="Chọn giọng nói của trợ lý"
-              aria-expanded={voiceOpen}
-              className={`${ROUND} ${voiceOpen ? ACTIVE : IDLE}`}
-            >
-              <Icon name="caller" size={18} />
-            </button>
-            {voiceOpen ? <VoiceMenu demo={demo} /> : null}
-          </span>
-
           <button
             type="button"
             onClick={send}
@@ -178,66 +161,6 @@ export function CallOverlay({ spotRef, orbRef }: CallOverlayProps) {
           Fonnus luôn trả lời bằng giọng nói. Bấm ✕ để thoát.
         </p>
       </div>
-    </div>
-  )
-}
-
-function VoiceMenu({ demo }: { demo: CallDemo }) {
-  return (
-    <div
-      role="group"
-      aria-label="Giọng của trợ lý"
-      className="absolute right-0 bottom-[52px] w-[296px] rounded-lg bg-surface-card p-2 shadow-[var(--shadow-overlay),inset_0_0_0_1px_var(--border-hairline)] motion-safe:animate-[fnRise_200ms_var(--ease-arc)]"
-    >
-      <div className="px-3 pt-2.5 pb-2 text-eyebrow leading-(--leading-body) font-semibold tracking-eyebrow text-text-muted uppercase">
-        Giọng của trợ lý
-      </div>
-      {VOICES.map((v, i) => {
-        const selected = demo.voice === i
-        return (
-          // Two sibling buttons, never one inside the other. The row keeps the
-          // fill; the choosing button carries its left and vertical padding so
-          // the whole row up to the preview stays one target.
-          <div
-            key={v.name}
-            className={[
-              'flex w-full items-center gap-3 rounded-[10px] pr-3 transition-colors duration-[120ms] ease-[ease-out]',
-              selected
-                ? 'bg-action-primary text-text-on-accent [--icon-accent:currentColor]'
-                : 'bg-transparent text-text-body hover:bg-action-ghost-hover',
-            ].join(' ')}
-          >
-            <button
-              type="button"
-              aria-pressed={selected}
-              onClick={() => {
-                demo.setVoice(i)
-              }}
-              className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-[10px] border-none bg-transparent py-2.5 pl-3 text-left text-inherit"
-            >
-              <span className="min-w-0 flex-1">
-                <span className="block text-body-sm leading-[1.4] font-semibold">{v.name}</span>
-                <span className="block text-ui leading-[1.4] opacity-72">{v.desc}</span>
-              </span>
-              {selected ? <Icon name="check" size={14} /> : null}
-            </button>
-            {/* Auditions the voice without selecting it. */}
-            <button
-              type="button"
-              aria-label={`Nghe thử giọng ${v.name}`}
-              onClick={demo.previewVoice}
-              className={[
-                'grid size-[34px] flex-none cursor-pointer place-items-center rounded-[50%] border-none',
-                selected
-                  ? 'bg-[color-mix(in_srgb,var(--text-on-accent)_20%,transparent)] text-text-on-accent'
-                  : 'bg-surface-warm text-text-accent',
-              ].join(' ')}
-            >
-              <Icon name="play" size={14} />
-            </button>
-          </div>
-        )
-      })}
     </div>
   )
 }

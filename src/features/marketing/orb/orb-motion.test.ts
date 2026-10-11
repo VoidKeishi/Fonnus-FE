@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ORB_ENVELOPE, envelopeStep, movesByFlight, orbPose, speechLevel } from './orb-motion'
+import { ORB_ENVELOPE, envelopeStep, movesByFlight, orbPose } from './orb-motion'
 
 /*
  * The orb has to land exactly on the hero's dock, leave for the corner at the
@@ -82,26 +82,5 @@ describe('envelopeStep', () => {
 
   it('settles slowly through a pause', () => {
     expect(envelopeStep(1, 0, ORB_ENVELOPE)).toBeCloseTo(0.9)
-  })
-})
-
-describe('speechLevel', () => {
-  it('is silent for a flat signal', () => {
-    expect(speechLevel(new Uint8Array(512).fill(128))).toBe(0)
-  })
-
-  it('scales quiet speech up by 3.2', () => {
-    // ±16 around the centre is an RMS of 0.125.
-    const quiet = Uint8Array.from({ length: 512 }, (_, i) => (i % 2 ? 144 : 112))
-    expect(speechLevel(quiet)).toBeCloseTo(0.4)
-  })
-
-  it('never passes 1 however loud the voice', () => {
-    const loud = Uint8Array.from({ length: 512 }, (_, i) => (i % 2 ? 255 : 0))
-    expect(speechLevel(loud)).toBe(1)
-  })
-
-  it('is silent for an empty frame', () => {
-    expect(speechLevel(new Uint8Array(0))).toBe(0)
   })
 })

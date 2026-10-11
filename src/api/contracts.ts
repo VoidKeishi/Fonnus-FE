@@ -10,9 +10,9 @@
  * from `docs/field-catalogue-mapping.md`. When you change an interface here,
  * change that document in the same commit.
  *
- * The `auth` and `leads` groups exist today. The other groups of the contract —
- * tenant, assistant, receptionist, voice — arrive with the screens that call
- * them (PLAN.md); nothing ships ahead of its first consumer.
+ * The `auth`, `leads` and `voice` groups exist today. The other groups of the
+ * contract — tenant, assistant, receptionist — arrive with the screens that
+ * call them (PLAN.md); nothing ships ahead of its first consumer.
  */
 
 /** Every method takes this, so a caller can cancel on unmount. */
@@ -136,15 +136,73 @@ export interface LeadsApi {
 }
 
 // ---------------------------------------------------------------------------
+// Voice
+// ---------------------------------------------------------------------------
+
+/** What the receptionist is doing, as the call screen's one line says it. */
+export type VoiceAgentState = 'connecting' | 'speaking' | 'listening';
+
+/** `user` closed it; `agent` ended the call; `timeout` is the duration cap; `error` is anything else. */
+export type VoiceEndReason = 'user' | 'agent' | 'error' | 'timeout';
+
+/** Only what the screen reads. Audio and loudness are deliberately not events — see `getAmplitude`. */
+export type VoiceEvent =
+  | { type: 'state'; state: VoiceAgentState }
+  | { type: 'ended'; reason: VoiceEndReason };
+
+/**
+ * One conversation with the receptionist. The landing demo's today; the F3
+ * try-out's once Fonnus-BE serves a voice gateway (ADR 0006).
+ */
+export interface VoiceSession {
+  /**
+   * Returns the unsubscribe. A new listener is first handed the latest event,
+   * synchronously, so a caller that subscribes after `connect` resolves still
+   * learns that she is already speaking. Nothing is delivered after `close()`
+   * resolves.
+   */
+  subscribe(listener: (event: VoiceEvent) => void): () => void;
+
+  /**
+   * The UI's entire microphone surface. The session owns getUserMedia and
+   * everything downstream of it — sample rate, framing and codec are exactly
+   * what changes with the transport, and no component should have to know.
+   */
+  setMicEnabled(on: boolean): Promise<void>;
+
+  /** For callers who would rather type: a chip or the typed line. */
+  sendText(text: string): void;
+
+  /**
+   * Output loudness 0..1, or null when silent. Polled from the orb's
+   * requestAnimationFrame loop, never pushed through React state: a 60fps
+   * signal there would re-render every consumer each frame.
+   */
+  getAmplitude(): number | null;
+
+  /** Idempotent. Emits `ended { reason: 'user' }` once if the session had not ended already. */
+  close(): Promise<void>;
+}
+
+export interface VoiceApi {
+  /**
+   * Opens a session. Call it from inside the click that asked for the call:
+   * an implementation that plays audio needs that gesture for autoplay.
+   */
+  connect(opts: { mode: 'landing-demo'; signal?: AbortSignal | undefined }): Promise<VoiceSession>;
+}
+
+// ---------------------------------------------------------------------------
 // The aggregate
 // ---------------------------------------------------------------------------
 
 export interface FonnusApi {
   auth: AuthApi;
   leads: LeadsApi;
+  voice: VoiceApi;
 }
 
 /** The group names `NEXT_PUBLIC_API_LIVE_GROUPS` accepts. */
-export const API_GROUPS = ['auth', 'leads'] as const;
+export const API_GROUPS = ['auth', 'leads', 'voice'] as const;
 
 export type ApiGroup = (typeof API_GROUPS)[number];
