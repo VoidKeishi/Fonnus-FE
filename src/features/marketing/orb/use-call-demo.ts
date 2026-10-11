@@ -95,7 +95,10 @@ export function useCallDemoState(): CallDemo {
    * `greeting` is the fallback's, primed by the caller inside the tap; it is
    * released unused when `connect` resolves.
    */
-  const connectCall = useCallback((greeting: PrimedGreeting) => {
+  // `greeting` is the player primed inside the tap, for a fallback that arrives
+  // after the microphone prompt has used up the gesture; the mock rejects in the
+  // same tick and needs none, so it passes `null` and the scripted session builds its own.
+  const connectCall = useCallback((greeting: PrimedGreeting | null) => {
     endSession()
     const id = turn.current
     const controller = new AbortController()
@@ -136,16 +139,16 @@ export function useCallDemoState(): CallDemo {
     // synchronously inside `connect`, while the gesture still counts.
     void api.voice.connect({ mode: 'landing-demo', signal: controller.signal }).then(
       (next) => {
-        greeting.dispose()
+        greeting?.dispose()
         attach(next)
       },
       (err: unknown) => {
         if (turn.current !== id) {
-          greeting.dispose()
+          greeting?.dispose()
           return
         }
         if (isApiError(err) && err.code === 'microphone_denied') setMicDenied(true)
-        attach(scriptedVoiceSession({ createPlayer: greeting.createPlayer }))
+        attach(scriptedVoiceSession(greeting ? { createPlayer: greeting.createPlayer } : {}))
       },
     )
   }, [endSession])
@@ -170,7 +173,7 @@ export function useCallDemoState(): CallDemo {
         setAwaitingConsent(true)
         return
       }
-      connectCall(primeGreeting())
+      connectCall(null)
     },
     [open, endSession, connectCall],
   )
