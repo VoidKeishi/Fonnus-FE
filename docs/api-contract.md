@@ -3,11 +3,9 @@
 What the web frontend expects from the backend. Written for a backend engineer who has never
 opened this repo.
 
-**Status: proposed, not implemented** — except §6, the `leads` group, and the voice demo's
-`POST /api/voice-demo/token` in §5, which this app's own route handlers implement
-([ADR 0005](./adr/0005-leads-to-google-sheets.md),
-[ADR 0006](./adr/0006-elevenlabs-landing-voice-demo.md)). Nothing else here exists yet on
-either side. This document lives in Fonnus-FE and Fonnus-FE is its authority
+**Status: proposed, not implemented** — except §6, the `leads` group, which this app's own
+route handlers implement ([ADR 0005](./adr/0005-leads-to-google-sheets.md)). Nothing else
+here exists yet on either side. This document lives in Fonnus-FE and Fonnus-FE is its authority
 until `../Fonnus-BE` implements it. The frontend runs against in-browser mocks
 (`NEXT_PUBLIC_API_MODE=mock`, the committed default) that implement exactly these signatures,
 so the shapes below are already exercised — but outside §6 no HTTP request has ever been
@@ -30,8 +28,8 @@ For field names and their meanings, see
 Every path below is relative to a configurable base (`NEXT_PUBLIC_API_BASE_URL`, default
 `/api/v1`). In development the Next.js server rewrites `/api/v1/*` to `API_PROXY_TARGET`
 (`next.config.ts`), so the browser only ever talks to `localhost:3000` — **no CORS is involved
-in dev at all.** The exceptions are §6 and the voice demo's token in §5: those paths are this
-app's own, written in full (`/api/leads…`, `/api/voice-demo/token`) and never under the base.
+in dev at all.** The exception is §6: those paths are this app's own, written in full
+(`/api/leads…`) and never under the base.
 
 ### Authentication — read this before anything else
 
@@ -429,44 +427,11 @@ Three implementations stand behind the interface. The **scripted session**
 (`src/api/voice-scripted.ts`) plays Linh's recorded greeting and then listens; a question
 makes her "speak" for 4.4 seconds. It is the mock, and it is also the fallback: whenever
 `connect` rejects, for any reason, the call carries on with the scripted session, silently.
-The **live implementation** today is the ElevenLabs path of
+The **live implementation** (`voice.live.ts`) is a stub that rejects, so a live `voice` group
+still plays the scripted session. What replaces it is the ElevenLabs path of
 [ADR 0006](./adr/0006-elevenlabs-landing-voice-demo.md), not Fonnus-BE: the browser connects
-to a private ElevenLabs agent with a conversation token minted by this app (below). When
-Fonnus-BE serves a web voice gateway into the pipeline, it implements this same interface in
-`voice.live.ts` and the token route is deleted.
-
-### `POST /api/voice-demo/token`
-
-**Not Fonnus-BE's.** This app's own route handler, on this app's origin and outside
-`/api/v1`, like §6. It mints the WebRTC conversation token the live voice session hands to
-ElevenLabs, using a key that never reaches the browser.
-
-```jsonc
-// request — Content-Type: application/json
-{}
-// → 200, Cache-Control: no-store
-{ "token": "<WebRTC conversation token>" }
-```
-
-- **Unauthenticated.** No cookie is read and a `401` is never answered.
-- **The request must be `Content-Type: application/json`.** The body is ignored, but JSON is
-  required so that another site cannot make a visitor's browser mint a token with a simple,
-  preflight-free request; the route sends no CORS headers.
-- **Never upstream text.** A refusal has no body, and nothing ElevenLabs said reaches the
-  response.
-
-Every refusal makes `connect` reject, and the call screen carries on with the scripted
-session, silently (ADR 0006 point 7).
-
-| Status | Body | Meaning |
-|---|---|---|
-| `200` | `{ "token": "…" }`, `Cache-Control: no-store` | A token, valid for fifteen minutes |
-| `400` | — | The body is not JSON |
-| `413` | — | The body is over 48 KiB, the cap the `leads` routes share |
-| `415` | — | Not `application/json` |
-| `429` | — (from the Vercel Firewall) | Too many tokens from this IP |
-| `502` | — | ElevenLabs refused, or did not answer within the 8-second deadline |
-| `503` | — | `ELEVENLABS_API_KEY` or `ELEVENLABS_AGENT_ID` is not set. Unsetting the key is the kill switch |
+to a private ElevenLabs agent with a conversation token this app mints. When Fonnus-BE serves
+a web voice gateway into the pipeline, it implements this same interface in `voice.live.ts`.
 
 ---
 

@@ -52,6 +52,8 @@ export function useCallDemoState(): CallDemo {
   const unsubscribe = useRef<(() => void) | null>(null)
   const connecting = useRef<AbortController | null>(null)
   const opener = useRef<HTMLElement | null>(null)
+  /** Mirrors `mic` for the session calls, so two quick taps never read the same stale value. */
+  const micRef = useRef(true)
   /** Bumped by every open and close, so a session that arrives for an earlier call is closed unheard. */
   const turn = useRef(0)
 
@@ -76,6 +78,9 @@ export function useCallDemoState(): CallDemo {
       setOpen(true)
       setAgent('connecting')
       setEnded(null)
+      // Every call starts with the microphone on; the last call's toggle does not carry over.
+      micRef.current = true
+      setMic(true)
 
       const attach = (next: VoiceSession) => {
         if (turn.current !== id) {
@@ -88,6 +93,8 @@ export function useCallDemoState(): CallDemo {
           if (event.type === 'state') setAgent(event.state)
           else setEnded(event.reason)
         })
+        // A tap on the mic button while still connecting lands here, not in the void.
+        if (!micRef.current) void next.setMicEnabled(false)
       }
 
       // Called in the click's own turn: the scripted session starts the
@@ -113,10 +120,11 @@ export function useCallDemoState(): CallDemo {
   }, [])
 
   const toggleMic = useCallback(() => {
-    const next = !mic
+    const next = !micRef.current
+    micRef.current = next
     setMic(next)
     void session.current?.setMicEnabled(next)
-  }, [mic])
+  }, [])
 
   const getAmplitude = useCallback(() => session.current?.getAmplitude() ?? null, [])
 
