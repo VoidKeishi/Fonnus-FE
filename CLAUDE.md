@@ -76,8 +76,9 @@ before code.
   copies: a change there is a re-copy of the whole file, never an edit (ADR 0002).
 - **Icons are drawn, not installed** (`src/design-system/icons.ts`), one terracotta accent
   per glyph through `--icon-accent`. No icon library, no emoji in markup.
-- **Dependencies are added deliberately.** The runtime list is `next`, `react`, `react-dom`.
-  Adding a fourth is a decision with a `PLAN.md` row behind it.
+- **Dependencies are added deliberately.** The runtime list is `next`, `react`, `react-dom`
+  and `@elevenlabs/client` — the last one loaded on the first click of the voice orb, never
+  with the page (ADR 0006). Adding another is a decision with a `PLAN.md` row behind it.
 - **Nothing ships ahead of its first consumer** — a contract group, a token, an abstraction
   arrives with the screen that needs it. This is `../Fonnus/docs/adr/0011` applied here.
 - A claim about Fonnus-BE or the pipeline is verified against their source or their

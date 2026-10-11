@@ -408,6 +408,16 @@ works (`0914378064` / `111002`).
 
 Newest first. One line per session that taught something; the rule itself goes above.
 
+- **2026-10-11 (landing page, the call screen goes live)** — Two things from giving the
+  "Nghe thử" call its real states. A screen that was one modal with one label became a small
+  state machine (consent → connecting → speaking/listening → ended), and every state needed
+  its own focus target, or the keyboard fell to `<body>` behind the `inert` page when the
+  focused button unmounted with its slot; the rule is in `.claude/rules/next-code.md`
+  §Rendering. And the session the hook talks to emits before the hook can subscribe, so
+  `subscribe` hands a new listener the latest event — otherwise the label sat on
+  "Đang kết nối…" through the whole greeting (§State in the same file). Neither is a visual
+  rule, which is why they live beside the React rules rather than above this log.
+
 - **2026-10-05 (footer, the legal links)** — Turning a link-styled `<button>` into a `Link`
   changes its hover: the copied `base.css` gives every `<a>` a terracotta colour and
   underline on hover, which a button never matched. A quiet link with its own hover colour,

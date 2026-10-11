@@ -53,6 +53,11 @@ marked `'use client'`.
 
 - A value that can be computed from props or state is computed during render,
   not copied into state by an effect.
+- A source that emits before a subscriber can attach — a session that speaks the
+  moment `connect` creates it, while the hook subscribes only after the promise
+  resolves — hands a new listener its latest event synchronously. Otherwise the
+  first event is lost and the label sits on "Đang kết nối…" through the whole
+  greeting (`src/api/voice-events.ts`, from the call demo).
 - A state update that depends on the previous value uses the updater form
   `set(prev => …)`. A deferred delete that closed over the old array once
   restored a row already deleted (`docs/ui-ux-principles.md`, Lessons log
@@ -70,6 +75,11 @@ marked `'use client'`.
 
 - A ternary instead of `&&` when the condition is a number: `{count && …}`
   renders `0`.
+- A modal whose content swaps between states gives every state an explicit focus
+  target. A focused button that unmounts with its state drops focus to `<body>`,
+  behind the `inert` page, and the keyboard is lost (`call-overlay.tsx`: the
+  consent and ended slots focus their first action; a slot that disappears hands
+  focus back to the dialog).
 - `<Activity mode={open ? 'visible' : 'hidden'}>` for a panel that opens and
   closes often and must keep its state, such as the try-out rail on a phone.
 - One global listener shared by N components lives in one hook, not in each

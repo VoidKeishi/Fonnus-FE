@@ -256,8 +256,10 @@ the second arrived (ADR 0006 point 9); a third use follows them, it does not nee
   `err.message` never reaches the screen.
 - Fields are `snake_case` exactly as the catalogue names them; no camelCase mapping at any
   layer.
-- A group that needs a WebSocket (`voice`) dials Fonnus-BE's origin directly through its own
-  variable in `env.ts`; the Next.js rewrite does not upgrade WebSockets.
+- A group that holds a live connection (`voice`) dials its origin directly, never through the
+  Next.js rewrite, which does not upgrade WebSockets or carry WebRTC. Today that origin is
+  ElevenLabs, reached with a token from this app's own route (ADR 0006); when Fonnus-BE serves
+  the voice gateway, it is Fonnus-BE's origin through its own variable in `env.ts`.
 
 ### `src/session/`
 
