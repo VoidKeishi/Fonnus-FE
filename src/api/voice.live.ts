@@ -3,18 +3,17 @@
  * ADR 0006. The browser talks to a private ElevenLabs agent over WebRTC, with
  * a conversation token this app's own route mints (`POST /api/voice-demo/token`).
  * When Fonnus-BE serves a web voice gateway, this file dials it instead and
- * nothing above the `VoiceSession` interface changes.
+ * nothing above the `VoiceSession` interface changes. It is the `voice` group's
+ * only implementation: there is no mock (ADR 0007).
  *
  * `@elevenlabs/client` (and `livekit-client` under it) is imported dynamically
  * inside `connect`, never at module scope: the landing page's first load must
  * not carry it, and nothing here may run at import time.
  *
- * `connect` rejects, and the call demo falls back to the scripted session, for
- * everything that goes wrong before the conversation starts (ADR 0006 point 7):
- * `microphone_denied` (the visitor or the page's permissions refused it),
- * `voice_unavailable` (no microphone API or no microphone, the SDK failed to
- * load or start, or no connection within the budget below), and whatever
- * `http.ts` makes of the token route's refusal.
+ * `connect` rejects for everything that goes wrong before the conversation
+ * starts: `microphone_unavailable` (the browser gave no microphone, for any reason),
+ * `voice_unavailable` (the SDK failed to load or start, or no connection within
+ * the budget below), and whatever `http.ts` makes of the token route's refusal.
  */
 import type { VoiceAgentState, VoiceApi, VoiceEndReason, VoiceEvent, VoiceSession } from './contracts'
 import { ApiError } from './errors'
@@ -23,8 +22,8 @@ import { createVoiceEvents } from './voice-events'
 
 /*
  * How long the token, the SDK and the connection may take together before the
- * demo falls back to the recording. Counted from the microphone grant: the
- * prompt waits on a person, not on the network.
+ * call is shown as failed. Counted from the microphone grant: the prompt waits
+ * on a person, not on the network.
  */
 const CONNECT_BUDGET_MS = 15_000
 /**
@@ -47,39 +46,17 @@ interface Conversation {
 
 const canceled = (cause?: unknown) => new ApiError({ kind: 'canceled', cause })
 const unavailable = (cause?: unknown) => new ApiError({ kind: 'unknown', code: 'voice_unavailable', cause })
+const microphoneUnavailable = (cause?: unknown) =>
+  new ApiError({ kind: 'unknown', code: 'microphone_unavailable', cause })
 
 function throwIfAborted(signal: AbortSignal | undefined): void {
   if (signal?.aborted) throw canceled()
 }
 
-/**
- * A refusal by the visitor or by the page's permissions; a missing or busy device is not one.
- * Exported for the tests.
- */
-export function isRefusal(cause: unknown): boolean {
-  const name = typeof cause === 'object' && cause !== null && 'name' in cause ? cause.name : undefined
-  return name === 'NotAllowedError' || name === 'SecurityError'
-}
-
 export const voiceLive: VoiceApi = {
   async connect({ signal }) {
     throwIfAborted(signal)
-
-    // Absent outside a secure context (plain http on a LAN address) and in old browsers.
-    const media = navigator.mediaDevices as MediaDevices | undefined
-    if (typeof media?.getUserMedia !== 'function') throw unavailable()
-
-    // First, because it is the one step that shows the browser's prompt: no
-    // token is minted for a visitor who refuses. The SDK opens its own stream,
-    // so this one only asks the question and is released at once.
-    let stream: MediaStream
-    try {
-      stream = await media.getUserMedia({ audio: true })
-    } catch (cause) {
-      throw isRefusal(cause) ? new ApiError({ kind: 'unknown', code: 'microphone_denied', cause }) : unavailable(cause)
-    }
-    for (const track of stream.getTracks()) track.stop()
-    throwIfAborted(signal)
+    await askForMicrophone(signal)
 
     // One budget for everything from here: the caller's abort, or the time running out.
     const timeout = AbortSignal.timeout(CONNECT_BUDGET_MS)
@@ -129,6 +106,27 @@ export const voiceLive: VoiceApi = {
       signal,
     )
   },
+}
+
+/**
+ * First, because it is the one step that shows the browser's prompt: no token
+ * is minted for a visitor who refuses. The SDK opens its own stream, so this
+ * one only asks the question and is released at once. A refusal, no
+ * microphone, a busy one and no media API at all (plain http on a LAN address,
+ * an old browser) have one outcome, so they share one code.
+ */
+async function askForMicrophone(signal: AbortSignal | undefined): Promise<void> {
+  const media = navigator.mediaDevices as MediaDevices | undefined
+  if (typeof media?.getUserMedia !== 'function') throw microphoneUnavailable()
+  let stream: MediaStream
+  try {
+    stream = await media.getUserMedia({ audio: true })
+  } catch (cause) {
+    throwIfAborted(signal)
+    throw microphoneUnavailable(cause)
+  }
+  for (const track of stream.getTracks()) track.stop()
+  throwIfAborted(signal)
 }
 
 /** The SDK callbacks this file listens to, in the SDK's own shapes. */
@@ -256,8 +254,8 @@ export function startSession(
         }
         if (droppedEarly) {
           // Gone before it was handed over: still "before the conversation
-          // started", so the recording takes over silently. Ended anyway, so
-          // a half-closed peer never stays open behind the recording.
+          // started", so `connect` rejects and the screen says it could not
+          // connect. Ended anyway, so a half-closed peer never stays open.
           fail(unavailable())
           void started.endSession().catch(() => undefined)
           return

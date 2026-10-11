@@ -12,7 +12,8 @@
  * existed.
  *
  * Groups are added here as their screens arrive: `auth`, `leads` and `voice`
- * today.
+ * today. `voice` is always live: a faked conversation is a recording, which is
+ * what ADR 0007 removed, so it has no mock and no switch.
  */
 import { API_GROUPS } from './contracts';
 import type { FonnusApi } from './contracts';
@@ -23,12 +24,11 @@ import { authMock } from './auth.mock';
 import { leadsLive } from './leads.live';
 import { leadsMock } from './leads.mock';
 import { voiceLive } from './voice.live';
-import { voiceMock } from './voice.mock';
 
 export const api: FonnusApi = {
   auth: isLive('auth') ? authLive : authMock,
   leads: isLive('leads') ? leadsLive : leadsMock,
-  voice: isLive('voice') ? voiceLive : voiceMock,
+  voice: voiceLive,
 };
 
 // A one-line reminder in the console, so nobody debugs a mock for an hour
@@ -55,8 +55,5 @@ export {
   phoneError,
 } from './phone';
 export { stashPhone, takePhone } from './sign-up-handoff';
-// The call demo's fallback whenever `api.voice.connect` rejects (ADR 0006 point 7).
-export { primeGreeting, scriptedVoiceSession } from './voice-scripted';
-export type { PrimedGreeting } from './voice-scripted';
 export { MAX_ADDRESS_LENGTH, MAX_EMAIL_LENGTH, MAX_LOCATIONS, MAX_NAME_LENGTH } from './lead-limits';
 export * from './contracts';

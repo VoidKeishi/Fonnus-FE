@@ -17,7 +17,8 @@ the browser. It has no `pg`, no `DATABASE_URL`, no SQL, and no server-side data 
    making real requests, both typed against the same interface, so `pnpm typecheck` is what
    fails the moment a live implementation drifts from the mock it replaces. That is the
    entire drift mechanism and there is no second one. `src/api/index.ts` is the only file
-   that chooses between them.
+   that chooses between them. One exception, recorded in ADR 0007 point 1: the `voice`
+   group has no mock, because the only honest mock of a conversation is no conversation.
 3. **Live is switched on per group**, through `NEXT_PUBLIC_API_LIVE_GROUPS=auth`, not
    globally. Fonnus-BE will ship endpoints over weeks; with only a global switch the first
    real endpoint could not be exercised until every other one existed. `auth` is the only

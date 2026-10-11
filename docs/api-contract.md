@@ -10,8 +10,9 @@ opened this repo.
 either side. This document lives in Fonnus-FE and Fonnus-FE is its authority
 until `../Fonnus-BE` implements it. The frontend runs against in-browser mocks
 (`NEXT_PUBLIC_API_MODE=mock`, the committed default) that implement exactly these signatures,
-so the shapes below are already exercised — but outside §6 no HTTP request has ever been
-made. Treat everything outside §6 as a specification to agree on, not a description of a
+so the shapes below are already exercised — but outside §5's voice session and §6 no HTTP
+request has ever been made. The `voice` group of §5 is the one group with no mock: it is
+always the ElevenLabs implementation (ADR 0007). Treat everything outside §6 as a specification to agree on, not a description of a
 running system. Where a decision is genuinely open, it is marked and listed in
 [`open-questions.md`](./open-questions.md).
 
@@ -404,8 +405,8 @@ Not an HTTP endpoint: the interface the landing page's "Nghe thử" call screen 
 screen and its hook never change when the transport does.
 
 `api.voice.connect({ mode: 'landing-demo', signal })` resolves a `VoiceSession`. The caller
-invokes it inside the click that opened the call, because an implementation that plays audio
-needs that gesture for autoplay. The session has:
+invokes it inside the tap that started the call, because the microphone prompt needs that
+gesture. The session has:
 
 | Member | What it does |
 |---|---|
@@ -425,32 +426,33 @@ Events are only what the screen reads:
 
 There is no transcript event and no voice choice: the screen shows neither.
 
-Three implementations stand behind the interface. The **scripted session**
-(`src/api/voice-scripted.ts`) plays Linh's recorded greeting and then listens; a question
-makes her "speak" for 4.4 seconds. It is the mock, and it is also the fallback: whenever
-`connect` rejects, for any reason, the call carries on with the scripted session, silently
-unless the reason is a refused microphone (below).
-The **live implementation** (`voice.live.ts`) is the ElevenLabs session of
+One implementation stands behind the interface, and there is no mock
+([ADR 0007](./adr/0007-voice-demo-agent-only-and-text-fallback.md)): a faked conversation is a
+recording, and the demo answers with the agent or not at all. `voice` is therefore not in
+`API_GROUPS`, and `NEXT_PUBLIC_MOCK_FAILURE_RATE` does not reach it; its error paths are reached
+by unsetting `ELEVENLABS_API_KEY` (the token route's `503`) and by the unit tests of
+`voice.live.ts`. That **live implementation** is the ElevenLabs session of
 [ADR 0006](./adr/0006-elevenlabs-landing-voice-demo.md), not Fonnus-BE's: the browser connects
 over WebRTC to a private ElevenLabs agent with the conversation token this app mints (below).
 `@elevenlabs/client` is imported inside `connect`, so it loads on the first call and never with
 the page. What the client does:
 
-- **Consent first.** With the group live, the call screen opens on one line saying what happens
-  to the visitor's voice and one button, "Bắt đầu gọi"; `connect` runs inside that tap, never on
-  the orb click (ADR 0006 point 8). The mock opens no microphone and skips this step.
+- **Consent first.** The call screen opens on one line saying what happens to the visitor's
+  voice and one button, "Bắt đầu gọi"; `connect` runs inside that tap, never on the orb click
+  (ADR 0006 point 8).
 - **Microphone before token.** `connect` asks for the microphone first and releases the stream
   at once (the SDK opens its own), so no token is minted for a visitor who refuses. Then it
   posts to `POST /api/voice-demo/token`, then loads the SDK and starts the session.
 - **Two codes of its own.** Besides whatever `http.ts` makes of the token route's answer,
-  `connect` rejects with `ApiError { kind: 'unknown', code }`: `microphone_denied` when the
-  visitor or the page's permissions refuse the microphone (`getUserMedia` rejects with
-  `NotAllowedError` or `SecurityError`), and `voice_unavailable` when there is no microphone API
-  (an insecure context), `getUserMedia` fails for any other reason (no microphone, a busy one),
-  the SDK fails to load or to start, or the token, the SDK and the connection together take more
-  than **fifteen seconds**, counted from the microphone grant. Every rejection falls back to the scripted session; `microphone_denied` alone
-  adds a line under the state line saying the visitor is hearing a recording because the
-  microphone was not allowed. Neither code is ever rendered through `messageFor`.
+  `connect` rejects with `ApiError { kind: 'unknown', code }`: `microphone_unavailable` when
+  the browser gives no microphone for any reason (`getUserMedia` refused by the visitor or the
+  page's permissions, no microphone, a busy one, or no media API at all in an insecure
+  context), and `voice_unavailable` when the SDK fails to load or to start, or the token, the
+  SDK and the connection together take more than **fifteen seconds**, counted from the
+  microphone grant. Neither code is ever rendered through `messageFor`.
+- **What the screen does with a rejection.** Every rejection, `microphone_unavailable`
+  included, is a failed call: "Không kết nối được với Linh lúc này. Bạn thử gọi lại sau một
+  lát." and "Gọi lại", with no sign-up link. Nothing stands in for the agent.
 - **A 175-second cap**, under the agent's own 180, so the ending is the app's: the session
   emits `ended { reason: 'timeout' }` and closes itself.
 - **Endings.** `agent` (the receptionist hung up) and `timeout` show a closing line with
@@ -486,8 +488,8 @@ ElevenLabs, using a key that never reaches the browser.
 - **Never upstream text.** A refusal has no body, and nothing ElevenLabs said reaches the
   response.
 
-Every refusal makes `connect` reject, and the call screen carries on with the scripted
-session, silently (ADR 0006 point 7).
+Every refusal makes `connect` reject, and the call screen says it could not connect to Linh
+and offers to call again ([ADR 0007](./adr/0007-voice-demo-agent-only-and-text-fallback.md) point 5).
 
 | Status | Body | Meaning |
 |---|---|---|

@@ -1,6 +1,6 @@
 # ADR 0006: The landing page's voice demo talks to an ElevenLabs agent, as a stand-in behind the `voice` seam
 
-**Status:** accepted · **Date:** 2026-10-11
+**Status:** accepted · **Date:** 2026-10-11 · Points 2, 7 and 10 amended by [ADR 0007](./0007-voice-demo-agent-only-and-text-fallback.md): the scripted session is gone, a failed connection is shown, and a visitor without a microphone types
 
 ## Decision
 

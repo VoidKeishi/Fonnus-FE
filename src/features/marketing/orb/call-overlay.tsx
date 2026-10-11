@@ -6,11 +6,11 @@ import { Button, buttonClassName, Icon, Pattern } from '@/design-system'
 import {
   CALL_AGAIN_LABEL,
   CHIPS,
+  CONNECT_FAILED_LINE,
   CONSENT_LINE,
   ENDED_AGENT_LINE,
   ENDED_ERROR_LINE,
   ENDED_TIMEOUT_LINE,
-  MIC_DENIED_LINE,
   START_LABEL,
   TRY_FREE_LABEL,
 } from '@/data/call-demo'
@@ -29,10 +29,11 @@ import { stateLabel } from './call-state'
  * Modal by `inert`, not by `<dialog>.showModal()`: the top layer would paint
  * the panel over the orb, which has to sit between the screen and the controls.
  *
- * The slot under the orb has three shapes: the state line while a session
- * runs, the consent line before a live call connects, and the ending of a call
- * that ended on its own. The last two hide the controls, which have nothing to
- * talk to, but keep the room reserved for them so the orb does not move.
+ * The slot under the orb has four shapes: the state line while a session
+ * runs, the consent line before the call connects, the ending of a call that
+ * ended on its own, and a call that could not connect. The last three hide the
+ * controls, which have nothing to talk to, but keep the room reserved for them
+ * so the orb does not move.
  */
 
 /* Same treatment as the hero: Chấm nhịp behind the orb only, centred on its slot. */
@@ -65,8 +66,8 @@ export function CallOverlay({ spotRef, orbRef }: CallOverlayProps) {
   // The slot's line describes its first action, which takes focus when the
   // slot appears, so a screen reader landing there hears why.
   const slotLineId = useId()
-  const { awaitingConsent, ended } = demo
-  const showsControls = !awaitingConsent && !ended
+  const { awaitingConsent, ended, failed } = demo
+  const showsControls = !awaitingConsent && !ended && !failed
 
   useEffect(() => {
     const dialog = dialogRef.current
@@ -92,18 +93,51 @@ export function CallOverlay({ spotRef, orbRef }: CallOverlayProps) {
   // with it; focus moves to the new slot's first action, or back to the dialog
   // once a call starts, instead of falling to the page under it.
   useEffect(() => {
-    if (awaitingConsent || ended) {
+    if (awaitingConsent || ended || failed) {
       actionsRef.current?.querySelector<HTMLElement>('a, button')?.focus({ preventScroll: true })
       return
     }
     if (document.activeElement === document.body) dialogRef.current?.focus({ preventScroll: true })
-  }, [awaitingConsent, ended])
+  }, [awaitingConsent, ended, failed])
 
   const send = () => {
     if (!typed.trim()) return
     demo.ask(typed)
     setTyped('')
   }
+
+  /** The ending of a call that ended on its own, or of one that could not connect; null while neither. */
+  const ending = ended ? (
+    <div ref={actionsRef} className="flex flex-col items-center gap-4 text-center">
+      <p id={slotLineId} role="status" className={SLOT_LINE}>
+        {endedLine(ended)}
+      </p>
+      <div className="flex flex-wrap justify-center gap-3">
+        {ended === 'error' ? null : (
+          <Link href="/dang-ky" aria-describedby={slotLineId} className={buttonClassName({ variant: 'primary' })}>
+            {TRY_FREE_LABEL}
+          </Link>
+        )}
+        <Button
+          variant="secondary"
+          onClick={demo.startCall}
+          aria-describedby={ended === 'error' ? slotLineId : undefined}
+        >
+          {CALL_AGAIN_LABEL}
+        </Button>
+      </div>
+    </div>
+  ) : failed ? (
+    <div ref={actionsRef} className="flex flex-col items-center gap-4 text-center">
+      <p id={slotLineId} role="status" className={SLOT_LINE}>
+        {CONNECT_FAILED_LINE}
+      </p>
+      {/* No sign-up link: a visitor the demo failed is not sent to a form. */}
+      <Button variant="secondary" onClick={demo.startCall} aria-describedby={slotLineId}>
+        {CALL_AGAIN_LABEL}
+      </Button>
+    </div>
+  ) : null
 
   return (
     <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} className="outline-none">
@@ -140,33 +174,14 @@ export function CallOverlay({ spotRef, orbRef }: CallOverlayProps) {
                 {START_LABEL}
               </Button>
             </div>
-          ) : ended ? (
-            <div ref={actionsRef} className="flex flex-col items-center gap-4 text-center">
-              <p id={slotLineId} role="status" className={SLOT_LINE}>
-                {endedLine(ended)}
-              </p>
-              <div className="flex flex-wrap justify-center gap-3">
-                {ended === 'error' ? null : (
-                  <Link href="/dang-ky" aria-describedby={slotLineId} className={buttonClassName({ variant: 'primary' })}>
-                    {TRY_FREE_LABEL}
-                  </Link>
-                )}
-                <Button
-                  variant="secondary"
-                  onClick={demo.startCall}
-                  aria-describedby={ended === 'error' ? slotLineId : undefined}
-                >
-                  {CALL_AGAIN_LABEL}
-                </Button>
-              </div>
-            </div>
           ) : (
-            <div className="flex flex-col items-center gap-1 text-center">
-              <div role="status" className={`min-h-[22px] ${LABEL}`}>
-                {stateLabel(demo.agent, demo.mic)}
+            ending ?? (
+              <div className="flex flex-col items-center gap-1 text-center">
+                <div role="status" className={`min-h-[22px] ${LABEL}`}>
+                  {stateLabel(demo.agent, demo.mic)}
+                </div>
               </div>
-              {demo.micDenied ? <p className={`m-0 max-w-[36ch] ${LABEL}`}>{MIC_DENIED_LINE}</p> : null}
-            </div>
+            )
           )}
         </div>
 
