@@ -95,7 +95,7 @@ export const voiceLive: VoiceApi = {
       ownOrigin: true,
       signal: budget,
     }).catch((cause: unknown) => {
-      // `http.ts` reports the budget's abort as its own timeout; it is this one.
+      // `http.ts` reports the budget's abort as `canceled` or `timeout`; both are this budget's.
       throwIfSpent()
       throw cause
     })
