@@ -428,13 +428,41 @@ There is no transcript event and no voice choice: the screen shows neither.
 Three implementations stand behind the interface. The **scripted session**
 (`src/api/voice-scripted.ts`) plays Linh's recorded greeting and then listens; a question
 makes her "speak" for 4.4 seconds. It is the mock, and it is also the fallback: whenever
-`connect` rejects, for any reason, the call carries on with the scripted session, silently.
-The **live implementation** (`voice.live.ts`) is a stub that rejects, so a live `voice` group
-still plays the scripted session. What replaces it is the ElevenLabs path of
-[ADR 0006](./adr/0006-elevenlabs-landing-voice-demo.md), not Fonnus-BE: the browser connects
-to a private ElevenLabs agent with the conversation token this app mints (below). When
-Fonnus-BE serves a web voice gateway into the pipeline, it implements this same interface in
-`voice.live.ts` and the token route is deleted.
+`connect` rejects, for any reason, the call carries on with the scripted session, silently
+unless the reason is a refused microphone (below).
+The **live implementation** (`voice.live.ts`) is the ElevenLabs session of
+[ADR 0006](./adr/0006-elevenlabs-landing-voice-demo.md), not Fonnus-BE's: the browser connects
+over WebRTC to a private ElevenLabs agent with the conversation token this app mints (below).
+`@elevenlabs/client` is imported inside `connect`, so it loads on the first call and never with
+the page. What the client does:
+
+- **Consent first.** With the group live, the call screen opens on one line saying what happens
+  to the visitor's voice and one button, "Bắt đầu gọi"; `connect` runs inside that tap, never on
+  the orb click (ADR 0006 point 8). The mock opens no microphone and skips this step.
+- **Microphone before token.** `connect` asks for the microphone first and releases the stream
+  at once (the SDK opens its own), so no token is minted for a visitor who refuses. Then it
+  posts to `POST /api/voice-demo/token`, then loads the SDK and starts the session.
+- **Two codes of its own.** Besides whatever `http.ts` makes of the token route's answer,
+  `connect` rejects with `ApiError { kind: 'unknown', code }`: `microphone_denied` when the
+  browser refuses the microphone, and `voice_unavailable` when there is no microphone API (an
+  insecure context), the SDK fails to load or to start, or the session is not connected within
+  **10 seconds**. Every rejection falls back to the scripted session; `microphone_denied` alone
+  adds a line under the state line saying the visitor is hearing a recording because the
+  microphone was not allowed. Neither code is ever rendered through `messageFor`.
+- **A 175-second cap**, under the agent's own 180, so the ending is the app's: the session
+  emits `ended { reason: 'timeout' }` and closes itself.
+- **Endings.** `agent` (the receptionist hung up) and `timeout` show a closing line with
+  "Dùng thử miễn phí" (to `/dang-ky`) and "Gọi lại"; `error` (the connection dropped after the
+  call started) shows "Mất kết nối với Linh." and "Gọi lại". "Gọi lại" connects again without a
+  second consent. `user` is the visitor closing the screen and shows nothing.
+- **Loudness.** `getAmplitude()` is the agent's output volume while she speaks, and `null`
+  otherwise or once the session has ended; the orb draws its own idle pulse while she listens.
+- **The agent's own cap.** When ElevenLabs ends the call at its 180 s `max_duration_seconds`
+  before the client's 175 s timer does, the disconnect arrives as an error with the context
+  `max_duration_exceeded`; the session reports it as `timeout`, not `error`.
+
+When Fonnus-BE serves a web voice gateway into the pipeline, it implements this same interface
+in `voice.live.ts` and the token route is deleted.
 
 ### `POST /api/voice-demo/token`
 
