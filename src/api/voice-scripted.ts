@@ -11,6 +11,7 @@
  * until a session is created — inside the click that opens the call.
  */
 import type { VoiceAgentState, VoiceEvent, VoiceSession } from './contracts'
+import { createVoiceEvents } from './voice-events'
 
 /*
  * The fallback beat, used only when the greeting does not play: the browser
@@ -42,20 +43,13 @@ export interface ScriptedDeps {
  * a caller inside a click keeps the gesture autoplay needs.
  */
 export function scriptedVoiceSession({ createPlayer = (onEnded) => new GreetingPlayer(onEnded) }: ScriptedDeps = {}): VoiceSession {
-  const listeners = new Set<(event: VoiceEvent) => void>()
-  let latest: VoiceEvent = { type: 'state', state: 'connecting' }
-  let closed = false
+  const events = createVoiceEvents<VoiceEvent>({ type: 'state', state: 'connecting' })
   let timers: ReturnType<typeof setTimeout>[] = []
   /** Bumped by every question and by `close()`, so a late answer to an earlier one is ignored. */
   let turn = 0
 
-  const emit = (event: VoiceEvent) => {
-    if (closed) return
-    latest = event
-    for (const listener of [...listeners]) listener(event)
-  }
   const setState = (state: VoiceAgentState) => {
-    emit({ type: 'state', state })
+    events.emit({ type: 'state', state })
   }
   const after = (ms: number, then: () => void) => {
     timers.push(setTimeout(then, ms))
@@ -78,7 +72,7 @@ export function scriptedVoiceSession({ createPlayer = (onEnded) => new GreetingP
   const greetingTurn = turn
   setState('speaking')
   void player.play().then((started) => {
-    if (started || closed || turn !== greetingTurn) return
+    if (started || events.isClosed() || turn !== greetingTurn) return
     // Refused or stalled: connect, then speak for a scripted beat, so the
     // screen is never both silent and frozen.
     setState('connecting')
@@ -92,12 +86,7 @@ export function scriptedVoiceSession({ createPlayer = (onEnded) => new GreetingP
 
   return {
     subscribe(listener) {
-      if (closed) return () => undefined
-      listeners.add(listener)
-      listener(latest)
-      return () => {
-        listeners.delete(listener)
-      }
+      return events.subscribe(listener)
     },
 
     // Nothing to switch on: the scripted session never opens a microphone.
@@ -106,7 +95,7 @@ export function scriptedVoiceSession({ createPlayer = (onEnded) => new GreetingP
     },
 
     sendText(text) {
-      if (closed || !text.trim()) return
+      if (events.isClosed() || !text.trim()) return
       // Asking something cuts the greeting off rather than talking over it.
       interrupt()
       setState('speaking')
@@ -120,13 +109,12 @@ export function scriptedVoiceSession({ createPlayer = (onEnded) => new GreetingP
     },
 
     close() {
-      if (closed) return Promise.resolve()
+      if (events.isClosed()) return Promise.resolve()
       interrupt()
       player.dispose()
       // The scripted session never ends on its own, so this is the one `ended`.
-      emit({ type: 'ended', reason: 'user' })
-      closed = true
-      listeners.clear()
+      events.emit({ type: 'ended', reason: 'user' })
+      events.close()
       return Promise.resolve()
     },
   }

@@ -58,8 +58,10 @@ src/
     auth.mock.ts · auth.live.ts
     leads.mock.ts · leads.live.ts  The contact form and the hotline report. Live posts to this app's own /api/leads… (ADR 0005)
     lead-limits.ts              The length caps and the 20-location limit, read by the forms and by server/
+    voice-events.ts             The event stream every voice session shares: the latest event handed to a new listener, nothing after close. Pure, imports nothing
     voice-scripted.ts (+test)   The scripted voice session: Linh's recorded greeting, then a script. The mock, and the fallback whenever connect rejects
-    voice.mock.ts · voice.live.ts  The landing call demo's session. Mock is the scripted one; live is ElevenLabs (ADR 0006), a stub that rejects until it lands
+    voice.mock.ts               The landing call demo's mock: the scripted session behind maybeFail
+    voice.live.ts               The ElevenLabs session, loaded on the first call (ADR 0006): microphone, token, SDK, 10 s deadline, 175 s cap
     tenant.* (F3) · receptionist.* · shell.* · insights.* (Tổng quan) · calls.* (F5) · appointments.* · numbers.* · account.* (F6)
 
   server/                       Code that runs only in a route handler (ADR 0005). Only src/app/ imports it
@@ -115,7 +117,7 @@ src/
     choice · chips · tiles · rows · save-bar · tabs · disclosure · slider · icon-button · play-button ·
     token-area · charts · table · use-appear · use-element-width · speak · index.ts   each with its first consumer
 
-  data/                         Copy with no markup: auth.ts, content.ts, call-demo.ts (the call screen's chips), pricing.ts, call-demos.ts (the scripted calls under "Khả năng"), hotline-report.ts (the figures and sample report of /cham-diem-hotline)
+  data/                         Copy with no markup: auth.ts, content.ts, call-demo.ts (the call screen's copy: chips, consent, endings, the refused-microphone line), pricing.ts, call-demos.ts (the scripted calls under "Khả năng"), hotline-report.ts (the figures and sample report of /cham-diem-hotline)
   styles/tokens/                Byte copies from ../Fonnus-Web-UI (ADR 0002)
 ```
 
