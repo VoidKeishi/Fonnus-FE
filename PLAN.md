@@ -15,7 +15,7 @@ Status: ⬜ not started · 🔨 in progress · ✅ done, with the date.
 | **F4 · Landing page** — the landing page at `/` and the "Chấm điểm hotline" page at `/cham-diem-hotline`, ported from `../Fonnus-Web-UI` in nine stacked pull requests: the marketing frame, the hero, the voice orb and its call demo, pricing, how it works, capabilities, FAQ with security and testimonials, the contact form against `POST /leads`, and the hotline page against `POST /leads/hotline-report` | ✅ | Server-rendered; this is the acquisition surface. The header always shows "Đăng nhập" and "Dùng thử miễn phí", as the prototype does, and reads no session. The call demo goes through the `voice` group since F4c. A nav or footer link appears only in the pull request that lands its section |
 | **F4b · Leads to a Google Sheet** — the contact form and the "Chấm điểm hotline" request stop waiting on `../Fonnus-BE`: this app receives them in two route handlers and appends them to a Google Sheet (ADR 0005). Four stacked pull requests: the decision, `POST /api/leads`, `POST /api/leads/hotline-report`, then both forms switched to them | ✅ 2026-09-30 | Built and gated by typecheck, lint, test and build only: no request has reached a real sheet yet. `NEXT_PUBLIC_API_LIVE_GROUPS=leads` turns both forms live at once. What remains is the owner's setup and the first live append; see Backlog |
 | **F4c · The voice demo answers** — the "Nghe thử" orb opens a real three-minute conversation with a private ElevenLabs agent, as a stand-in for the pipeline behind the `voice` seam (ADR 0006). Four stacked pull requests: the decision, the `voice` seam with today's recording as its scripted implementation, `POST /api/voice-demo/token`, then the live implementation and the call screen's new states | ✅ 2026-10-11 | Built and gated by typecheck, lint, test and build only: no live call has been made yet, and no browser has opened the new states. `@elevenlabs/client` loads on the first tap, never with the page. `NEXT_PUBLIC_API_LIVE_GROUPS=voice` plus the two server variables turn it on; what remains is the owner's setup and the first live call (Backlog), which also settles the assumptions ADR 0006 lists |
-| **F4d · The voice demo is agent-only, with a text fallback** — the recorded greeting and the scripted session are deleted; `voice` is the one group with no mock; a connection that fails is said on screen; a visitor whose browser gives no microphone talks to the same agent by typing (ADR 0007) | 🔨 | Two stacked pull requests: the decision with the recording removed, `voice` always live and the failed-connection state (this one); then the text session and the text-shaped call screen. Until the second lands, a refused microphone is a failed call. Gated by typecheck, lint, test and build only |
+| **F4d · The voice demo is agent-only, with a text fallback** — the recorded greeting and the scripted session are deleted; `voice` is the one group with no mock; a connection that fails is said on screen; a visitor whose browser gives no microphone talks to the same agent by typing (ADR 0007) | ✅ 2026-10-11 | Two stacked pull requests: the decision with the recording removed, `voice` always live and the failed-connection state; then the text session and the text-shaped call screen. Gated by typecheck, lint, test and build only: no text session has been run against ElevenLabs yet, which is what settles the four assumptions ADR 0007 lists. The owner enables the Text-only override (Backlog) |
 | **F5 · Cuộc gọi** — the clinic's own call history | ⬜ | Blocked: `GET /calls` is "specified later" in `docs/api-contract.md` §7 and has no agreed shape |
 | **F6 · Lịch hẹn, Số điện thoại, Cài đặt** | ⬜ | |
 | **F7 · Deployment** — an ADR on how this runs on Vercel: the domain, the environments, CI, and the cookie posture towards Fonnus-BE | ⬜ | The host is Vercel (the owner's choice, and the premise of ADR 0005); everything else is undecided. The build SHA on `/api/healthz` waits here |
@@ -94,9 +94,20 @@ Each blocks nothing today and has a default that applies if nothing is said.
   it is an AI with a closing line around 2:50; in Vercel, `ELEVENLABS_API_KEY` and
   `ELEVENLABS_AGENT_ID` as Sensitive variables, and one Firewall rate-limit rule. The Hobby
   plan allows one rate-limit rule per project, so it is one rule over both `/api/leads*` and
-  `/api/voice-demo/token`, keyed on IP, with a window of at most ten minutes. Deferred by
-  the owner's call until the demo is live; setting the two variables is what turns it on
-  (there is no group switch since F4d).
+  `/api/voice-demo/token`, keyed on IP, with a window of at most ten minutes; and, since
+  F4d, the **Text-only mode** override enabled under the agent's Security tab, or the text
+  session of a visitor without a microphone is refused. Deferred by the owner's call until
+  the demo is live; setting the two variables is what turns it on (there is no group
+  switch since F4d).
+- **"Nhắn tin thay vì gọi" as a choice on the consent screen** (S, after the first live text
+  session): today a text session is a consequence of the browser giving no microphone (ADR
+  0007). A button beside "Bắt đầu gọi" would let a visitor in a quiet room choose text
+  outright; it changes the consent screen the prototype drew, so it waits for a reason
+  observed on a real visitor.
+- **The transcript line shape exists twice** (S): `src/features/marketing/sections/call-demo-player.tsx`
+  and the thread of the call screen's text shape (`call-overlay.tsx`, `ThreadTurn`) carry
+  the same speaker-label-plus-line classes. Moving them to one shared place in the marketing
+  feature needs an entry in `docs/architecture.md`; do it the next time either changes.
 - **Vercel's Hobby plan is for non-commercial use** (F7): the landing page sells a product,
   which Vercel's terms place outside Hobby. Not a code question; it belongs to the deployment
   ADR and is noted here so F7 does not forget it.

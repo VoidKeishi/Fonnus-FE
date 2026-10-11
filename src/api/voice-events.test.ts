@@ -2,10 +2,11 @@ import { describe, expect, it, vi } from 'vitest'
 import { createVoiceEvents } from './voice-events'
 
 /*
- * Both voice sessions, the scripted one and the live one, speak through this
- * stream. A listener that misses the event emitted before it subscribed leaves
- * the line under the orb on "Đang kết nối…" through the whole greeting, and a
- * listener still called after close drives a call screen that is already gone.
+ * Every voice session speaks through this stream. A listener that misses the
+ * event emitted before it subscribed leaves the line under the orb on "Đang kết
+ * nối…" through her whole first sentence, a text session that loses a line
+ * before the hook subscribes loses the one saying she is an AI, and a listener
+ * still called after close drives a call screen that is already gone.
  */
 
 describe('createVoiceEvents', () => {
@@ -23,6 +24,17 @@ describe('createVoiceEvents', () => {
     const listener = vi.fn<(event: string) => void>()
     events.subscribe(listener)
     expect(listener.mock.calls).toEqual([['listening']])
+  })
+
+  it('hands a late listener every kept event, in order, and then the latest of the others', () => {
+    const events = createVoiceEvents('connecting', (event) => event.startsWith('line:'))
+    events.emit('line:Chào anh/chị')
+    events.emit('listening')
+    events.emit('line:Cạo vôi bao nhiêu?')
+    events.emit('speaking')
+    const listener = vi.fn<(event: string) => void>()
+    events.subscribe(listener)
+    expect(listener.mock.calls).toEqual([['line:Chào anh/chị'], ['line:Cạo vôi bao nhiêu?'], ['speaking']])
   })
 
   it('delivers each event to every listener, in the order they subscribed', () => {

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Mock } from 'vitest'
-import type { VoiceEvent, VoiceSession } from './contracts'
+import type { VoiceEvent, VoiceInput, VoiceSession } from './contracts'
 import { ApiError } from './errors'
 import { MAX_CALL_MS, startSession, voiceLive } from './voice.live'
 
@@ -10,7 +10,8 @@ import { MAX_CALL_MS, startSession, voiceLive } from './voice.live'
  * could not connect instead of hanging on "Đang kết nối…" — and a conversation
  * that turns up after that must be hung up, or she answers in the background
  * of a failed call. A browser that gives no microphone, for any reason, must
- * reject with one code and mint no token. After it starts, the
+ * reject with the one code that turns the call into a typed conversation, and
+ * that conversation must never touch the microphone. After it starts, the
  * SDK's disconnect has to become the one ending the screen shows, said once
  * and with the right reason. None of it needs a microphone or a network: the
  * SDK and the token request are stubbed and their callbacks called by hand.
@@ -18,15 +19,17 @@ import { MAX_CALL_MS, startSession, voiceLive } from './voice.live'
 
 const stubs = vi.hoisted(() => ({
   request: vi.fn<(path: string, opts: Record<string, unknown>) => Promise<{ token: string }>>(),
+  textStart: vi.fn<(options: Record<string, unknown>) => Promise<unknown>>(),
   voiceStart: vi.fn<(options: Record<string, unknown>) => Promise<unknown>>(),
 }))
 
 vi.mock('./http', () => ({ request: stubs.request }))
 vi.mock('@elevenlabs/client', () => ({
+  Conversation: { startSession: stubs.textStart },
   VoiceConversation: { startSession: stubs.voiceStart },
 }))
 
-type Start = Parameters<typeof startSession>[0]
+type Start = Parameters<typeof startSession>[1]
 type Callbacks = Parameters<Start>[0]
 
 interface StubConversation {
@@ -49,7 +52,7 @@ function stubConversation(): StubConversation {
  * Starts a session on the stub, under a budget made of the caller's signal and
  * a stand-in for `AbortSignal.timeout` the test aborts by hand, combined as `connect` combines them.
  */
-function open() {
+function open(input: VoiceInput = 'voice') {
   const caller = new AbortController()
   const timeout = new AbortController()
   const conversation = stubConversation()
@@ -64,15 +67,15 @@ function open() {
         sdk.reject = reject
       }),
   )
-  const pending = startSession(start, AbortSignal.any([caller.signal, timeout.signal]), caller.signal)
+  const pending = startSession(input, start, AbortSignal.any([caller.signal, timeout.signal]), caller.signal)
   const { callbacks, resolve, reject } = sdk
   if (!callbacks || !resolve || !reject) throw new Error('startSession did not call start')
   return { pending, caller, timeout, conversation, callbacks, resolve, reject }
 }
 
 /** Opens a session, lets the SDK hand the conversation over, and records every event. */
-async function started() {
-  const opened = open()
+async function started(input: VoiceInput = 'voice') {
+  const opened = open(input)
   opened.resolve()
   const session: VoiceSession = await opened.pending
   const events: VoiceEvent[] = []
@@ -83,6 +86,7 @@ async function started() {
 }
 
 const endings = (events: VoiceEvent[]) => events.filter((e) => e.type === 'ended')
+const lines = (events: VoiceEvent[]) => events.filter((e) => e.type === 'message')
 
 beforeEach(() => {
   vi.useFakeTimers()
@@ -109,6 +113,13 @@ describe('startSession, before the conversation starts', () => {
     await vi.advanceTimersByTimeAsync(MAX_CALL_MS)
     expect(conversation.endSession).toHaveBeenCalledTimes(1)
     expect(conversation.getOutputVolume).not.toHaveBeenCalled()
+  })
+
+  it('rejects a text conversation as unavailable when the budget runs out', async () => {
+    const { pending, timeout } = open('text')
+    timeout.abort()
+    await expect(pending).rejects.toBeInstanceOf(ApiError)
+    await expect(pending).rejects.toMatchObject({ code: 'voice_unavailable' })
   })
 
   it('rejects as canceled, not unavailable, when the caller aborts', async () => {
@@ -159,6 +170,12 @@ describe('startSession, once the conversation has started', () => {
     expect(session.getAmplitude()).toBe(0.42)
     callbacks.onModeChange({ mode: 'listening' })
     expect(session.getAmplitude()).toBeNull()
+  })
+
+  it('shows no transcript in a voice call', async () => {
+    const { events, callbacks } = await started()
+    callbacks.onMessage({ role: 'agent', message: 'Dạ, Nha khoa Minh Anh xin nghe.' })
+    expect(lines(events)).toEqual([])
   })
 
   it('ends as the agent’s doing when the agent hangs up', async () => {
@@ -236,6 +253,76 @@ describe('startSession, once the conversation has started', () => {
   })
 })
 
+describe('startSession, typed', () => {
+  it('waits for the visitor once connected, before her first line', async () => {
+    const { events } = await started('text')
+    expect(events).toEqual([{ type: 'state', state: 'listening' }])
+  })
+
+  it('keeps her first line when it arrives before the conversation is handed over', async () => {
+    const { pending, callbacks, resolve } = open('text')
+    callbacks.onModeChange({ mode: 'listening' })
+    callbacks.onMessage({ role: 'agent', message: 'Dạ, Nha khoa Minh Anh xin nghe, em là trợ lý AI.' })
+    resolve()
+    const session = await pending
+    const events: VoiceEvent[] = []
+    session.subscribe((event) => {
+      events.push(event)
+    })
+    expect(events).toEqual([
+      { type: 'message', from: 'agent', text: 'Dạ, Nha khoa Minh Anh xin nghe, em là trợ lý AI.' },
+      { type: 'state', state: 'listening' },
+    ])
+  })
+
+  it('adds the visitor’s line and waits for her reply, then adds hers and waits for the visitor', async () => {
+    const { session, events, conversation, callbacks } = await started('text')
+    session.sendText(' Cạo vôi răng bao nhiêu? ')
+    expect(events.slice(1)).toEqual([
+      { type: 'message', from: 'visitor', text: 'Cạo vôi răng bao nhiêu?' },
+      { type: 'state', state: 'speaking' },
+    ])
+    expect(conversation.sendUserMessage.mock.calls).toEqual([['Cạo vôi răng bao nhiêu?']])
+
+    callbacks.onMessage({ role: 'user', message: 'Cạo vôi răng bao nhiêu?' })
+    callbacks.onMessage({ role: 'agent', message: 'Dạ, cạo vôi răng là 300.000 đồng ạ.' })
+    expect(events.slice(3)).toEqual([
+      { type: 'message', from: 'agent', text: 'Dạ, cạo vôi răng là 300.000 đồng ạ.' },
+      { type: 'state', state: 'listening' },
+    ])
+  })
+
+  it('follows the lines, not the room’s audio, for whether she is answering', async () => {
+    const { session, events, callbacks } = await started('text')
+    session.sendText('Phòng khám ở đâu?')
+    callbacks.onModeChange({ mode: 'listening' })
+    expect(events.at(-1)).toEqual({ type: 'state', state: 'speaking' })
+  })
+
+  it('has no loudness and never touches the microphone', async () => {
+    const { session, conversation, callbacks } = await started('text')
+    session.sendText('9h sáng thứ Bảy còn trống không?')
+    expect(session.getAmplitude()).toBeNull()
+    callbacks.onMessage({ role: 'agent', message: 'Dạ còn ạ.' })
+    expect(session.getAmplitude()).toBeNull()
+    await session.setMicEnabled(false)
+    await session.setMicEnabled(true)
+    expect(conversation.setMicMuted).not.toHaveBeenCalled()
+    expect(conversation.getOutputVolume).not.toHaveBeenCalled()
+  })
+
+  it('ends on the cap and when the agent hangs up, as a call does', async () => {
+    const capped = await started('text')
+    await vi.advanceTimersByTimeAsync(MAX_CALL_MS)
+    expect(endings(capped.events)).toEqual([{ type: 'ended', reason: 'timeout' }])
+    expect(capped.conversation.endSession).toHaveBeenCalledTimes(1)
+
+    const hungUp = await started('text')
+    hungUp.callbacks.onDisconnect({ reason: 'agent' })
+    expect(endings(hungUp.events)).toEqual([{ type: 'ended', reason: 'agent' }])
+  })
+})
+
 describe('connect', () => {
   const getUserMedia = vi.fn<(constraints: MediaStreamConstraints) => Promise<MediaStream>>()
 
@@ -243,6 +330,7 @@ describe('connect', () => {
     vi.useRealTimers()
     vi.stubGlobal('navigator', { mediaDevices: { getUserMedia } })
     stubs.request.mockResolvedValue({ token: 'conversation-token' })
+    stubs.textStart.mockImplementation(() => Promise.resolve(stubConversation()))
     stubs.voiceStart.mockImplementation(() => Promise.resolve(stubConversation()))
   })
 
@@ -251,14 +339,30 @@ describe('connect', () => {
     vi.resetAllMocks()
   })
 
+  it('starts a typed conversation on the same token and transport, without asking for the microphone', async () => {
+    const session = await voiceLive.connect({ mode: 'landing-demo', input: 'text' })
+    expect(getUserMedia).not.toHaveBeenCalled()
+    expect(stubs.request).toHaveBeenCalledWith(
+      '/api/voice-demo/token',
+      expect.objectContaining({ method: 'POST', ownOrigin: true }),
+    )
+    expect(stubs.voiceStart).not.toHaveBeenCalled()
+    expect(stubs.textStart).toHaveBeenCalledWith(
+      expect.objectContaining({ conversationToken: 'conversation-token', connectionType: 'webrtc', textOnly: true }),
+    )
+    await session.close()
+  })
+
   it('asks for the microphone first, releases it, and starts a voice conversation', async () => {
     const track = { stop: vi.fn<() => void>() }
     getUserMedia.mockResolvedValue({ getTracks: () => [track] } as unknown as MediaStream)
-    const session = await voiceLive.connect({ mode: 'landing-demo' })
+    const session = await voiceLive.connect({ mode: 'landing-demo', input: 'voice' })
     expect(track.stop).toHaveBeenCalledTimes(1)
+    expect(stubs.textStart).not.toHaveBeenCalled()
     expect(stubs.voiceStart).toHaveBeenCalledWith(
       expect.objectContaining({ conversationToken: 'conversation-token', connectionType: 'webrtc' }),
     )
+    expect(stubs.voiceStart.mock.calls[0]?.[0]).not.toHaveProperty('textOnly')
     await session.close()
   })
 
@@ -269,7 +373,7 @@ describe('connect', () => {
     ['a busy microphone', { name: 'NotReadableError' }],
   ])('rejects as microphone unavailable, minting no token: %s', async (_, cause) => {
     getUserMedia.mockRejectedValue(cause)
-    const connecting = voiceLive.connect({ mode: 'landing-demo' })
+    const connecting = voiceLive.connect({ mode: 'landing-demo', input: 'voice' })
     await expect(connecting).rejects.toBeInstanceOf(ApiError)
     await expect(connecting).rejects.toMatchObject({ code: 'microphone_unavailable' })
     expect(stubs.request).not.toHaveBeenCalled()
@@ -277,7 +381,7 @@ describe('connect', () => {
 
   it('rejects as microphone unavailable when the browser has no media API at all', async () => {
     vi.stubGlobal('navigator', {})
-    const connecting = voiceLive.connect({ mode: 'landing-demo' })
+    const connecting = voiceLive.connect({ mode: 'landing-demo', input: 'voice' })
     await expect(connecting).rejects.toMatchObject({ code: 'microphone_unavailable' })
     expect(stubs.request).not.toHaveBeenCalled()
   })
@@ -285,8 +389,7 @@ describe('connect', () => {
   it('passes on the token route’s refusal, so the screen says the call could not connect', async () => {
     const refusal = new ApiError({ kind: 'server', status: 503 })
     stubs.request.mockRejectedValue(refusal)
-    getUserMedia.mockResolvedValue({ getTracks: () => [] } as unknown as MediaStream)
-    await expect(voiceLive.connect({ mode: 'landing-demo' })).rejects.toBe(refusal)
-    expect(stubs.voiceStart).not.toHaveBeenCalled()
+    await expect(voiceLive.connect({ mode: 'landing-demo', input: 'text' })).rejects.toBe(refusal)
+    expect(stubs.textStart).not.toHaveBeenCalled()
   })
 })

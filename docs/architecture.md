@@ -59,7 +59,7 @@ src/
     leads.mock.ts · leads.live.ts  The contact form and the hotline report. Live posts to this app's own /api/leads… (ADR 0005)
     lead-limits.ts              The length caps and the 20-location limit, read by the forms and by server/
     voice-events.ts (+test)     The event stream every voice session shares: the latest event handed to a new listener, nothing after close. Pure, imports nothing
-    voice.live.ts (+test)       The ElevenLabs session, loaded on the first call (ADR 0006, 0007): microphone, token, SDK, 15 s connect budget, 175 s cap. The one group with no mock: always live
+    voice.live.ts (+test)       The ElevenLabs session, loaded on the first call (ADR 0006, 0007): voice input (microphone, token, SDK, WebRTC) or text input (token, SDK, text-only), 15 s connect budget, 175 s cap. The one group with no mock: always live
     tenant.* (F3) · receptionist.* · shell.* · insights.* (Tổng quan) · calls.* (F5) · appointments.* · numbers.* · account.* (F6)
 
   server/                       Code that runs only in a route handler (ADR 0005). Only src/app/ imports it
@@ -360,8 +360,9 @@ the second arrived (ADR 0006 point 9); a third use follows them, it does not nee
   sends "Nghe thử Linh" back to `/#hero` instead. The call's state lives one level up, in
   `CallDemoProvider` in the marketing layout, because the header opens the same call as the
   orb. The call goes through `api.voice`, which is always the ElevenLabs agent (ADR 0006,
-  amended by ADR 0007): there is no mock and no recording, and a connection that fails is
-  said on screen, never covered.
+  amended by ADR 0007): there is no mock and no recording. A visitor whose browser gives no
+  microphone gets a text session with the same agent; a connection that fails is said on
+  screen, never covered.
 - A night surface (the footer) renders inside a `data-theme="dark"` scope, so every alias
   inside it resolves to the night palette `colors.css` already defines. This is a night
   island in a light page, not a dark mode: nothing switches it.
