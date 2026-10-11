@@ -24,8 +24,10 @@ exists, one file changes and no screen does.
 2. **Three implementations, one interface.** `voice-scripted.ts` is today's demo — Linh's
    recorded greeting through an `AnalyserNode`, then "listening" — moved out of
    `src/features/marketing/orb/greeting-player.ts` and wrapped as a `VoiceSession`.
-   `voice.mock.ts` is the scripted session behind `delay` and `maybeFail`, so
-   `NEXT_PUBLIC_MOCK_FAILURE_RATE=1` walks the fallback path. `voice.live.ts` is ElevenLabs.
+   `voice.mock.ts` is the scripted session behind `maybeFail` — not `delay`: the recording
+   is the latency, and a delay would push the greeting out of the click's user gesture that
+   autoplay needs — so `NEXT_PUBLIC_MOCK_FAILURE_RATE=1` walks the fallback path.
+   `voice.live.ts` is ElevenLabs.
    `src/api/index.ts` chooses mock or live as for every other group;
    `NEXT_PUBLIC_API_LIVE_GROUPS=voice` turns the demo live.
 3. **The browser connects to a third party.** ADR 0003 says this app "talks to exactly one
@@ -129,9 +131,9 @@ exists, one file changes and no screen does.
 
 ## Assumed, to confirm during the build
 
-- The ElevenLabs agent has a privacy setting that disables audio and transcript retention,
-  so the demo keeps the landing page's promise "Xin phép trước khi ghi âm". Settled in the
-  dashboard by the owner.
+- The agent's privacy settings — Retention at 0 days and Audio Saving off, both documented
+  by ElevenLabs — are what keeps the landing page's promise "Xin phép trước khi ghi âm".
+  Settled when the owner sets them; the demo must not go live before.
 - `@elevenlabs/client`'s WebRTC path loads its audio worklets in a way `next build` and
   Vercel serve without configuration. Settled by the first live call on a preview deploy.
 - The hostnames the SDK dials (`api.elevenlabs.io` and the WebRTC endpoints) are what a CSP
