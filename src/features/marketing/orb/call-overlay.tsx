@@ -226,7 +226,7 @@ export function CallOverlay({ spotRef, orbRef }: CallOverlayProps) {
                 <div
                   ref={threadRef}
                   aria-live="polite"
-                  className="flex min-h-0 w-full flex-col gap-3 overflow-y-auto overscroll-contain"
+                  className="flex min-h-0 w-full flex-col gap-3 overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                 >
                   {demo.messages.map((line) => (
                     <ThreadTurn key={line.id} line={line} />
