@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CONTACT, FAQS, TESTIMONIALS } from '@/data/content'
+import { CONTACT, FAQS } from '@/data/content'
 import { PLANS } from '@/data/pricing'
 import { SITE_URL } from '@/data/site'
 import {
@@ -61,21 +61,10 @@ describe('productJsonLd', () => {
     for (const description of expected) expect(description.endsWith(' — ')).toBe(false)
   })
 
-  it('carries each testimonial as a review without its quotation marks, credited to its clinic', () => {
-    const reviews = product.review ?? []
-    expect(reviews).toHaveLength(TESTIMONIALS.length)
-    reviews.forEach((review, index) => {
-      const quote = TESTIMONIALS[index]?.quote ?? ''
-      expect(review.reviewBody).not.toBe('')
-      expect(review.reviewBody.startsWith('“')).toBe(false)
-      expect(review.reviewBody.endsWith('”')).toBe(false)
-      expect(quote).toContain(review.reviewBody)
-      expect(review.author.name).toBe(TESTIMONIALS[index]?.attribution)
-    })
-  })
-
-  it('never states a rating, since the page shows none', () => {
+  it('states no review and no rating, since the page shows no rating to take them from', () => {
     const json = JSON.stringify(product)
+    expect(json).not.toContain('"review"')
+    expect(json).not.toContain('Review')
     expect(json).not.toContain('aggregateRating')
     expect(json).not.toContain('reviewRating')
   })
