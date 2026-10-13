@@ -6,6 +6,7 @@ export const metadata: Metadata = {
   description: 'Điều khoản dịch vụ của Fonnus đang được hoàn thiện và sẽ được đăng tại trang này.',
   // Kept out of search results until the real text replaces the notice.
   robots: { index: false, follow: true },
+  alternates: { canonical: '/dieu-khoan-dich-vu' },
 }
 
 export default function Page() {

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
 import { Baloo_2, Be_Vietnam_Pro, IBM_Plex_Sans } from 'next/font/google';
+import { SITE_URL } from '@/data/site';
 import { SessionProvider } from '@/session/session-provider';
 import './globals.css';
 
@@ -47,11 +48,14 @@ export const metadata: Metadata = {
   description:
     'Fonnus nghe máy cho phòng khám 24/7, báo giá rõ ràng, đặt lịch hẹn và chuyển cho người thật khi cần thiết.',
   /*
-   * The share image must be an absolute URL for crawlers, and a preview
-   * deployment must still point at the production image, not at its own
-   * `*.vercel.app` host — so the base is the production domain, written out.
+   * The share image and each page's canonical must be absolute URLs for
+   * crawlers, and a preview deployment must still point at production, not at
+   * its own `*.vercel.app` host — so the base is the production domain
+   * (`src/data/site.ts`). The canonical itself is declared per page: metadata
+   * merges shallowly by key, so one `alternates` here would name the same URL
+   * on every route.
    */
-  metadataBase: new URL('https://fonnus.ai'),
+  metadataBase: new URL(SITE_URL),
   openGraph: {
     type: 'website',
     siteName: 'Fonnus',
