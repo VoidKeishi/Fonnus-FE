@@ -47,11 +47,11 @@ export const metadata: Metadata = {
   description:
     'Fonnus nghe máy cho phòng khám 24/7, báo giá rõ ràng, đặt lịch hẹn và chuyển cho người thật khi cần thiết.',
   /*
-   * No `metadataBase`: the production domain is not decided (CONTEXT.md
-   * §Deployment). Next.js then resolves the image against the Vercel
-   * project's production URL, which follows the custom domain once one is
-   * attached — nothing to change here when that ADR lands.
+   * The share image must be an absolute URL for crawlers, and a preview
+   * deployment must still point at the production image, not at its own
+   * `*.vercel.app` host — so the base is the production domain, written out.
    */
+  metadataBase: new URL('https://fonnus.ai'),
   openGraph: {
     type: 'website',
     siteName: 'Fonnus',

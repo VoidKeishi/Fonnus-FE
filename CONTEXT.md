@@ -124,6 +124,8 @@ landing page's live voice demo, loaded on the first click of the orb and never w
 ## Deployment
 
 The host is Vercel: the owner's choice, and the premise ADR 0005 rests on, because the lead
-route handlers run as functions there and the project holds the Google key. The rest is not
-decided: the domain, the environments, CI, and the cookie posture towards Fonnus-BE once it
-exists. Those wait for their own ADR; `PLAN.md` carries the row.
+route handlers run as functions there and the project holds the Google key. The production
+domain is `fonnus.ai`, attached to that Vercel project; it is the `metadataBase` every
+share link resolves against. The rest is not decided: the environments, CI, and the cookie
+posture towards Fonnus-BE once it exists. Those wait for their own ADR; `PLAN.md` carries
+the row.

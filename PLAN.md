@@ -18,7 +18,7 @@ Status: ⬜ not started · 🔨 in progress · ✅ done, with the date.
 | **F4d · The voice demo is agent-only, with a text fallback** — the recorded greeting and the scripted session are deleted; `voice` is the one group with no mock; a connection that fails is said on screen; a visitor whose browser gives no microphone talks to the same agent by typing (ADR 0007) | ✅ 2026-10-11 | Two stacked pull requests: the decision with the recording removed, `voice` always live and the failed-connection state; then the text session and the text-shaped call screen. Gated by typecheck, lint, test and build only: no text session has been run against ElevenLabs yet, which is what settles the four assumptions ADR 0007 lists. The owner enables the Text-only override (Backlog) |
 | **F5 · Cuộc gọi** — the clinic's own call history | ⬜ | Blocked: `GET /calls` is "specified later" in `docs/api-contract.md` §7 and has no agreed shape |
 | **F6 · Lịch hẹn, Số điện thoại, Cài đặt** | ⬜ | |
-| **F7 · Deployment** — an ADR on how this runs on Vercel: the domain, the environments, CI, and the cookie posture towards Fonnus-BE | ⬜ | The host is Vercel (the owner's choice, and the premise of ADR 0005); everything else is undecided. The build SHA on `/api/healthz` waits here |
+| **F7 · Deployment** — an ADR on how this runs on Vercel: the environments, CI, and the cookie posture towards Fonnus-BE | ⬜ | The host is Vercel (the owner's choice, and the premise of ADR 0005) and the production domain is `fonnus.ai`; everything else is undecided. The build SHA on `/api/healthz` waits here |
 
 ## Waiting on ../Fonnus-BE
 
@@ -52,7 +52,7 @@ Each blocks nothing today and has a default that applies if nothing is said.
    the written contract. **Recommendation: two subdomains**, which is what the contract
    already says; development uses the rewrite either way. **Default if undecided:** the
    subdomain posture stands as written in ADR 0003.
-2. **How Fonnus-FE runs on Vercel** — the host is chosen; the domain, the environments and
+2. **How Fonnus-FE runs on Vercel** — the host and the domain (`fonnus.ai`) are chosen; the environments and
    CI are not. See roadmap row F7. **Default if undecided:** `CONTEXT.md` §Deployment keeps
    saying what is open.
 3. **Whether Cài đặt is a sidebar destination.** The prototype keeps it out of the nav list:
