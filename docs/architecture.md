@@ -35,6 +35,7 @@ src/
     globals.css                 Tailwind, the token imports, the @theme alias layer
     icon.svg · not-found.tsx
     robots.ts · sitemap.ts      What a crawler may fetch and which pages are meant to be found; both read src/data/site.ts
+    llms.txt/route.ts           GET /llms.txt, static: the site's summary for an agent, rendered by features/marketing/llms-txt.ts from src/data/
     global-error.tsx            'use client', plain HTML, Vietnamese: runs when the root layout itself failed  [backlog]
     api/healthz/route.ts        Liveness of this server. Build SHA added at F7
     api/leads/route.ts          POST /api/leads: the contact form, appended to a Google Sheet (ADR 0005)
@@ -91,6 +92,7 @@ src/
     receptionist/               F3. The Lễ tân tab — see §3
     overview/ · calls/ · appointments/ · numbers/ · account/   One per tab; F5, F6
     marketing/                  landing.tsx (the section list, then the orb) · header.tsx · nav-item-link.tsx · footer.tsx
+                                llms-txt.ts (the text of /llms.txt: the pages, the navigation, the plans, the FAQ and the contact details, every sentence from data/)
                                 hero/ (hero, sign-up-form, clinic-logos)
                                 legal/ (legal-notice-page: one server component for both legal routes, copy from LEGAL_PAGES in data/)
                                 orb/ (voice-orb, orb, orb-field, use-orb-placement, orb-motion, call-overlay,
@@ -116,7 +118,7 @@ src/
     choice · chips · tiles · rows · save-bar · tabs · disclosure · slider · icon-button · play-button ·
     token-area · charts · table · use-appear · use-element-width · speak · index.ts   each with its first consumer
 
-  data/                         Copy with no markup: auth.ts, content.ts, call-demo.ts (the call screen's copy: chips, consent, endings, the failed-connection line), pricing.ts, call-demos.ts (the scripted calls under "Khả năng"), hotline-report.ts (the figures and sample report of /cham-diem-hotline), site.ts (the production origin and the sitemap's pages)
+  data/                         Copy with no markup: auth.ts, content.ts, call-demo.ts (the call screen's copy: chips, consent, endings, the failed-connection line), pricing.ts, call-demos.ts (the scripted calls under "Khả năng"), hotline-report.ts (the figures and sample report of /cham-diem-hotline), site.ts (the production origin, the site's name, tagline and description, and the pages a crawler is sent to — read by the root layout, robots, the sitemap and llms.txt)
   styles/tokens/                Byte copies from ../Fonnus-Web-UI (ADR 0002)
 ```
 
@@ -211,10 +213,12 @@ No gate enforces these; the pm's review does.
   it runs when the root layout itself has failed.
 - No `loading.tsx` under `/app`: a client page draws its own skeleton from its state, and
   `RequireSession` already draws the shell's.
-- Three kinds of `route.ts` exist: `healthz`, the `leads` handlers of ADR 0005, and the voice
-  demo's token of ADR 0006. A `route.ts` exports the method and hands the request to one
-  function in `src/server/`. No route handler proxies Fonnus-BE, and there is no server action
-  (ADR 0003 point 5).
+- Four kinds of `route.ts` exist: `healthz`, the `leads` handlers of ADR 0005, the voice
+  demo's token of ADR 0006, and `llms.txt`. A `route.ts` exports the method and hands the
+  request to one function: in `src/server/` when the handler holds a secret or writes
+  anywhere, in the feature when it only renders data the pages already show (`llms.txt`,
+  static). No route handler proxies Fonnus-BE, and there is no server action (ADR 0003
+  point 5).
 
 ### `src/server/` — what runs only in a route handler
 

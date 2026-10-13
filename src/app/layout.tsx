@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
 import { Baloo_2, Be_Vietnam_Pro, IBM_Plex_Sans } from 'next/font/google';
-import { SITE_URL } from '@/data/site';
+import { SITE_DESCRIPTION, SITE_NAME, SITE_TAGLINE, SITE_URL } from '@/data/site';
 import { SessionProvider } from '@/session/session-provider';
 import './globals.css';
 
@@ -39,14 +39,14 @@ const plex = IBM_Plex_Sans({
  * Metadata is the one place in this repo where Vietnamese and English meet: the
  * title and description are read by a person, so they follow the rule every
  * other user-facing string follows (CLAUDE.md §Ground rules) and are Vietnamese.
+ * Their sentences live in `src/data/site.ts`, where llms.txt reads the same ones.
  */
 export const metadata: Metadata = {
   title: {
-    default: 'Fonnus | Lễ tân AI trả lời bằng tiếng Việt',
-    template: '%s · Fonnus',
+    default: `${SITE_NAME} | ${SITE_TAGLINE}`,
+    template: `%s · ${SITE_NAME}`,
   },
-  description:
-    'Fonnus nghe máy cho phòng khám 24/7, báo giá rõ ràng, đặt lịch hẹn và chuyển cho người thật khi cần thiết.',
+  description: SITE_DESCRIPTION,
   /*
    * The share image and each page's canonical must be absolute URLs for
    * crawlers, and a preview deployment must still point at production, not at
