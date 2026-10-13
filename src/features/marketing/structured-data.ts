@@ -14,6 +14,13 @@ import { SITE_DESCRIPTION, SITE_NAME, SITE_URL } from '@/data/site'
 export type JsonLd = { '@context': 'https://schema.org'; '@type': string } & Record<string, unknown>
 
 const CONTEXT = 'https://schema.org'
+/*
+ * A JSON-LD node identifier, not a page: the WebSite's `publisher` and the
+ * Product's `brand` point at this `@id` so a parser reads one Organization on
+ * the page, not three copies. The spec wants an IRI, and the site's own origin
+ * keeps it globally unique; the fragment never reaches the server, so nothing
+ * has to answer at this address.
+ */
 const ORGANIZATION_ID = `${SITE_URL}/#organization`
 const PRICING_URL = `${SITE_URL}/#bang-gia`
 
