@@ -41,11 +41,31 @@ const plex = IBM_Plex_Sans({
  */
 export const metadata: Metadata = {
   title: {
-    default: 'Fonnus — Lễ tân AI cho phòng khám',
+    default: 'Fonnus | Lễ tân AI trả lời bằng tiếng Việt',
     template: '%s · Fonnus',
   },
   description:
-    'Fonnus nghe và trả lời cuộc gọi đến cho phòng khám, 24/7, bằng tiếng Việt. Không cuộc gọi nào bị bỏ lỡ.',
+    'Fonnus nghe máy cho phòng khám 24/7, báo giá rõ ràng, đặt lịch hẹn và chuyển cho người thật khi cần thiết.',
+  /*
+   * No `metadataBase`: the production domain is not decided (CONTEXT.md
+   * §Deployment). Next.js then resolves the image against the Vercel
+   * project's production URL, which follows the custom domain once one is
+   * attached — nothing to change here when that ADR lands.
+   */
+  openGraph: {
+    type: 'website',
+    siteName: 'Fonnus',
+    locale: 'vi_VN',
+    images: [
+      {
+        url: '/fonnus-og.png',
+        width: 1200,
+        height: 630,
+        alt: 'Fonnus — Không cuộc gọi nào bị bỏ lỡ.',
+      },
+    ],
+  },
+  twitter: { card: 'summary_large_image' },
 };
 
 /*
