@@ -34,6 +34,7 @@ src/
     layout.tsx                  <html lang="vi">, the three fonts, globals.css, SessionProvider (+ ToastProvider, F2). No chrome
     globals.css                 Tailwind, the token imports, the @theme alias layer
     icon.svg · not-found.tsx
+    robots.ts · sitemap.ts      What a crawler may fetch and which pages are meant to be found; both read src/data/site.ts
     global-error.tsx            'use client', plain HTML, Vietnamese: runs when the root layout itself failed  [backlog]
     api/healthz/route.ts        Liveness of this server. Build SHA added at F7
     api/leads/route.ts          POST /api/leads: the contact form, appended to a Google Sheet (ADR 0005)
@@ -115,7 +116,7 @@ src/
     choice · chips · tiles · rows · save-bar · tabs · disclosure · slider · icon-button · play-button ·
     token-area · charts · table · use-appear · use-element-width · speak · index.ts   each with its first consumer
 
-  data/                         Copy with no markup: auth.ts, content.ts, call-demo.ts (the call screen's copy: chips, consent, endings, the failed-connection line), pricing.ts, call-demos.ts (the scripted calls under "Khả năng"), hotline-report.ts (the figures and sample report of /cham-diem-hotline)
+  data/                         Copy with no markup: auth.ts, content.ts, call-demo.ts (the call screen's copy: chips, consent, endings, the failed-connection line), pricing.ts, call-demos.ts (the scripted calls under "Khả năng"), hotline-report.ts (the figures and sample report of /cham-diem-hotline), site.ts (the production origin and the sitemap's pages)
   styles/tokens/                Byte copies from ../Fonnus-Web-UI (ADR 0002)
 ```
 
@@ -194,10 +195,12 @@ No gate enforces these; the pm's review does.
 
 ### `src/app/` — the route tree
 
-- Only Next.js convention files: `layout`, `page`, `error`, `not-found`, `route`, `loading`.
-  No components, no hooks, no constants.
+- Only Next.js convention files: `layout`, `page`, `error`, `not-found`, `route`, `loading`,
+  `robots`, `sitemap`. No components, no hooks, no constants.
 - A `page.tsx` is 3–10 lines: import one component from a feature, return it. `metadata` is
-  declared here because this is the server file.
+  declared here because this is the server file. Every public page declares its own
+  `alternates.canonical`: metadata merges shallowly by key, so a canonical in a layout would
+  name one URL for every route under it.
 - The thirteen Lễ tân sections are **three `[section]/page.tsx` files**, not thirteen
   directories. The page reads `params`, looks the segment up in the map exported by
   `features/receptionist/sections.ts`, and calls `notFound()` when it is absent. The map is

@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { AuthHeading, AuthShell } from '@/features/auth/auth-shell'
 import { Placeholder } from '@/ui/placeholder'
 
-export const metadata: Metadata = { title: 'Dùng thử miễn phí' }
+export const metadata: Metadata = { title: 'Dùng thử miễn phí', alternates: { canonical: '/dang-ky' } }
 
 /**
  * Sign-up shares every part of sign-in — the same pill field, the same six

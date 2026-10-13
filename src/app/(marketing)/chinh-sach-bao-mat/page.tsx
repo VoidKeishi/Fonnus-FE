@@ -6,6 +6,7 @@ export const metadata: Metadata = {
   description: 'Chính sách bảo mật của Fonnus đang được hoàn thiện và sẽ được đăng tại trang này.',
   // Kept out of search results until the real text replaces the notice.
   robots: { index: false, follow: true },
+  alternates: { canonical: '/chinh-sach-bao-mat' },
 }
 
 export default function Page() {
