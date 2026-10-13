@@ -92,7 +92,7 @@ src/
     receptionist/               F3. The Lễ tân tab — see §3
     overview/ · calls/ · appointments/ · numbers/ · account/   One per tab; F5, F6
     marketing/                  landing.tsx (the section list, then the orb) · header.tsx · nav-item-link.tsx · footer.tsx
-                                llms-txt.ts (the text of /llms.txt: the pages, the navigation, the plans, the FAQ and the contact details, every sentence from data/)
+                                llms-txt.ts (+test) (the text of /llms.txt: the pages, the navigation, the plans, the FAQ and the contact details, every sentence from data/)
                                 hero/ (hero, sign-up-form, clinic-logos)
                                 legal/ (legal-notice-page: one server component for both legal routes, copy from LEGAL_PAGES in data/)
                                 orb/ (voice-orb, orb, orb-field, use-orb-placement, orb-motion, call-overlay,
