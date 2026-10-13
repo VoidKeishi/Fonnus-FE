@@ -1,4 +1,4 @@
-import { CONTACT, FAQS, TESTIMONIALS } from '@/data/content'
+import { CONTACT, FAQS } from '@/data/content'
 import { PLANS, type Plan } from '@/data/pricing'
 import { SITE_DESCRIPTION, SITE_NAME, SITE_URL } from '@/data/site'
 
@@ -8,7 +8,13 @@ import { SITE_DESCRIPTION, SITE_NAME, SITE_URL } from '@/data/site'
  * costs, what the FAQ answers. Google's policy is that structured data must be
  * a true representation of the page, so every value is one the pages already
  * show, read from `src/data/`; the only words written here are schema.org's
- * own names. There is no rating on the page, so there is none here either.
+ * own names.
+ *
+ * No `review` and no rating, although the page shows three testimonials:
+ * Google's review rules require a `reviewRating` on each review and an
+ * `aggregateRating` once there is more than one, and the page shows no rating
+ * to take either from. Reviews return with the testimonials row in
+ * `PLAN.md` §Backlog, when real clinics and a visible rating exist.
  */
 
 export type JsonLd = { '@context': 'https://schema.org'; '@type': string } & Record<string, unknown>
@@ -70,11 +76,6 @@ function planOffers(plan: Plan) {
   }))
 }
 
-/** The quote as the card prints it, less the typographic quotation marks around it. */
-function reviewBody(quote: string): string {
-  return quote.replace(/^“/, '').replace(/”$/, '')
-}
-
 export function organizationJsonLd() {
   return {
     '@context': CONTEXT,
@@ -101,11 +102,6 @@ export function webSiteJsonLd() {
 }
 
 export function productJsonLd() {
-  const reviews = TESTIMONIALS.map((item) => ({
-    '@type': 'Review',
-    reviewBody: reviewBody(item.quote),
-    author: { '@type': 'Person', name: item.attribution },
-  }))
   return {
     '@context': CONTEXT,
     '@type': 'Product',
@@ -115,7 +111,6 @@ export function productJsonLd() {
     image: `${SITE_URL}/fonnus-og.png`,
     brand: { '@id': ORGANIZATION_ID },
     offers: PLANS.flatMap(planOffers),
-    ...(reviews.length > 0 ? { review: reviews } : {}),
   } satisfies JsonLd
 }
 
