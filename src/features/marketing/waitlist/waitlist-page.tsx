@@ -52,7 +52,7 @@ export function WaitlistPage() {
 
   const formRef = useRef<HTMLFormElement | null>(null)
   const inFlight = useRef<AbortController | null>(null)
-  // Set by "Đăng ký phòng khám khác", read once when the fresh form mounts.
+  // Set by "Đăng ký đơn khác", read once when the fresh form mounts.
   const focusFirstFieldOnMount = useRef(false)
 
   // A send still running when the page unmounts must not land on nothing.
@@ -298,7 +298,7 @@ export function WaitlistPage() {
           </p>
           <div className="flex flex-wrap gap-2.5">
             <Button variant="secondary" className="h-[46px]" onClick={startOver}>
-              Đăng ký phòng khám khác
+              Đăng ký đơn khác
             </Button>
             <Link href="/" className={`${buttonClassName({ variant: 'secondary' })} h-[46px]`}>
               Về trang chủ
