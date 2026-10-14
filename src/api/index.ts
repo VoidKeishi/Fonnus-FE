@@ -46,6 +46,7 @@ export type { ApiErrorKind, FieldError } from './errors';
 export { setUnauthorizedHandler } from './http';
 export { API_MODE, isLive } from './env';
 export {
+  formatBusinessPhone,
   formatPhone,
   isValidCallbackNumber,
   isValidEmail,

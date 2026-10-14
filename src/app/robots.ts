@@ -10,7 +10,7 @@ import { SITE_URL } from '@/data/site'
  * Googlebot) are separate user agents and keep the `*` rule.
  *
  * `/app/` is behind the session cookie and renders nothing a crawler can use;
- * `/api/` is three intake handlers and a health check, not pages. Both are
+ * `/api/` is four intake handlers and a health check, not pages. Both are
  * disallowed so a bot does not spend its budget, or the rate limit, on them.
  */
 export default function robots(): MetadataRoute.Robots {

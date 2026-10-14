@@ -104,6 +104,7 @@ proposals a designer may redraw, not as canon — each is marked `[ext]` in
 | `globe`        | `globe`                    | the ring with a meridian arc                       |
 | `sun`          | `sun`                      | a terracotta disc with short rays                  |
 | `sunset`       | `sunset`                   | a half-set sun, the arc terracotta                 |
+| `moon`         | `moon-star`                | an ink crescent with a terracotta sparkle — the night panel of `/waitlist` |
 | `caller-lost`  | `user-round-x`             | the handoff composition with a terracotta cross in place of the arrow |
 | `practitioner` | `stethoscope`              | a person with a terracotta badge — the reference forbids the stethoscope |
 | `alert`        | `circle-alert`, `triangle-alert` | the ring, terracotta stem, ink dot           |

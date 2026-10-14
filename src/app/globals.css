@@ -349,6 +349,59 @@ html[data-scroll-lock] body {
   50% { transform: scaleY(0.45); }
 }
 
+/* The arc of the mark inside the header's "Danh sách chờ" button
+   (src/design-system/logo.tsx, LogoMark): still for most of each 3.2s cycle,
+   then one small hop. Only the arc moves; the dot stays put. */
+@keyframes fnLift {
+  0%, 62%, 100% { transform: none; }
+  74% { transform: translateY(-2.5px); }
+}
+
+/*
+ * The waitlist page (src/features/marketing/waitlist/). Every one states its
+ * start, as the "Cách hoạt động" scenes do: each element's resting style is its
+ * finished state — the seal drawn, every row of the night log opaque — so
+ * under reduced motion, where none of these runs, the page reads complete.
+ */
+
+/* The night dots drift up by one tile, so the loop has no seam. */
+@keyframes fnSink {
+  from { transform: none; }
+  to { transform: translateY(-22px); }
+}
+
+/* The moon's glow, run `alternate` so it drifts back. */
+@keyframes fnGlowDrift {
+  from { transform: none; }
+  to { transform: translate(-30px, 24px) scale(1.04); }
+}
+
+/* The crescent of the night log's moon icon, run `alternate`. */
+@keyframes fnSway {
+  from { transform: none; }
+  to { transform: rotate(-14deg) translateY(-1px); }
+}
+
+/* Each row of the night log rises in, holds, then dims; staggered per row. */
+@keyframes fnRowCycle {
+  0% { opacity: 0.3; transform: translateY(8px); }
+  6%, 86% { opacity: 1; transform: none; }
+  100% { opacity: 0.3; transform: none; }
+}
+
+/* A stroke drawing itself. The element sets `--draw-length` to its dash
+   length; at rest its offset is 0, so it reads drawn. */
+@keyframes fnDraw {
+  from { stroke-dashoffset: var(--draw-length); }
+  to { stroke-dashoffset: 0; }
+}
+
+/* The busy arc in a button while it sends. */
+@keyframes fnSpin {
+  from { transform: none; }
+  to { transform: rotate(360deg); }
+}
+
 /* A bottom sheet comes up from off-screen, not from 16px away: it is the
    whole surface arriving, and a short hop reads as a jitter instead. */
 @keyframes fnSheetUp {
