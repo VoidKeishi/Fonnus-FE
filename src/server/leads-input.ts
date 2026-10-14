@@ -1,14 +1,15 @@
 import { MAX_ADDRESS_LENGTH, MAX_EMAIL_LENGTH, MAX_LOCATIONS, MAX_NAME_LENGTH } from '@/api/lead-limits'
 import { isValidCallbackNumber, isValidEmail, normalizeCallbackNumber } from '@/api/phone'
-import type { HotlineLocation, HotlineReportInput, LeadInput } from '@/api/contracts'
+import type { HotlineLocation, HotlineReportInput, LeadInput, WaitlistInput } from '@/api/contracts'
 import type { FieldError } from '@/api/errors'
 
 /*
- * The two marketing forms' bodies, checked again on the server (ADR 0005
+ * The three marketing forms' bodies, checked again on the server (ADR 0005
  * point 5).
  *
  * The rules are the forms' own (`features/marketing/sections/lead-fields.ts`,
- * `features/marketing/hotline/report-fields.ts`): text trimmed and non-empty,
+ * `features/marketing/hotline/report-fields.ts`,
+ * `features/marketing/waitlist/waitlist-fields.ts`): text trimmed and non-empty,
  * an email that looks like one, a number a person can be rung back on, 1–20
  * locations. The length caps are the server's addition, read from the same
  * `@/api/lead-limits` the inputs take their `maxLength` from, so a visitor
@@ -24,6 +25,10 @@ export type LeadParse =
 
 export type HotlineReportParse =
   | { ok: true; report: HotlineReportInput }
+  | { ok: false; errors: FieldError[] }
+
+export type WaitlistParse =
+  | { ok: true; entry: WaitlistInput }
   | { ok: false; errors: FieldError[] }
 
 type Fields = Record<string, unknown>
@@ -120,4 +125,23 @@ export function parseHotlineReport(body: unknown): HotlineReportParse {
   if (errors.length > 0) return { ok: false, errors }
 
   return { ok: true, report: { contact_name, email, clinic_name, locations: locations.map((parsed) => parsed.location) } }
+}
+
+/**
+ * The waitlist entry to store, or every field that is wrong, in form order:
+ * name, phone, email. `source` and any other key are ignored, as for
+ * `parseLead`.
+ */
+export function parseWaitlist(body: unknown): WaitlistParse {
+  const fields: Fields = isPlainObject(body) ? body : {}
+  const contact_name = trimmedText(fields.contact_name)
+  const phone = trimmedText(fields.phone)
+  const email = trimmedText(fields.email)
+
+  const errors = [nameError('contact_name', contact_name), phoneError(phone), emailError(email)].filter(
+    (error) => error !== null,
+  )
+  if (errors.length > 0) return { ok: false, errors }
+
+  return { ok: true, entry: { contact_name, phone: normalizeCallbackNumber(phone), email } }
 }

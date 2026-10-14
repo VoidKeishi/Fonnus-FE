@@ -6,12 +6,13 @@ import type { CSSProperties, ImgHTMLAttributes } from 'react'
  * referenced them — a `variant="stacked"` rendered a broken image against a
  * type that compiled. Re-add a variant together with its file (ADR 0002).
  */
-type Variant = 'mark' | 'mark-dark' | 'horizontal'
+type Variant = 'mark' | 'mark-dark' | 'horizontal' | 'horizontal-dark'
 
 const FILES: Record<Variant, string> = {
   mark: '/fonnus-mark.svg',
   'mark-dark': '/fonnus-mark-dark.svg',
   horizontal: '/fonnus-lockup-horizontal.svg',
+  'horizontal-dark': '/fonnus-lockup-horizontal-dark.svg',
 }
 
 export interface LogoProps extends Omit<ImgHTMLAttributes<HTMLImageElement>, 'height' | 'src' | 'alt'> {
@@ -31,7 +32,8 @@ export function Logo({
   ...rest
 }: LogoProps) {
   // Below 24px the wordmark stops being legible, so the lockup drops to the mark.
-  const resolved: Variant = variant === 'horizontal' && height < 24 ? 'mark' : variant
+  const resolved: Variant =
+    height >= 24 ? variant : variant === 'horizontal' ? 'mark' : variant === 'horizontal-dark' ? 'mark-dark' : variant
 
   return (
     /* Every logo is an SVG of a known size and `images.unoptimized` is set
@@ -45,5 +47,35 @@ export function Logo({
       style={{ height, padding: clearspace ? height * 0.3 : 0, ...style }}
       {...rest}
     />
+  )
+}
+
+export interface LogoMarkProps {
+  size?: number
+  className?: string
+  /** On the arc alone, for the one place it moves: the header's waitlist button. */
+  arcClassName?: string
+}
+
+/**
+ * The mark drawn inline, in `currentColor`, so it can sit inside a button and
+ * take that button's text colour — and so the arc can be animated, which an
+ * `<img>` of the same file cannot be. The light and night files above stay the
+ * logo everywhere else.
+ */
+export function LogoMark({ size = 18, className = '', arcClassName = '' }: LogoMarkProps) {
+  return (
+    <svg viewBox="0 0 64 64" width={size} height={size} aria-hidden="true" focusable="false" className={className}>
+      <path
+        d="M17 20 A21 21 0 0 1 47 20"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="9"
+        strokeLinecap="round"
+        className={arcClassName}
+        style={{ transformBox: 'fill-box', transformOrigin: 'center' }}
+      />
+      <circle cx="32" cy="42" r="18" fill="currentColor" />
+    </svg>
   )
 }

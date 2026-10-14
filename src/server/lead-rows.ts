@@ -1,9 +1,9 @@
-import type { HotlineReportInput, LeadInput } from '@/api/contracts'
+import type { HotlineReportInput, LeadInput, WaitlistInput } from '@/api/contracts'
 
 /*
  * What one submission looks like in the spreadsheet (ADR 0005 point 7): one
  * row in `leads` per contact request, one row in `hotline_report` per
- * location. Every cell is a string and is appended with
+ * location, one row in `waitlist` per sign-up. Every cell is a string and is appended with
  * `valueInputOption=RAW`, so a phone keeps its leading 0 and a name that
  * starts with `=` stays text.
  */
@@ -30,6 +30,11 @@ export function vietnamTimestamp(at: Date): string {
 /** Received time, clinic name, contact name, phone, source. */
 export function leadRow(lead: LeadInput, receivedAt: Date): string[] {
   return [vietnamTimestamp(receivedAt), lead.clinic_name, lead.contact_name, lead.phone, 'landing_contact']
+}
+
+/** Received time, contact name, phone, email, source. */
+export function waitlistRow(entry: WaitlistInput, receivedAt: Date): string[] {
+  return [vietnamTimestamp(receivedAt), entry.contact_name, entry.phone, entry.email, 'waitlist']
 }
 
 /**

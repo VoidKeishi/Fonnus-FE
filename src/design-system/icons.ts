@@ -228,6 +228,15 @@ export const ICONS = {
     { c: [12, 12, 3.6], accent: true },
     { d: 'M12 3.4v2.2M12 18.4v2.2M3.4 12h2.2M18.4 12h2.2M5.9 5.9l1.6 1.6M16.5 16.5l1.6 1.6M18.1 5.9l-1.6 1.6M7.5 16.5l-1.6 1.6' },
   ],
+  /**
+   * [ext] Đêm — the after-hours crescent with a terracotta sparkle instead of
+   * the star dot. The crescent is drawn first: the waitlist panel sways it
+   * alone and leaves the sparkle still.
+   */
+  moon: [
+    { d: 'M19.4 15.2A8.4 8.4 0 0 1 8.8 4.6a8.4 8.4 0 1 0 10.6 10.6z' },
+    { d: 'M17.2 4.2v3M15.7 5.7h3', accent: true },
+  ],
   /** [ext] Chiều — a sun half-set behind the horizon; the arc is the accent. */
   sunset: [
     { d: 'M3.5 17.5h17' },

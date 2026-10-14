@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { hotlineRows, leadRow, vietnamTimestamp } from './lead-rows'
+import { hotlineRows, leadRow, vietnamTimestamp, waitlistRow } from './lead-rows'
 
 /*
  * The team reads the sheet in Vietnam, and a server runs in UTC: a request
@@ -48,5 +48,15 @@ describe('hotlineRows', () => {
       [...shared, '1', '12 Nguyễn Trãi, Quận 1, TP.HCM', '02838221234'],
       [...shared, '2', '45 Lê Lợi, Quận 3, TP.HCM', '0901234567'],
     ])
+  })
+})
+
+describe('waitlistRow', () => {
+  it('lays out one sign-up in the tab order, the phone kept as text', () => {
+    const row = waitlistRow(
+      { contact_name: 'Nguyễn Thị Lan', phone: '02838221234', email: 'lan@phongkham.vn' },
+      new Date('2026-10-14T03:15:00Z'),
+    )
+    expect(row).toEqual(['2026-10-14 10:15:00', 'Nguyễn Thị Lan', '02838221234', 'lan@phongkham.vn', 'waitlist'])
   })
 })

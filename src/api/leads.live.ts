@@ -3,7 +3,7 @@
  * the leads spreadsheet (ADR 0005) — not by Fonnus-BE. Paths and bodies:
  * `docs/api-contract.md` §6.
  *
- * `ownOrigin` keeps both calls on this origin whatever `API_BASE_URL` says,
+ * `ownOrigin` keeps every call on this origin whatever `API_BASE_URL` says,
  * because in production that is Fonnus-BE's.
  */
 import type { LeadsApi } from './contracts'
@@ -26,6 +26,15 @@ export const leadsLive: LeadsApi = {
     await http.post(
       '/api/leads/hotline-report',
       { ...input, source: 'hotline_report' },
+      { signal: opts?.signal, expect401: true, parse: 'none', ownOrigin: true },
+    )
+  },
+
+  async joinWaitlist(input, opts) {
+    // Same terms as the contact form: unauthenticated, rate-limited by IP at the firewall.
+    await http.post(
+      '/api/leads/waitlist',
+      { ...input, source: 'waitlist' },
       { signal: opts?.signal, expect401: true, parse: 'none', ownOrigin: true },
     )
   },

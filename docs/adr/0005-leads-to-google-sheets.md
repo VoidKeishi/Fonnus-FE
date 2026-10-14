@@ -11,9 +11,11 @@ to a Google Sheet. Every other group still goes to Fonnus-BE exactly as ADR 0003
 This rests on one premise the owner has stated: the site is deployed on Vercel, so a route
 handler runs as a Node.js function and the project can hold a secret.
 
-1. **Two route handlers in this app receive the forms**: `POST /api/leads` and
-   `POST /api/leads/hotline-report`, on this app's own origin. They sit outside `/api/v1`,
-   which stays Fonnus-BE's path and is rewritten to it in development.
+1. **Route handlers in this app receive the forms**: `POST /api/leads` and
+   `POST /api/leads/hotline-report`, on this app's own origin, and since 2026-10-14
+   `POST /api/leads/waitlist`, the waitlist page's form — the landing page's one call to
+   action while the product opens in batches. They sit outside `/api/v1`, which stays
+   Fonnus-BE's path and is rewritten to it in development.
 2. **The wire contract does not change.** Request bodies, `202`, the `422` field list, `429`
    and `5xx` stay as `docs/api-contract.md` §6 describes them; only the implementer and the
    path change. The forms, their copy and `leads.mock.ts` are untouched, and handing the
@@ -44,10 +46,11 @@ handler runs as a Node.js function and the project can hold a secret.
    The token is reused inside one warm function instance until shortly before it expires;
    nothing depends on that reuse, because a function instance cannot be relied on to keep
    state between requests.
-7. **One spreadsheet, two tabs.** `leads`: one row per contact request — received time,
-   clinic name, contact name, phone, source. `hotline_report`: one row per location —
+7. **One spreadsheet, one tab per form.** `leads`: one row per contact request — received
+   time, clinic name, contact name, phone, source. `hotline_report`: one row per location —
    received time, a request id shared by the rows of one submission, contact name, email,
-   clinic name, the location's ordinal, address, phone. Rows are appended with
+   clinic name, the location's ordinal, address, phone. `waitlist` (added 2026-10-14): one
+   row per person joining — received time, contact name, phone, email, source. Rows are appended with
    `valueInputOption=RAW` and `insertDataOption=INSERT_ROWS`: `RAW` keeps a leading `0` on a
    phone number and stops typed text being evaluated as a formula. A submission of 20
    locations is one append request.

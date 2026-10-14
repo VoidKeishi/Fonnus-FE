@@ -1,16 +1,16 @@
 import 'server-only'
 import { googleSheetsConfig } from './env'
 import { GoogleRequestError } from './google-token'
-import { hotlineRows, leadRow } from './lead-rows'
-import { parseHotlineReport, parseLead } from './leads-input'
+import { hotlineRows, leadRow, waitlistRow } from './lead-rows'
+import { parseHotlineReport, parseLead, parseWaitlist } from './leads-input'
 import { isJsonMediaType, readCappedText } from './request-body'
 import { appendRows } from './sheets'
 import type { FieldError } from '@/api/errors'
 
 /*
- * The two marketing forms, each appended to its tab of the leads spreadsheet
+ * The three marketing forms, each appended to its tab of the leads spreadsheet
  * (ADR 0005): `POST /api/leads` to `leads`, `POST /api/leads/hotline-report`
- * to `hotline_report`. The wire is docs/api-contract.md §6: 202 with no body,
+ * to `hotline_report`, `POST /api/leads/waitlist` to `waitlist`. The wire is docs/api-contract.md §6: 202 with no body,
  * or a 422 naming the fields. Every other refusal is a bare status — nothing
  * a server or Google said is ever echoed to the visitor.
  */
@@ -58,7 +58,7 @@ interface FormEndpoint {
   check: (body: unknown) => Checked
 }
 
-/** The ladder both forms share: 415, 413, 400, 422, 503, then 202. */
+/** The ladder every form shares: 415, 413, 400, 422, 503, then 202. */
 async function receiveForm(request: Request, { path, tab, check }: FormEndpoint): Promise<Response> {
   const deadline = AbortSignal.timeout(GOOGLE_DEADLINE_MS)
 
@@ -112,6 +112,17 @@ export function handleHotlineReport(request: Request): Promise<Response> {
       const parsed = parseHotlineReport(body)
       // Every location is one row, all in one append; the id ties them together.
       return parsed.ok ? { ok: true, rows: hotlineRows(parsed.report, new Date(), crypto.randomUUID()) } : parsed
+    },
+  })
+}
+
+export function handleWaitlist(request: Request): Promise<Response> {
+  return receiveForm(request, {
+    path: '/api/leads/waitlist',
+    tab: 'waitlist',
+    check: (body) => {
+      const parsed = parseWaitlist(body)
+      return parsed.ok ? { ok: true, rows: [waitlistRow(parsed.entry, new Date())] } : parsed
     },
   })
 }

@@ -52,17 +52,19 @@ satisfy is `docs/api-contract.md`; the reasoning is `docs/adr/0003-backend-bound
 
 ## Send the marketing forms to a Google Sheet
 
-`POST /api/leads` appends one row per contact request to a Google Sheet, and
-`POST /api/leads/hotline-report` one row per clinic location, through a Google service
-account (`docs/adr/0005-leads-to-google-sheets.md`). With no setup both answer `503`.
+`POST /api/leads` appends one row per contact request to a Google Sheet,
+`POST /api/leads/hotline-report` one row per clinic location, and `POST /api/leads/waitlist`
+one row per person joining the waitlist, through a Google service account
+(`docs/adr/0005-leads-to-google-sheets.md`). With no setup all three answer `503`.
 
 1. In Google Cloud, create a project and enable the Google Sheets API.
 2. Create a service account with no project role, then a JSON key for it. Keep the file
    outside this repository.
-3. Create a spreadsheet with two tabs. `leads`, whose first row is `received_at`,
+3. Create a spreadsheet with three tabs. `leads`, whose first row is `received_at`,
    `clinic_name`, `contact_name`, `phone`, `source`. `hotline_report`, whose first row is
    `received_at`, `request_id`, `contact_name`, `email`, `clinic_name`, `location_no`,
-   `address`, `phone`; the rows of one request share a `request_id`.
+   `address`, `phone`; the rows of one request share a `request_id`. `waitlist`, whose
+   first row is `received_at`, `contact_name`, `phone`, `email`, `source`.
 4. Share the spreadsheet with the service account's `client_email` as an editor.
 5. Put three variables in `.env.local`, or in the host's environment as secrets:
 
@@ -72,7 +74,7 @@ GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY=""   # private_key from the key file, quoted,
 LEADS_SPREADSHEET_ID=           # the part of the sheet's URL between /d/ and /edit
 ```
 
-6. Turn the forms live: `NEXT_PUBLIC_API_LIVE_GROUPS=leads`. Both forms switch together.
+6. Turn the forms live: `NEXT_PUBLIC_API_LIVE_GROUPS=leads`. All three forms switch together.
    Without it they keep using the mock, which stores nothing.
 
 On a public deployment the endpoints accept requests as soon as the three variables are set,

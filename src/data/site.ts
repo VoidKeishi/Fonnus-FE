@@ -31,8 +31,8 @@ export interface SitePage {
  * The pages a crawler is sent to: public, indexable, and built. `/dang-ky`
  * joins when it stops being a placeholder; the two legal pages join when their
  * text is published and their `noindex` is removed (PLAN.md §Backlog).
- * `/dang-nhap` is a door, reached from the header; a search result for it
- * sells nothing.
+ * `/dang-nhap` is a door with nothing linking to it while the product opens in
+ * batches; a search result for it sells nothing.
  */
 export const SITE_PAGES = {
   home: { path: '/', label: 'Trang chủ', description: SITE_DESCRIPTION },
@@ -41,6 +41,12 @@ export const SITE_PAGES = {
     label: 'Chấm điểm hotline miễn phí',
     description:
       'Phòng khám nào cũng bỏ lỡ nhiều cuộc gọi hơn mình nghĩ. Để Fonnus gọi thử hotline từng cơ sở của bạn 5–7 lần, như một bệnh nhân thật, rồi nhận báo cáo chấm điểm miễn phí qua email.',
+  },
+  waitlist: {
+    path: '/waitlist',
+    label: 'Danh sách chờ',
+    description:
+      'Fonnus mở theo từng đợt để mỗi phòng khám được cài đặt kỹ. Để lại tên, số điện thoại và email — chúng tôi gọi khi đến lượt bạn.',
   },
 } satisfies Record<string, SitePage>
 

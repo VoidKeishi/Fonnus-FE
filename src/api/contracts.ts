@@ -126,6 +126,18 @@ export interface HotlineReportInput {
 }
 
 /**
+ * The waitlist page: who to ring when the clinic's turn comes, and where to
+ * send the setup guide. The name at most `MAX_NAME_LENGTH`, the email at most
+ * `MAX_EMAIL_LENGTH` (`./lead-limits`), both once trimmed.
+ */
+export interface WaitlistInput {
+  contact_name: string;
+  /** National form, digits only, as `LeadInput.phone`: `0901234567`, `02838221234`, `19001234`. */
+  phone: string;
+  email: string;
+}
+
+/**
  * Received by this app's own route handlers, not Fonnus-BE (ADR 0005): the
  * paths are on this origin, outside `/api/v1`.
  */
@@ -134,6 +146,8 @@ export interface LeadsApi {
   submit(input: LeadInput, opts?: Signal): Promise<void>;
   /** `POST /api/leads/hotline-report`. Unauthenticated: the "Chấm điểm hotline" page. */
   requestHotlineReport(input: HotlineReportInput, opts?: Signal): Promise<void>;
+  /** `POST /api/leads/waitlist`. Unauthenticated: the waitlist page. */
+  joinWaitlist(input: WaitlistInput, opts?: Signal): Promise<void>;
 }
 
 // ---------------------------------------------------------------------------

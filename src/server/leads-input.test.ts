@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { MAX_LOCATIONS, MAX_NAME_LENGTH, parseHotlineReport, parseLead } from './leads-input'
+import { MAX_LOCATIONS, MAX_NAME_LENGTH, parseHotlineReport, parseLead, parseWaitlist } from './leads-input'
 
 /*
  * The server's copy of the contact form's rules is the only thing between a
@@ -220,6 +220,58 @@ describe('parseHotlineReport', () => {
       { field: 'email', code: 'required' },
       { field: 'clinic_name', code: 'required' },
       { field: 'locations', code: 'required' },
+    ])
+  })
+})
+
+/*
+ * The waitlist promises a call when the clinic's turn comes, so the number has
+ * to be one a person can be rung back on — a front desk's fixed line included —
+ * and the email one the setup guide can reach.
+ */
+
+const ENTRY = { contact_name: 'Nguyễn Thị Lan', phone: '0901234567', email: 'lan@phongkham.vn' }
+
+function waitlistErrorsOf(body: unknown) {
+  const result = parseWaitlist(body)
+  return result.ok ? [] : result.errors
+}
+
+describe('parseWaitlist', () => {
+  it('trims the text and writes the number in national digits, ignoring the source', () => {
+    expect(
+      parseWaitlist({ contact_name: ' Nguyễn Thị Lan ', phone: '+84 90 123 45 67', email: ' lan@phongkham.vn ', source: 'waitlist' }),
+    ).toEqual({ ok: true, entry: ENTRY })
+  })
+
+  it('accepts a fixed line and a 1900 hotline', () => {
+    const fixed = parseWaitlist({ ...ENTRY, phone: '028 3822 1234' })
+    const hotline = parseWaitlist({ ...ENTRY, phone: '1900 1234' })
+    expect([fixed.ok && fixed.entry.phone, hotline.ok && hotline.entry.phone]).toEqual(['02838221234', '19001234'])
+  })
+
+  it('asks for every field of an empty body, in form order', () => {
+    expect(waitlistErrorsOf(null)).toEqual([
+      { field: 'contact_name', code: 'required' },
+      { field: 'phone', code: 'required' },
+      { field: 'email', code: 'required' },
+    ])
+  })
+
+  it('refuses a number nobody can be rung back on and an email with no domain', () => {
+    expect(waitlistErrorsOf({ ...ENTRY, phone: '1234', email: 'lan@phongkham' })).toEqual([
+      { field: 'phone', code: 'invalid_phone' },
+      { field: 'email', code: 'invalid_email' },
+    ])
+  })
+
+  it('refuses a name or an email longer than the form allows', () => {
+    const name = 'Nguyễn Thị Lan'.padEnd(MAX_NAME_LENGTH + 1, '.')
+    const email = `${'a'.repeat(255 - '@phongkham.vn'.length)}@phongkham.vn`
+    expect([name.length, email.length]).toEqual([201, 255])
+    expect(waitlistErrorsOf({ ...ENTRY, contact_name: name, email })).toEqual([
+      { field: 'contact_name', code: 'too_long' },
+      { field: 'email', code: 'too_long' },
     ])
   })
 })
