@@ -76,9 +76,9 @@ export function PlanCard({ plan, revealOrder }: { plan: Plan; revealOrder: numbe
         ))}
       </ul>
 
-      {/* Every plan starts the same way: an account, then the plan is picked inside. */}
+      {/* Every plan starts the same way: on the waitlist. */}
       <div className="mt-auto pt-6">
-        <Link href="/dang-ky" className={buttonClassName({ variant: onFill ? 'inverse' : 'secondary', fullWidth: true })}>
+        <Link href="/waitlist" className={buttonClassName({ variant: onFill ? 'inverse' : 'secondary', fullWidth: true })}>
           {plan.cta}
         </Link>
       </div>

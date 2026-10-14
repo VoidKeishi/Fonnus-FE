@@ -12,7 +12,7 @@ const POINTS = [
 /**
  * "Liên hệ": the slower door, for owners who want a person before they want an
  * account — chains and hospitals on a quoted plan, and anyone who would rather
- * be walked through call forwarding than press "Dùng thử miễn phí".
+ * be walked through call forwarding than join the waitlist.
  *
  * A server component; the form on the right is its one client leaf.
  */

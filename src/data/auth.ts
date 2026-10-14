@@ -16,12 +16,12 @@ import type { IconName } from '@/design-system'
 export const AUTH_FOOTNOTE = {
   residency: 'Dữ liệu phòng khám lưu tại Việt Nam',
   supportLabel: 'Cần hỗ trợ?',
-  supportNote: '8:00–20:00',
+  supportNote: 'gọi hoặc Zalo',
 } as const
 
 export const CONTACT = {
-  phone: '024 7307 7199',
-  phoneHref: 'tel:+842473077199',
+  phone: '+84 914 378 064',
+  phoneHref: 'tel:+84914378064',
 } as const
 
 interface WhenChip {

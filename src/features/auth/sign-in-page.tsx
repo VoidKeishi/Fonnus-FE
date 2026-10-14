@@ -35,12 +35,9 @@ const RESEND_SECONDS = 42
 
 /** Top right on every step of this door. */
 const SWAP = (
-  <>
-    Chưa có tài khoản?{' '}
-    <Link href="/dang-ky" className="font-medium">
-      Dùng thử miễn phí
-    </Link>
-  </>
+  <Link href="/waitlist" className="font-medium">
+    Vào danh sách chờ
+  </Link>
 )
 
 /**

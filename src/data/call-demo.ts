@@ -32,7 +32,7 @@ export const ENDED_TIMEOUT_LINE = 'Hết 3 phút gọi thử. Ở phòng khám c
 export const ENDED_AGENT_LINE = 'Linh đã kết thúc cuộc gọi thử. Ở phòng khám của bạn, Linh nghe máy cả ngày.'
 export const ENDED_ERROR_LINE = 'Mất kết nối với Linh.'
 export const CALL_AGAIN_LABEL = 'Gọi lại'
-export const TRY_FREE_LABEL = 'Dùng thử miễn phí'
+export const WAITLIST_LABEL = 'Vào danh sách chờ'
 
 /** Nothing could connect: the token route refused, the SDK failed, or the time ran out (ADR 0007 point 5). */
 export const CONNECT_FAILED_LINE = 'Không kết nối được với Linh lúc này. Bạn thử gọi lại sau một lát.'
