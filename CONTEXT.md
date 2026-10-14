@@ -7,8 +7,9 @@ answers the phone for Vietnamese clinics. Three surfaces, one application:
 
 1. **The landing page** — what Fonnus is, what it costs, and a way to be contacted, plus
    the "Chấm điểm hotline" page, which offers a free report on how many of a clinic's calls
-   go unanswered. This is an acquisition surface: clinics will find it by searching, so it
-   is server-rendered.
+   go unanswered, and the waitlist page, where a clinic leaves its details while the
+   product opens in batches. This is an acquisition surface: clinics will find it by
+   searching, so it is server-rendered.
 2. **Sign-up and sign-in** — a phone number and a code, or an email, or Google. No password
    anywhere in the product.
 3. **The signed-in app at `/app`** — where a clinic owner configures their receptionist
@@ -17,8 +18,8 @@ answers the phone for Vietnamese clinics. Three surfaces, one application:
 
 It owns no data. Everything it shows comes from `../Fonnus-BE` over HTTP (ADR 0003); the
 call pipeline itself is never contacted directly. The one thing it receives itself is the
-two marketing forms, the contact request and the hotline report request, which it appends to
-a Google Sheet the team works from (ADR 0005).
+three marketing forms — the contact request, the hotline report request and the waitlist
+sign-up — which it appends to a Google Sheet the team works from (ADR 0005).
 
 The design comes from `../Fonnus-Web-UI`, a complete Vite prototype of this same product.
 That repo is the absolute authority on how the product looks and behaves, and is now frozen:
@@ -41,6 +42,7 @@ tuning the pipeline. Different person, different repo, same design system.
 |---|---|---|
 | Landing | `/` | Hero with a live voice demo, how it works, pricing, contact |
 | Chấm điểm hotline | `/cham-diem-hotline` | The free report: Fonnus rings each of the clinic's locations as a patient would and scores the calls. For owners, often of a chain, who are not ready for a receptionist yet |
+| Danh sách chờ | `/waitlist` | Name, phone and email of a clinic waiting its turn. Every "join" call to action on the marketing pages lands here while the product opens in batches; there is no self-serve sign-up and no sign-in entry on the marketing pages |
 | Sign-up / sign-in | `/dang-ky`, `/dang-nhap` | One flow: an existing number turns a sign-up into a sign-in |
 | Tổng quan | `/app` | The shape of the week: calls answered, what needs attention |
 | Cuộc gọi | `/app/cuoc-goi` | The clinic's own call history — the same read path as Fonnus-Admin with a tenant filter |
@@ -96,7 +98,7 @@ exists, with no values.
 
 ### Personal data in the lead sheet
 
-The two marketing forms collect a contact's name, phone and email, and this app stores them
+The three marketing forms collect a contact's name, phone and email, and this app stores them
 in Google Sheets. Whether that is a cross-border transfer of personal data under PDPL is an
 open question with no answer yet; `PLAN.md` carries it.
 

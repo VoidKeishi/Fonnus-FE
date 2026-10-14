@@ -478,7 +478,7 @@ the page. What the client does:
 - **A 175-second cap**, under the agent's own 180, so the ending is the app's: the session
   emits `ended { reason: 'timeout' }` and closes itself. It applies to a text session unchanged.
 - **Endings.** `agent` (the receptionist hung up) and `timeout` show a closing line with
-  "Dùng thử miễn phí" (to `/dang-ky`) and "Gọi lại"; `error` (the connection dropped after the
+  "Vào danh sách chờ" (to `/waitlist`) and "Gọi lại"; `error` (the connection dropped after the
   call started) shows "Mất kết nối với Linh." and "Gọi lại". "Gọi lại" connects again, a call
   first, without a second consent. `user` is the visitor closing the screen and shows nothing.
 - **Loudness.** `getAmplitude()` is the agent's output volume while she speaks in a call, and

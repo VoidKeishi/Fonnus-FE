@@ -40,6 +40,8 @@ src/
     api/healthz/route.ts        Liveness of this server. Build SHA added at F7
     api/leads/route.ts          POST /api/leads: the contact form, appended to a Google Sheet (ADR 0005)
     api/leads/hotline-report/route.ts   POST /api/leads/hotline-report: one row per location
+    api/leads/waitlist/route.ts         POST /api/leads/waitlist: one row per person joining the waitlist
+    waitlist/page.tsx           /waitlist, the one call to action of the marketing pages while the product opens in batches. Outside both route groups: no header pill or footer (its own split frame, like the sign-in door), no auth layout
     api/voice-demo/token/route.ts       POST: the live demo's ticket — a WebRTC conversation token for a voice call, a WebSocket signed URL for a text session (ADR 0006, 0007)
     (marketing)/                F4. layout (header, footer, the call demo's provider), page, cham-diem-hotline/page.tsx (static, the hotline report), chinh-sach-bao-mat/ and dieu-khoan-dich-vu/ (static, noindex: the notice that each legal text is not published yet), error.tsx
     (auth)/                     layout (AuthShell, F1b), dang-nhap/, dang-ky/ (F1b), error.tsx [backlog]
@@ -56,9 +58,8 @@ src/
     errors.ts                   ApiError and every Vietnamese error sentence
     mock-support.ts             delay, maybeFail, storage, the demo fixtures
     phone.ts (+test)            Vietnamese phone rules and the national digits-only wire form: the SMS-able mobile (auth, hero) and the callback number (contact form)
-    sign-up-handoff.ts (+test)  The number typed in the landing hero, carried to /dang-ky in sessionStorage
     auth.mock.ts · auth.live.ts
-    leads.mock.ts · leads.live.ts  The contact form and the hotline report. Live posts to this app's own /api/leads… (ADR 0005)
+    leads.mock.ts · leads.live.ts  The contact form, the hotline report and the waitlist. Live posts to this app's own /api/leads… (ADR 0005)
     lead-limits.ts              The length caps and the 20-location limit, read by the forms and by server/
     voice-events.ts (+test)     The event stream every voice session shares: the latest event handed to a new listener, nothing after close. Pure, imports nothing
     voice.live.ts (+test)       The ElevenLabs session, loaded on the first call (ADR 0006, 0007): voice input (microphone, token, SDK, WebRTC) or text input (signed URL, SDK, text-only over WebSocket), 15 s connect budget, 175 s cap. The one group with no mock: always live
@@ -67,7 +68,7 @@ src/
   server/                       Code that runs only in a route handler (ADR 0005). Only src/app/ imports it
     env.ts                      The three Google variables and the two ElevenLabs ones, read per request. The only file here that reads process.env
     leads-input.ts (+test)      Checks a posted body again, with the forms' own rules
-    lead-rows.ts (+test)        A checked lead as a spreadsheet row, a hotline report as one row per location, stamped in Vietnam time
+    lead-rows.ts (+test)        A checked lead or waitlist sign-up as a spreadsheet row, a hotline report as one row per location, stamped in Vietnam time
     google-jwt.ts (+test)       The signed assertion a service account trades for an access token
     google-token.ts             The exchange, and the token kept while the instance is warm
     sheets.ts                   appendRows: one call to spreadsheets.values.append
@@ -94,7 +95,8 @@ src/
     marketing/                  landing.tsx (the section list, then the orb) · header.tsx · nav-item-link.tsx · footer.tsx
                                 llms-txt.ts (+test) (the text of /llms.txt: the pages, the navigation, the plans, the FAQ and the contact details, every sentence from data/)
                                 structured-data.ts (+test) · json-ld.tsx (the schema.org blocks — Organization and WebSite in the marketing layout, Product and FAQPage on the landing page — every value from data/)
-                                hero/ (hero, sign-up-form, clinic-logos)
+                                hero/ (hero, clinic-logos)
+                                waitlist/ (waitlist-page, waitlist-panel, waitlist-field, waitlist-fields (+test): the /waitlist door — its own split frame and pill field, rebuilt rather than imported from auth/, because features never import each other)
                                 legal/ (legal-notice-page: one server component for both legal routes, copy from LEGAL_PAGES in data/)
                                 orb/ (voice-orb, orb, orb-field, use-orb-placement, orb-motion, call-overlay,
                                 call-demo-provider, use-call-demo, call-state)
@@ -110,7 +112,7 @@ src/
                                 floating-cta, and the page's local kit: list-buttons, use-appear)
 
   design-system/                Brand primitives every surface uses
-    button.tsx (+ buttonClassName, the classes a Link wears) · input.tsx · icon.tsx · logo.tsx · icons.ts · index.ts
+    button.tsx (+ buttonClassName, the classes a Link wears) · input.tsx · icon.tsx · logo.tsx (Logo, the four SVG files; LogoMark, the mark inline in currentColor for the header's waitlist button) · icons.ts · index.ts
     pattern.tsx · switch.tsx · shape.tsx (only the drawings in use) · badge.tsx
 
   ui/                           The signed-in app's kit. Marketing never imports it
@@ -119,7 +121,7 @@ src/
     choice · chips · tiles · rows · save-bar · tabs · disclosure · slider · icon-button · play-button ·
     token-area · charts · table · use-appear · use-element-width · speak · index.ts   each with its first consumer
 
-  data/                         Copy with no markup: auth.ts, content.ts, call-demo.ts (the call screen's copy: chips, consent, endings, the failed-connection line), pricing.ts, call-demos.ts (the scripted calls under "Khả năng"), hotline-report.ts (the figures and sample report of /cham-diem-hotline), site.ts (the production origin, the site's name, tagline and description, and the pages a crawler is sent to — read by the root layout, robots, the sitemap and llms.txt)
+  data/                         Copy with no markup: auth.ts, content.ts, waitlist.ts (the night panel of /waitlist), call-demo.ts (the call screen's copy: chips, consent, endings, the failed-connection line), pricing.ts, call-demos.ts (the scripted calls under "Khả năng"), hotline-report.ts (the figures and sample report of /cham-diem-hotline), site.ts (the production origin, the site's name, tagline and description, and the pages a crawler is sent to — read by the root layout, robots, the sitemap and llms.txt)
   styles/tokens/                Byte copies from ../Fonnus-Web-UI (ADR 0002)
 ```
 
@@ -135,7 +137,7 @@ app  →  features/*  →  { shell, session }  →  { ui, design-system, api, da
 |---|---|
 | Two directories under `features/` never import each other. | The only two channels between tabs are `session.patchMe()` (a page changes what the sidebar shows: the name, the plan) and `markSummaryStale()` from `shell/summary.ts` (a page makes the sidebar's numbers stale). The prototype ran the whole product on exactly those two. Needing a third means something is in the wrong directory. Keeping every feature under one parent is what lets this rule be one `no-restricted-imports` glob. |
 | `ui/` and `design-system/` never import a feature, `api/`, `session/` or `shell/`. | A control receives its data through props. A control that knows about the API cannot be reused and cannot be tested as a pure function. |
-| `features/marketing/` never imports `ui/`, `session/` or `shell/`. | The landing page is a server component so a crawler can read it. `ui/` is the client kit; pulling it in drags `'use client'` into the acquisition surface. Marketing uses `design-system/`, `data/`, `api.leads` in the contact form and the hotline report form, and `api.voice` in the call demo. |
+| `features/marketing/` never imports `ui/`, `session/` or `shell/`. | The landing page is a server component so a crawler can read it. `ui/` is the client kit; pulling it in drags `'use client'` into the acquisition surface. Marketing uses `design-system/`, `data/`, `api.leads` in the contact form, the hotline report form and the waitlist form, and `api.voice` in the call demo. |
 | `api/` imports nothing outside itself and no React. | `http.ts` exposes its 401 hook through a module-level setter instead of importing `session/`. The other direction is the cycle `session → api → session`. |
 | `session/` and `shell/` import `api/`, `ui/`, `design-system/`; never a feature. | The sidebar shows numbers from `api.shell`, not the state of one tab. |
 | Only `app/` imports `server/`. `server/` imports itself, `api/phone`, `api/contracts`, `api/errors`, `api/lead-limits` and Node built-ins. | `server/` holds the Google credential and runs only inside a route handler. It shares the forms' rules and caps through the four pure `api/` files, never through `api/index.ts`, which pulls in the mocks. |
@@ -154,7 +156,9 @@ app  →  features/*  →  { shell, session }  →  { ui, design-system, api, da
 - A component is exported in PascalCase, one main component per file. A file may hold
   unexported helper components.
 - Route segments are unaccented Vietnamese, as in the prototype:
-  `/app/le-tan/kien-thuc/gio-mo-cua`. A key in a section map equals its segment.
+  `/app/le-tan/kien-thuc/gio-mo-cua`. A key in a section map equals its segment. The one
+  exception is `/waitlist`, English by the owner's decision (2026-10-14); do not rename it,
+  and do not take it as a precedent.
 - Feature directories are English (`receptionist/`, `calls/`, `appointments/`); route
   segments are Vietnamese (`le-tan`, `cuoc-goi`, `lich-hen`). Two layers, two languages —
   the "code English, screen Vietnamese" rule applied to paths. The prototype's `letan/` was
@@ -177,9 +181,11 @@ No gate enforces these; the pm's review does.
 - `'use client'` goes on the lowest file that needs state or a hook, never on a layout or a
   page. `src/app/app/layout.tsx` is the model: a server component rendering client leaves.
 - **The `(marketing)` route group makes no request to Fonnus-BE on load and reads no
-  session.** Its header always offers "Đăng nhập" and "Dùng thử miễn phí", as the prototype
-  does; sending an owner who is still signed in straight on to `/app` is the sign-in page's
-  job, not the landing page's (`PLAN.md` §Backlog).
+  session.** Its header offers one action, "Danh sách chờ" (`/waitlist`), and no sign-in
+  entry: the product opens in batches and has no customers to sign in yet (the owner's
+  decision, 2026-10-14, replacing the prototype's "Đăng nhập" and "Dùng thử miễn phí").
+  `/dang-nhap` stays reachable by URL; sending an owner who is still signed in straight on
+  to `/app` is that page's job, not the landing page's (`PLAN.md` §Backlog).
 - `SessionProvider` is mounted in the root layout so state survives the move from
   `/dang-nhap` to `/app`, but its probe runs only when `usePathname()` is under `/app`,
   `/dang-nhap` or `/dang-ky`. This differs from the prototype, which probed on the landing
@@ -223,8 +229,8 @@ No gate enforces these; the pm's review does.
 
 ### `src/server/` — what runs only in a route handler
 
-Two things live here: the `leads` handlers that append to a Google Sheet (ADR 0005) and the
-route that mints the landing voice demo's ticket (ADR 0006). The rules below were written when
+Two things live here: the `leads` handlers that append to a Google Sheet (ADR 0005; three
+forms, one tab each) and the route that mints the landing voice demo's ticket (ADR 0006). The rules below were written when
 the second arrived (ADR 0006 point 9); a third use follows them, it does not need its own.
 
 - One module per upstream service — `sheets.ts`, `elevenlabs-token.ts` — and it starts with
@@ -338,7 +344,7 @@ the second arrived (ADR 0006 point 9); a third use follows them, it does not nee
 ### `src/features/marketing/`
 
 - Server components by default. `'use client'` on the lowest file that holds state: the
-  header (its menus, drawer and scroll state), the orb and its call demo, the two forms, the
+  header (its menus, drawer and scroll state), the orb and its call demo, the three forms, the
   hotline page's chart, the scroll reveal, the billing switch and the prices it changes, and
   the comparison table's disclosure, `play-when-seen.tsx`, which plays a
   "Cách hoạt động" scene once, and `call-demo-player.tsx`, the scripted calls under
@@ -353,7 +359,12 @@ the second arrived (ADR 0006 point 9); a third use follows them, it does not nee
   page's list kit — `list-buttons.tsx`, `use-appear.ts` — is a port of the prototype's app
   kit for this page alone, because marketing never imports `ui/`. The layout, the footer and
   the section copy stay on the server: a client leaf that wraps server content takes it as
-  `children`, as the plan cards and the comparison table do.
+  `children`, as the plan cards and the comparison table do. `/waitlist` is one client
+  component, `waitlist/waitlist-page.tsx`: the night panel beside its form reacts to the
+  form (the "Đã giữ chỗ" row appears once the sign-up is stored), so the two share state
+  and the panel cannot be a server-built prop the way the sign-in panel is. The page's
+  fixed copy still comes from `data/waitlist.ts`, and its pill field and split frame are
+  rebuilt in `waitlist-field.tsx` and the page rather than imported from `features/auth/`.
 - The scroll reveal is armed once per page, by `scroll-reveal.tsx` mounted after the
   sections — on the landing page and on `/cham-diem-hotline`. Blocks
   already on screen when it arms are marked revealed instead of hidden, because the server's

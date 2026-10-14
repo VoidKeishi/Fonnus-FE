@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { RefObject } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Button, Icon, Logo } from '@/design-system'
+import { buttonClassName, Icon, Logo, LogoMark } from '@/design-system'
 import { NAV_GROUPS } from '@/data/content'
 import type { NavGroup, NavItem } from '@/data/content'
 import { NavItemLink } from './nav-item-link'
@@ -18,8 +18,13 @@ import { useCallDemo } from './orb/call-demo-provider'
  * keeps it reading as Fonnus rather than as a generic SaaS bar.
  * Responsiveness is a swap, not a shrink: below the `nav` breakpoint (1100px,
  * measured — see globals.css) the menus move into a drawer and the pill keeps
- * only the brand, the primary CTA and the toggle. Both shapes are in the HTML
- * and the media query picks, so the server and the first client render agree.
+ * only the brand, the waitlist button and the toggle. Both shapes are in the
+ * HTML and the media query picks, so the server and the first client render
+ * agree.
+ *
+ * The waitlist button is the header's one action, the same label at every
+ * width, so the drawer carries destinations only. There is no sign-in entry on
+ * the marketing site: Fonnus has no customers to sign in yet.
  *
  * The same header sits on every marketing page. A link to the page you are on
  * keeps its wash, so the header also says where you are.
@@ -209,7 +214,7 @@ export function Header() {
   )
 }
 
-/** Both shapes are rendered; the `nav` breakpoint shows one. */
+/** The waitlist button at every width; the drawer toggle below the `nav` breakpoint. */
 interface ActionsProps {
   drawerOpen: boolean
   onToggleDrawer: () => void
@@ -219,16 +224,9 @@ interface ActionsProps {
 function Actions({ drawerOpen, onToggleDrawer, toggleRef }: ActionsProps) {
   return (
     <div className="ml-auto flex shrink-0 items-center gap-2">
-      <Link href="/dang-nhap" className="hidden shrink-0 no-underline nav:block">
-        <Button variant="secondary" size="sm">
-          Đăng nhập
-        </Button>
-      </Link>
-      <Link href="/dang-ky" className="shrink-0 no-underline">
-        <Button size="sm">
-          <span className="nav:hidden">Dùng thử</span>
-          <span className="hidden nav:inline">Dùng thử miễn phí</span>
-        </Button>
+      <Link href="/waitlist" className={`${buttonClassName({ size: 'sm' })} shrink-0`}>
+        <LogoMark size={18} arcClassName="motion-safe:animate-[fnLift_3.2s_var(--ease-arc)_infinite]" />
+        Danh sách chờ
       </Link>
       <button
         ref={toggleRef}
@@ -402,16 +400,6 @@ function Drawer({ pathname, onPick, onDemo }: { pathname: string; onPick: () => 
           </Link>
         ),
       )}
-      <Link
-        href="/dang-nhap"
-        onClick={onPick}
-        className={[
-          'mt-1 rounded-[14px] px-3.5 py-[15px] text-center font-ui text-body-sm leading-(--leading-body) font-semibold text-text-body no-underline',
-          'shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--text-heading)_14%,transparent)] hover:bg-action-ghost-hover',
-        ].join(' ')}
-      >
-        Đăng nhập
-      </Link>
     </nav>
   )
 }

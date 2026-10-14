@@ -7,9 +7,8 @@ import type { InputHTMLAttributes, ReactNode } from 'react'
  * The auth pill field.
  *
  * Deliberately not the design-system `Input`: that one draws a 12px bordered
- * box, and these screens borrow the landing hero's pill instead, so the first
- * control an owner meets after clicking "Dùng thử miễn phí" is the same shape
- * they just clicked.
+ * box, and these screens borrow the pill the landing page's buttons wear, so the
+ * first control an owner meets here is the shape they just clicked.
  *
  * Focus thickens the existing ring rather than adding a second one, so the
  * control never grows on focus and nothing below it shifts.

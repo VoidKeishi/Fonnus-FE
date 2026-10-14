@@ -16,7 +16,7 @@ import {
   TEXT_FOOTNOTE,
   TEXT_MODE_LINE,
   TEXT_PLACEHOLDER,
-  TRY_FREE_LABEL,
+  WAITLIST_LABEL,
 } from '@/data/call-demo'
 import { useCallDemo } from './call-demo-provider'
 import { stateLabel } from './call-state'
@@ -137,8 +137,8 @@ export function CallOverlay({ spotRef, orbRef }: CallOverlayProps) {
       </p>
       <div className="flex flex-wrap justify-center gap-3">
         {ended === 'error' ? null : (
-          <Link href="/dang-ky" aria-describedby={slotLineId} className={buttonClassName({ variant: 'primary' })}>
-            {TRY_FREE_LABEL}
+          <Link href="/waitlist" aria-describedby={slotLineId} className={buttonClassName({ variant: 'primary' })}>
+            {WAITLIST_LABEL}
           </Link>
         )}
         <Button

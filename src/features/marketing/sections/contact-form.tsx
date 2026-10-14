@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ChangeEvent } from 'react'
-import Link from 'next/link'
 import { MAX_NAME_LENGTH, api, isCanceled } from '@/api'
 import type { LeadInput } from '@/api'
 import { Button, Icon, Input } from '@/design-system'
@@ -17,7 +16,6 @@ import {
   withoutError,
 } from './lead-fields'
 import type { LeadErrors, LeadField } from './lead-fields'
-import { TEXT_LINK } from './section-chrome'
 
 /**
  * The form half of "Liên hệ", and the "Đã nhận thông tin" panel that replaces
@@ -185,17 +183,6 @@ export function ContactForm() {
           {sendError}
         </p>
       )}
-      <p className="m-0 text-ui leading-(--leading-body) text-text-muted">
-        Không cần chờ gọi lại:{' '}
-        <Link href="/dang-ky" className={TEXT_LINK}>
-          dùng thử miễn phí 14 ngày
-        </Link>{' '}
-        hoặc{' '}
-        <Link href="/#hero" className={TEXT_LINK}>
-          nghe thử ngay
-        </Link>
-        .
-      </p>
     </form>
   )
 }
