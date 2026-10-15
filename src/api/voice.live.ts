@@ -35,7 +35,9 @@ import { createVoiceEvents } from './voice-events'
 const CONNECT_BUDGET_MS = 15_000
 /**
  * The agent's own `max_duration_seconds` is 180. Closing first keeps the
- * ending the app's, with the app's words (ADR 0006 point 6). Exported for the tests.
+ * ending the app's, with the app's words (ADR 0006 point 6). A caller's
+ * `maxDurationMs` — what is left of the visitor's hour (ADR 0008) — can only
+ * shorten it. Exported for the tests.
  */
 export const MAX_CALL_MS = 175_000
 
@@ -68,7 +70,7 @@ function throwIfAborted(signal: AbortSignal | undefined): void {
 }
 
 export const voiceLive: VoiceApi = {
-  async connect({ input, signal }) {
+  async connect({ input, signal, maxDurationMs }) {
     throwIfAborted(signal)
     if (input === 'voice') await askForMicrophone(signal)
 
@@ -123,6 +125,7 @@ export const voiceLive: VoiceApi = {
           : sdk.VoiceConversation.startSession({ conversationToken: ticket, connectionType: 'webrtc', ...callbacks }),
       budget,
       signal,
+      maxDurationMs,
     )
   },
 }
@@ -184,13 +187,16 @@ interface Callbacks {
  * Starts the conversation under what is left of the connect budget and wraps
  * it as a `VoiceSession`. A conversation that arrives after the budget fired
  * is ended unheard, and its callbacks change nothing. `signal` is the caller's
- * own, read only to tell an abort from the budget running out. Exported for the tests.
+ * own, read only to tell an abort from the budget running out. The session
+ * ends with `timeout` after `maxDurationMs`, clamped to `MAX_CALL_MS`.
+ * Exported for the tests.
  */
 export function startSession(
   input: VoiceInput,
   start: (callbacks: Callbacks) => Promise<Conversation>,
   budget: AbortSignal,
   signal: AbortSignal | undefined,
+  maxDurationMs?: number,
 ): Promise<VoiceSession> {
   // A text conversation's lines are kept, not replaced by the next event: the
   // SDK may deliver her first one before this resolves and anyone subscribes.
@@ -306,7 +312,7 @@ export function startSession(
         }
         // A close or the cap ended it first and already said why.
         if (closing || ended) return
-        // The agent's own 180 s cap, if it beats the client's 175 s one (a
+        // The agent's own 180 s cap, if it beats the client's one (a
         // throttled background tab): still the duration cap, not a failure.
         if (details.reason === 'error' && details.context?.type === 'max_duration_exceeded') {
           end('timeout')
@@ -334,10 +340,13 @@ export function startSession(
         // Connected and nothing said yet: she waits for the visitor, rather
         // than the line sitting on "connecting" until her first message.
         if (text && mode === null) setMode('listening')
-        capTimer = setTimeout(() => {
-          end('timeout')
-          void started.endSession().catch(() => undefined)
-        }, MAX_CALL_MS)
+        capTimer = setTimeout(
+          () => {
+            end('timeout')
+            void started.endSession().catch(() => undefined)
+          },
+          Math.min(MAX_CALL_MS, Math.max(0, maxDurationMs ?? MAX_CALL_MS)),
+        )
         resolve(session)
       },
       (cause: unknown) => {

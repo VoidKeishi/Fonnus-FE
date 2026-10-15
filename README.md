@@ -85,10 +85,12 @@ and redeploy after changing any of the three: a variable applies only to new dep
 
 ## Turn on the live voice demo
 
-The voice orb on the landing page holds a real conversation of up to three minutes with a
-voice agent hosted on ElevenLabs Conversational AI
-(`docs/adr/0006-elevenlabs-landing-voice-demo.md`, amended by
-`docs/adr/0007-voice-demo-agent-only-and-text-fallback.md`). There is no recording and no
+The voice orb on the landing page holds a real conversation with a voice agent hosted on
+ElevenLabs Conversational AI (`docs/adr/0006-elevenlabs-landing-voice-demo.md`, amended by
+`docs/adr/0007-voice-demo-agent-only-and-text-fallback.md` and
+`docs/adr/0008-voice-demo-three-minutes-an-hour.md`). A visitor gets three minutes of
+conversation per hour, spent over as many calls as they like; the browser keeps the count
+in `localStorage`, so clearing site data gives a fresh hour. There is no recording and no
 mock: the visitor's browser talks to ElevenLabs directly, but only with a short-lived ticket,
 which this app's `POST /api/voice-demo/token` obtains from ElevenLabs with a secret API key.
 With no setup that route answers `503` and the call screen says it could not connect, which
@@ -112,7 +114,9 @@ browser gives no microphone talks to the same agent by typing, and reads the rep
      Vietnamese law requires (Law 134/2025/QH15), and so that it does **not** say the call
      is recorded: the landing page promises the opposite, and the Privacy settings above
      make it true. Write its prompt so that it brings the call to a close at around two
-     minutes and fifty seconds, before the limit cuts it off.
+     minutes and fifty seconds, before the limit cuts it off. A visitor's second call in
+     the same hour is shorter — only what is left of their three minutes — and the page
+     cuts it without warning the agent; nothing in the agent's setup can know about that.
    - Under Advanced → Turn timeout, consider more than the default 7 seconds. A visitor
      without a microphone types, and a Vietnamese sentence takes 15–30 seconds; the page
      tells the agent the visitor is typing, but a longer timeout is the backstop. The

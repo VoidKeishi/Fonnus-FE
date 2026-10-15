@@ -404,10 +404,12 @@ Not an HTTP endpoint: the interface the landing page's "Nghe thử" call screen 
 `voice` group in `src/api/contracts.ts`. Whatever carries the audio sits behind it, so the
 screen and its hook never change when the transport does.
 
-`api.voice.connect({ mode: 'landing-demo', input, signal })` resolves a `VoiceSession`.
-`input` is `voice` (a call) or `text` (the same conversation typed, for a browser that gives no
-microphone). The caller invokes it inside the tap that started the call, because the
-microphone prompt needs that gesture. The session has:
+`api.voice.connect({ mode: 'landing-demo', input, signal, maxDurationMs })` resolves a
+`VoiceSession`. `input` is `voice` (a call) or `text` (the same conversation typed, for a browser
+that gives no microphone). `maxDurationMs`, optional, is the screen's own cap for this session in
+milliseconds; the implementation clamps it to its own maximum and ends the session with `timeout`
+when it elapses, and without it the maximum applies. The caller invokes `connect` inside the tap
+that started the call, because the microphone prompt needs that gesture. The session has:
 
 | Member | What it does |
 |---|---|
@@ -475,17 +477,26 @@ the page. What the client does:
   microphone toggle. Every other rejection, of either attempt, is a failed call: "Không kết nối
   được với Linh lúc này. Bạn thử gọi lại sau một lát." and "Gọi lại", with no sign-up link.
   Nothing stands in for the agent.
-- **A 175-second cap**, under the agent's own 180, so the ending is the app's: the session
-  emits `ended { reason: 'timeout' }` and closes itself. It applies to a text session unchanged.
-- **Endings.** `agent` (the receptionist hung up) and `timeout` show a closing line with
-  "Vào danh sách chờ" (to `/waitlist`) and "Gọi lại"; `error` (the connection dropped after the
-  call started) shows "Mất kết nối với Linh." and "Gọi lại". "Gọi lại" connects again, a call
-  first, without a second consent. `user` is the visitor closing the screen and shows nothing.
+- **A cap of 175 seconds at most**, under the agent's own 180, so the ending is the app's: the
+  session emits `ended { reason: 'timeout' }` and closes itself. The screen passes what is left of
+  the visitor's three minutes an hour as `maxDurationMs`, so the cap is often shorter
+  ([ADR 0008](./adr/0008-voice-demo-three-minutes-an-hour.md)); the hour is counted in the
+  browser, above this interface, and never by the implementation. It applies to a text session
+  unchanged.
+- **Endings.** `agent` (the receptionist hung up) shows a closing line with "Vào danh sách chờ"
+  (to `/waitlist`) and "Gọi lại"; `error` (the connection dropped after the call started) shows
+  "Mất kết nối với Linh." and "Gọi lại". `timeout` means the hour is spent: its line says when
+  the next call can start, and it offers "Vào danh sách chờ" only. An `agent` or `error` ending
+  that spent the rest of the hour says the same, drops "Gọi lại" and offers "Vào danh sách chờ"
+  (for `error` too: the visitor has had their three minutes with Linh, ADR 0008 point 5). The
+  wait it names is as of the moment the slot appeared; it is not counted down, and the slot turns
+  back into its ordinary shape when the hour does. "Gọi lại" connects again, a call first,
+  without a second consent. `user` is the visitor closing the screen and shows nothing.
 - **Loudness.** `getAmplitude()` is the agent's output volume while she speaks in a call, and
   `null` otherwise, in a text session, or once the session has ended; the orb draws its own idle
   pulse while she listens.
 - **The agent's own cap.** When ElevenLabs ends the call at its 180 s `max_duration_seconds`
-  before the client's 175 s timer does, the disconnect arrives as an error with the context
+  before the client's own timer does, the disconnect arrives as an error with the context
   `max_duration_exceeded`; the session reports it as `timeout`, not `error`.
 
 When Fonnus-BE serves a web voice gateway into the pipeline, it implements this same interface

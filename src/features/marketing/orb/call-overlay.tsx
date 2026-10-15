@@ -1,16 +1,12 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import type { RefObject } from 'react'
 import Link from 'next/link'
-import type { VoiceEndReason } from '@/api'
 import { Button, buttonClassName, Icon, Pattern } from '@/design-system'
 import {
   CALL_AGAIN_LABEL,
   CHIPS,
   CONNECT_FAILED_LINE,
   CONSENT_LINE,
-  ENDED_AGENT_LINE,
-  ENDED_ERROR_LINE,
-  ENDED_TIMEOUT_LINE,
   SPEAKER_LABELS,
   START_LABEL,
   TEXT_FOOTNOTE,
@@ -19,7 +15,7 @@ import {
   WAITLIST_LABEL,
 } from '@/data/call-demo'
 import { useCallDemo } from './call-demo-provider'
-import { stateLabel } from './call-state'
+import { budgetLine, endingLine, spentLine, stateLabel } from './call-state'
 import type { ThreadLine } from './use-call-demo'
 
 /*
@@ -39,6 +35,13 @@ import type { ThreadLine } from './use-call-demo'
  * ended on its own, and a call that could not connect. The last three hide the
  * controls, which have nothing to talk to, but keep the room reserved for them
  * so the orb does not move.
+ *
+ * The hour's budget (ADR 0008) shows in two of them and nowhere during a
+ * call. Consent says what is left when part of the hour is spent, and with
+ * nothing left it says when the next call can start and offers only the
+ * waitlist. An ending that spent the rest of the hour says the same and drops
+ * "Gọi lại" until the hour turns: a button that opens a call that cannot
+ * connect is a promise the screen cannot keep.
  *
  * A typed conversation (ADR 0007 point 4) is the same screen with a smaller
  * orb, a line saying why it is typed, and the thread of lines between the
@@ -79,8 +82,12 @@ export function CallOverlay({ spotRef, orbRef }: CallOverlayProps) {
   // The slot's line describes its first action, which takes focus when the
   // slot appears, so a screen reader landing there hears why.
   const slotLineId = useId()
+  const budgetLineId = useId()
   const threadRef = useRef<HTMLDivElement>(null)
-  const { awaitingConsent, ended, failed } = demo
+  const { awaitingConsent, ended, failed, budget } = demo
+  /** Nothing of the hour is left: no call can start until it turns. */
+  const spent = budget.remainingMs <= 0
+  const leftLine = budgetLine(budget.remainingMs)
   const showsControls = !awaitingConsent && !ended && !failed
   const typing = demo.input === 'text'
   const lineCount = demo.messages.length
@@ -106,16 +113,18 @@ export function CallOverlay({ spotRef, orbRef }: CallOverlayProps) {
 
   // Declared after the effect above, so on open it runs second and wins over
   // the dialog's own focus. A slot that swaps out takes the focused control
-  // with it; focus moves to the new slot's first action, or back to the dialog
-  // once a call starts, instead of falling to the page under it. A call that
-  // turns typed takes the microphone toggle with it, which may have had focus.
+  // with it; focus moves to the new slot's first action, or to the dialog when
+  // the slot has none or once a call starts, instead of falling to the page
+  // under it. A call that turns typed takes the microphone toggle with it,
+  // which may have had focus; the hour turning swaps the spent slot for consent.
   useEffect(() => {
     if (awaitingConsent || ended || failed) {
-      actionsRef.current?.querySelector<HTMLElement>('a, button')?.focus({ preventScroll: true })
+      const target = actionsRef.current?.querySelector<HTMLElement>('a, button') ?? dialogRef.current
+      target?.focus({ preventScroll: true })
       return
     }
     if (document.activeElement === document.body) dialogRef.current?.focus({ preventScroll: true })
-  }, [awaitingConsent, ended, failed, typing])
+  }, [awaitingConsent, ended, failed, typing, spent])
 
   // The newest line is the one to read; the thread scrolls inside itself.
   useEffect(() => {
@@ -133,21 +142,26 @@ export function CallOverlay({ spotRef, orbRef }: CallOverlayProps) {
   const ending = ended ? (
     <div ref={actionsRef} className="flex flex-col items-center gap-4 text-center">
       <p id={slotLineId} role="status" className={SLOT_LINE}>
-        {endedLine(ended)}
+        {endingLine(ended, budget.remainingMs, budget.waitMs)}
       </p>
+      {/* A dropped connection sends nobody to a form — unless it ended the hour
+          the visitor spent talking to Linh, which is the moment to offer the
+          waitlist (ADR 0008 point 5). */}
       <div className="flex flex-wrap justify-center gap-3">
-        {ended === 'error' ? null : (
+        {ended === 'error' && !spent ? null : (
           <Link href="/waitlist" aria-describedby={slotLineId} className={buttonClassName({ variant: 'primary' })}>
             {WAITLIST_LABEL}
           </Link>
         )}
-        <Button
-          variant="secondary"
-          onClick={demo.startCall}
-          aria-describedby={ended === 'error' ? slotLineId : undefined}
-        >
-          {CALL_AGAIN_LABEL}
-        </Button>
+        {spent ? null : (
+          <Button
+            variant="secondary"
+            onClick={demo.startCall}
+            aria-describedby={ended === 'error' ? slotLineId : undefined}
+          >
+            {CALL_AGAIN_LABEL}
+          </Button>
+        )}
       </div>
     </div>
   ) : failed ? (
@@ -199,12 +213,30 @@ export function CallOverlay({ spotRef, orbRef }: CallOverlayProps) {
             aria-hidden="true"
             className={typing ? 'size-[clamp(120px,18vh,180px)] flex-none' : 'size-[clamp(200px,32vh,320px)]'}
           />
-          {awaitingConsent ? (
+          {awaitingConsent && spent ? (
+            <div ref={actionsRef} className="flex flex-col items-center gap-4 text-center">
+              <p id={slotLineId} className={SLOT_LINE}>
+                {spentLine(budget.waitMs)}
+              </p>
+              <Link href="/waitlist" aria-describedby={slotLineId} className={buttonClassName({ variant: 'primary' })}>
+                {WAITLIST_LABEL}
+              </Link>
+            </div>
+          ) : awaitingConsent ? (
             <div ref={actionsRef} className="flex flex-col items-center gap-4 text-center">
               <p id={slotLineId} className={SLOT_LINE}>
                 {CONSENT_LINE}
               </p>
-              <Button variant="primary" onClick={demo.startCall} aria-describedby={slotLineId}>
+              {leftLine === null ? null : (
+                <p id={budgetLineId} className={SLOT_LINE}>
+                  {leftLine}
+                </p>
+              )}
+              <Button
+                variant="primary"
+                onClick={demo.startCall}
+                aria-describedby={leftLine === null ? slotLineId : `${slotLineId} ${budgetLineId}`}
+              >
                 {START_LABEL}
               </Button>
             </div>
@@ -316,13 +348,6 @@ export function CallOverlay({ spotRef, orbRef }: CallOverlayProps) {
       ) : null}
     </div>
   )
-}
-
-/** The ending's line. `user` never reaches the screen: closing the call closes it. */
-function endedLine(reason: VoiceEndReason): string {
-  if (reason === 'timeout') return ENDED_TIMEOUT_LINE
-  if (reason === 'agent') return ENDED_AGENT_LINE
-  return ENDED_ERROR_LINE
 }
 
 /**

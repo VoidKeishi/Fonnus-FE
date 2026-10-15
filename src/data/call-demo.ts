@@ -1,9 +1,9 @@
 /**
  * Copy for the "Nghe thử" call screen on the landing page: the suggestion
  * chips, and the lines and buttons of the states around the conversation —
- * consent before the microphone, the endings, a call that could not connect,
- * and the typed conversation a browser without a microphone gets (ADR 0006,
- * ADR 0007).
+ * consent before the microphone, the hour's budget, the endings, a call that
+ * could not connect, and the typed conversation a browser without a microphone
+ * gets (ADR 0006, ADR 0007, ADR 0008).
  *
  * A chip is a question the caller asks, handled exactly as a typed line is:
  * handed to the voice session (`api.voice`), which is always the ElevenLabs
@@ -28,9 +28,28 @@ export const CONSENT_LINE =
   'Bạn sắp nói chuyện với Linh — một trợ lý AI. Giọng nói hoặc tin nhắn của bạn được xử lý trực tiếp để Linh trả lời, không lưu lại.'
 export const START_LABEL = 'Bắt đầu gọi'
 
+/*
+ * The hour's budget (ADR 0008). Each sentence takes its number already said:
+ * `remaining` is "2 phút 10 giây", `wait` is "42 phút".
+ */
+/** Under the consent line, when part of the hour is already spent. */
+export const budgetLeftLine = (remaining: string) => `Giờ này bạn còn ${remaining} gọi thử.`
+/** Instead of the consent line, when nothing of the hour is left. */
+export const budgetSpentLine = (wait: string) =>
+  `Bạn đã dùng hết 3 phút gọi thử trong giờ này — gọi lại được sau ${wait}. Ở phòng khám của bạn, Linh nghe máy cả ngày.`
+
+/** The call that spent the hour ended on its cap. */
+export const endedTimeoutLine = (wait: string) =>
+  `Hết 3 phút gọi thử trong giờ này — gọi lại được sau ${wait}. Ở phòng khám của bạn, Linh nghe máy cả ngày.`
+/**
+ * A call ended on its cap while the hour turned under it, so a new hour's
+ * budget is already there: the only ending on the cap that still offers "Gọi lại".
+ */
 export const ENDED_TIMEOUT_LINE = 'Hết 3 phút gọi thử. Ở phòng khám của bạn, Linh nghe máy cả ngày.'
 export const ENDED_AGENT_LINE = 'Linh đã kết thúc cuộc gọi thử. Ở phòng khám của bạn, Linh nghe máy cả ngày.'
 export const ENDED_ERROR_LINE = 'Mất kết nối với Linh.'
+/** After the agent's or the error's line, when the call spent the rest of the hour. */
+export const callAgainAfterLine = (wait: string) => `Gọi lại được sau ${wait}.`
 export const CALL_AGAIN_LABEL = 'Gọi lại'
 export const WAITLIST_LABEL = 'Vào danh sách chờ'
 

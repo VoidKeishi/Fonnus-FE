@@ -363,6 +363,11 @@ are English.
   on a wide screen and wraps under it on a narrow one, so it has to read either way.
 - No English leaks — including error text and anything a server sends back. The API
   returns machine codes; this app maps them.
+- A sentence that names a time — "gọi lại được sau 42 phút" — is a promise with an expiry.
+  The slot that shows it changes shape at that moment, on one timer set to it, and says
+  nothing a visitor could still be reading after it has stopped being true. It is not a
+  countdown: the number is as of when the slot appeared, and the screen says so where it
+  matters (`docs/api-contract.md` §voice). From the call screen's spent hour.
 
 ---
 
@@ -407,6 +412,15 @@ works (`0914378064` / `111002`).
 ## Lessons log
 
 Newest first. One line per session that taught something; the rule itself goes above.
+
+- **2026-10-15 (landing page, the call screen gets an hour's budget)** — Giving the "Nghe
+  thử" call three minutes an hour added one sentence with a clock in it, "gọi lại được sau
+  N phút", and both the builder's fork and the review circled the same hole: a slot that
+  says "sau N phút" and stays on screen past N is lying. The first build ran the hour's reset
+  timer only on the consent slot; the endings that carry the same sentence now share it, so
+  "Gọi lại" comes back the moment it is true. The rule is §9's last bullet. The number is
+  deliberately not a countdown: one timer at the moment it changes, no polling, and the
+  contract says the wait is as of when the slot appeared.
 
 - **2026-10-11 (landing page, the call screen gets a text shape)** — Two things from giving
   the "Nghe thử" call a second shape for a visitor without a microphone. The orb lands on a

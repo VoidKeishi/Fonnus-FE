@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api, isApiError } from '@/api'
 import type { VoiceEndReason, VoiceInput, VoiceSession } from '@/api'
 import type { AgentState } from './call-state'
+import { useCallBudget } from './use-call-budget'
+import type { CallBudget } from './use-call-budget'
 
 /*
  * The "Nghe thử" call. Everything the receptionist does comes from a
@@ -20,7 +22,12 @@ import type { AgentState } from './call-state'
  *   stands in for the agent.
  * - A session that ends on its own — the agent hung up, the duration cap, a
  *   dropped connection — leaves the screen open on its ending, which offers
- *   to call again.
+ *   to call again while the hour has time left.
+ * - The visitor has three minutes an hour, spent over any number of calls
+ *   (ADR 0008). Each call is capped at what is left; its seconds count from
+ *   the moment it is attached until it ends, for any reason, leaving the page
+ *   included. The ledger is read in the taps that open and start a call and
+ *   when one ends, never during render.
  */
 
 /** Set on <html> while the call is open; `globals.css` turns it into the scroll lock. */
@@ -51,6 +58,13 @@ export interface CallDemo {
   messages: readonly ThreadLine[]
   /** Nothing could connect: the screen says so and offers to call again. */
   failed: boolean
+  /**
+   * What is left of the hour, read when the call opens, when it starts, when
+   * it ends, and when the hour turns under a slot that says when. With nothing
+   * left the consent slot says when the next call can start, and no ending
+   * offers to call again until then.
+   */
+  budget: CallBudget
   /**
    * Opens the call screen on the consent line. `returnFocusTo` is the control
    * focus goes back to when the call closes; without one, or once it has left
@@ -87,6 +101,8 @@ export function useCallDemoState(): CallDemo {
   const [input, setInput] = useState<VoiceInput | null>(null)
   const [messages, setMessages] = useState<readonly ThreadLine[]>([])
   const [failed, setFailed] = useState(false)
+  const onSlot = open && (awaitingConsent || ended !== null)
+  const { budget, refreshBudget, startSpending, stopSpending } = useCallBudget(onSlot)
 
   const session = useRef<VoiceSession | null>(null)
   const unsubscribe = useRef<(() => void) | null>(null)
@@ -105,9 +121,10 @@ export function useCallDemoState(): CallDemo {
     connecting.current = null
     unsubscribe.current?.()
     unsubscribe.current = null
+    stopSpending()
     void session.current?.close()
     session.current = null
-  }, [])
+  }, [stopSpending])
 
   /** Back to the screen before anything connected, with no ending, no failure and no thread. */
   const resetCall = useCallback(() => {
@@ -121,10 +138,17 @@ export function useCallDemoState(): CallDemo {
   const startCall = useCallback(() => {
     endSession()
     const id = turn.current
+    resetCall()
+    // Read again: the hour may have turned, or another tab spent it, since the call opened.
+    const hour = refreshBudget()
+    if (hour.remainingMs <= 0) {
+      // Nothing to connect with: the consent slot's place says when to come back.
+      setAwaitingConsent(true)
+      return
+    }
     const controller = new AbortController()
     connecting.current = controller
     setAwaitingConsent(false)
-    resetCall()
 
     const attach = (next: VoiceSession, nextInput: VoiceInput) => {
       if (turn.current !== id) {
@@ -133,6 +157,9 @@ export function useCallDemoState(): CallDemo {
       }
       connecting.current = null
       session.current = next
+      // Before subscribing: a session already ended replays its ending
+      // synchronously, and that ending must find the entry to close.
+      startSpending()
       setInput(nextInput)
       unsubscribe.current = next.subscribe((event) => {
         if (event.type === 'state') {
@@ -152,6 +179,8 @@ export function useCallDemoState(): CallDemo {
         unsubscribe.current = null
         session.current = null
         void next.close()
+        stopSpending(event.reason === 'timeout')
+        refreshBudget()
         setAgent('connecting')
         setEnded(event.reason)
       })
@@ -166,7 +195,12 @@ export function useCallDemoState(): CallDemo {
     }
 
     const connect = (nextInput: VoiceInput) =>
-      api.voice.connect({ mode: 'landing-demo', input: nextInput, signal: controller.signal })
+      api.voice.connect({
+        mode: 'landing-demo',
+        input: nextInput,
+        signal: controller.signal,
+        maxDurationMs: hour.remainingMs,
+      })
 
     // Called in the tap's own turn: the microphone prompt needs the gesture.
     void connect('voice').then(
@@ -190,7 +224,7 @@ export function useCallDemoState(): CallDemo {
         )
       },
     )
-  }, [endSession, resetCall])
+  }, [endSession, resetCall, refreshBudget, startSpending, stopSpending])
 
   const openCall = useCallback(
     (returnFocusTo?: HTMLElement | null) => {
@@ -202,9 +236,10 @@ export function useCallDemoState(): CallDemo {
       setMic(true)
       endSession()
       resetCall()
+      refreshBudget()
       setAwaitingConsent(true)
     },
-    [open, endSession, resetCall],
+    [open, endSession, resetCall, refreshBudget],
   )
 
   const closeCall = useCallback(() => {
@@ -258,6 +293,16 @@ export function useCallDemoState(): CallDemo {
     }
   }, [open])
 
+  // Leaving the page ends the call as the close button does, so a tab closed
+  // mid-call still records the seconds it spent rather than its whole cap.
+  useEffect(() => {
+    if (!open) return
+    window.addEventListener('pagehide', closeCall)
+    return () => {
+      window.removeEventListener('pagehide', closeCall)
+    }
+  }, [open, closeCall])
+
   // The session, and the connection it holds, close with the layout that owns them.
   useEffect(() => endSession, [endSession])
 
@@ -271,6 +316,7 @@ export function useCallDemoState(): CallDemo {
       input,
       messages,
       failed,
+      budget,
       openCall,
       startCall,
       closeCall,
@@ -289,6 +335,7 @@ export function useCallDemoState(): CallDemo {
       input,
       messages,
       failed,
+      budget,
       openCall,
       startCall,
       closeCall,
