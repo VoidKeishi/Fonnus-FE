@@ -381,7 +381,10 @@ the second arrived (ADR 0006 point 9); a third use follows them, it does not nee
   orb. The call goes through `api.voice`, which is always the ElevenLabs agent (ADR 0006,
   amended by ADR 0007): there is no mock and no recording. A visitor whose browser gives no
   microphone gets a text session with the same agent; a connection that fails is said on
-  screen, never covered.
+  screen, never covered. The hour's budget of three minutes (ADR 0008) is the call demo's
+  own rule, not the transport's: `call-budget.ts` is the pure arithmetic and the labels,
+  `call-budget-store.ts` the `localStorage` read and write inside function calls, and the
+  hook hands the remainder to `api.voice.connect` as `maxDurationMs`.
 - A night surface (the footer) renders inside a `data-theme="dark"` scope, so every alias
   inside it resolves to the night palette `colors.css` already defines. This is a night
   island in a light page, not a dark mode: nothing switches it.

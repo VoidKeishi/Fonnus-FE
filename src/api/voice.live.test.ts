@@ -54,7 +54,7 @@ function stubConversation(): StubConversation {
  * Starts a session on the stub, under a budget made of the caller's signal and
  * a stand-in for `AbortSignal.timeout` the test aborts by hand, combined as `connect` combines them.
  */
-function open(input: VoiceInput = 'voice') {
+function open(input: VoiceInput = 'voice', maxDurationMs?: number) {
   const caller = new AbortController()
   const timeout = new AbortController()
   const conversation = stubConversation()
@@ -69,15 +69,21 @@ function open(input: VoiceInput = 'voice') {
         sdk.reject = reject
       }),
   )
-  const pending = startSession(input, start, AbortSignal.any([caller.signal, timeout.signal]), caller.signal)
+  const pending = startSession(
+    input,
+    start,
+    AbortSignal.any([caller.signal, timeout.signal]),
+    caller.signal,
+    maxDurationMs,
+  )
   const { callbacks, resolve, reject } = sdk
   if (!callbacks || !resolve || !reject) throw new Error('startSession did not call start')
   return { pending, caller, timeout, conversation, callbacks, resolve, reject }
 }
 
 /** Opens a session, lets the SDK hand the conversation over, and records every event. */
-async function started(input: VoiceInput = 'voice') {
-  const opened = open(input)
+async function started(input: VoiceInput = 'voice', maxDurationMs?: number) {
+  const opened = open(input, maxDurationMs)
   opened.resolve()
   const session: VoiceSession = await opened.pending
   const events: VoiceEvent[] = []
@@ -214,6 +220,23 @@ describe('startSession, once the conversation has started', () => {
     await vi.advanceTimersByTimeAsync(1)
     expect(endings(events)).toEqual([{ type: 'ended', reason: 'timeout' }])
     expect(conversation.endSession).toHaveBeenCalledTimes(1)
+  })
+
+  it('hangs up at the screen’s own cap, what is left of the hour, with the same ending', async () => {
+    const { events, conversation } = await started('voice', 40_000)
+    await vi.advanceTimersByTimeAsync(40_000 - 1)
+    expect(endings(events)).toEqual([])
+    await vi.advanceTimersByTimeAsync(1)
+    expect(endings(events)).toEqual([{ type: 'ended', reason: 'timeout' }])
+    expect(conversation.endSession).toHaveBeenCalledTimes(1)
+  })
+
+  it('never lets the screen’s cap run past its own 175 seconds', async () => {
+    const { events } = await started('voice', 10 * 60_000)
+    await vi.advanceTimersByTimeAsync(MAX_CALL_MS - 1)
+    expect(endings(events)).toEqual([])
+    await vi.advanceTimersByTimeAsync(1)
+    expect(endings(events)).toEqual([{ type: 'ended', reason: 'timeout' }])
   })
 
   it('ends once, as the visitor’s doing, when closed, and hears nothing after', async () => {

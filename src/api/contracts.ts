@@ -234,8 +234,18 @@ export interface VoiceApi {
    * browser gives no microphone, for any reason; the caller then connects
    * again with `text`. Rejects with `voice_unavailable` when nothing could
    * connect in time, or with whatever `http.ts` makes of the ticket's refusal.
+   *
+   * `maxDurationMs` is the screen's own cap for this session, in milliseconds:
+   * what is left of the visitor's hour (ADR 0008). The implementation clamps it
+   * to its own maximum (175 s today) and ends the session with `timeout` when
+   * it elapses; omitted means the implementation's maximum.
    */
-  connect(opts: { mode: 'landing-demo'; input: VoiceInput; signal?: AbortSignal | undefined }): Promise<VoiceSession>;
+  connect(opts: {
+    mode: 'landing-demo';
+    input: VoiceInput;
+    signal?: AbortSignal | undefined;
+    maxDurationMs?: number | undefined;
+  }): Promise<VoiceSession>;
 }
 
 // ---------------------------------------------------------------------------

@@ -315,6 +315,15 @@ the kill switch is unsetting `ELEVENLABS_API_KEY`, which makes the route answer 
 orb fall back to the scripted demo with no visible break. When the gateway exists, it takes
 over `voice.live.ts` and inherits the same three answers.
 
+**Added 2026-10-15 (`docs/adr/0008-voice-demo-three-minutes-an-hour.md`):** the three
+minutes are now a budget per visitor per hour, spent over any number of calls. Today only the
+browser can count it, because the token route sees a call start and never its end, so the
+ledger is `localStorage` and a cleared browser is a fresh hour. **Ask for the gateway:** it
+sees both ends of every call, so it should keep this budget per caller on the server and
+refuse a session (a `429`-shaped answer the seam renders as the exhausted slot) when the
+hour is spent; the browser's ledger then stays only as the hint that lets the consent slot
+say what is left before the gateway answers.
+
 ---
 
 ## Smaller confirmations
