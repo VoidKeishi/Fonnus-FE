@@ -66,6 +66,14 @@ export const MOCK_FAILURE_RATE = Math.min(
   Math.max(0, num(process.env.NEXT_PUBLIC_MOCK_FAILURE_RATE, 0)),
 );
 
+/**
+ * The landing voice demo's Cloudflare Turnstile widget (ADR 0009 point 5).
+ * Public by design: Cloudflare pairs it with the secret only the token route
+ * holds. Empty, there is no widget to ask, and every call fails closed.
+ */
+export const TURNSTILE_SITE_KEY: string =
+  process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? '';
+
 /** True when at least one group is still faked — used for a dev-only warning. */
 export const HAS_MOCKS: boolean = API_GROUPS.some((g) => !isLive(g));
 

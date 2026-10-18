@@ -44,7 +44,7 @@ if (IS_DEV && HAS_MOCKS) {
 export { ApiError, isApiError, isCanceled, messageFor } from './errors';
 export type { ApiErrorKind, FieldError } from './errors';
 export { setUnauthorizedHandler } from './http';
-export { API_MODE, isLive } from './env';
+export { API_MODE, isLive, TURNSTILE_SITE_KEY } from './env';
 export {
   formatBusinessPhone,
   formatPhone,

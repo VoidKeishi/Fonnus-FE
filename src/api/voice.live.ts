@@ -15,12 +15,18 @@
  * inside `connect`, never at module scope: the landing page's first load must
  * not carry it, and nothing here may run at import time.
  *
+ * Every ticket costs a proof that the visitor is a browser (ADR 0009 point 5):
+ * the caller's `challenge`, asked for after the microphone grant for a call and
+ * first thing for a text one, inside the budget below, and posted as
+ * `turnstile_token`. No proof is no ticket.
+ *
  * `connect` rejects for everything that goes wrong before the conversation
  * starts: `microphone_unavailable` (voice only: the browser gave no microphone,
  * for any reason, and the caller connects again with `text`),
- * `voice_unavailable` (the SDK failed to load or start, or no connection within
- * the budget below), and whatever `http.ts` makes of the token route's refusal
- * — `budget_spent` among them, when the visitor's hour is spent.
+ * `voice_unavailable` (no proof, the SDK failed to load or start, or no
+ * connection within the budget below), and whatever `http.ts` makes of the
+ * token route's refusal — `budget_spent` among them, when the visitor's hour
+ * is spent, and a `403` when the route refused the proof.
  *
  * The hour is the route's (ADR 0009): `budget` reads it from
  * `GET /api/voice-demo/budget`, and each ticket's answer says what that
@@ -40,8 +46,8 @@ import { http, request } from './http'
 import { createVoiceEvents } from './voice-events'
 
 /*
- * How long the ticket, the SDK and the connection may take together before the
- * call is shown as failed. Counted from the microphone grant for a voice call
+ * How long the proof, the ticket, the SDK and the connection may take together
+ * before the call is shown as failed. Counted from the microphone grant for a voice call
  * (the prompt waits on a person, not on the network) and from `connect` for a
  * text one.
  */
@@ -88,7 +94,7 @@ export const voiceLive: VoiceApi = {
     return http.get<VoiceBudget>(BUDGET_PATH, { ownOrigin: true, signal: opts?.signal })
   },
 
-  async connect({ input, signal }) {
+  async connect({ input, signal, challenge }) {
     throwIfAborted(signal)
     if (input === 'voice') await askForMicrophone(signal)
 
@@ -100,18 +106,8 @@ export const voiceLive: VoiceApi = {
       throwIfAborted(signal)
       if (budget.aborted) throw unavailable()
     }
-
-    const { ticket, hour } = await requestTicket(input, budget).catch((cause: unknown) => {
-      // `http.ts` reports the budget's abort as `canceled` or `timeout`; both
-      // are this budget's. Any other refusal, `budget_spent` included, is the
-      // route's and reaches the caller as `http.ts` built it.
-      throwIfSpent()
-      throw cause
-    })
-    throwIfSpent()
-
-    // A dynamic import takes no signal, so a chunk that never arrives is raced
-    // against the budget by hand; otherwise it alone could outlast the fifteen seconds.
+    // The proof and the SDK chunk are raced against the budget by hand: neither
+    // is bound to honour a signal, and either alone could outlast the fifteen seconds.
     const spent = new Promise<never>((_, reject) => {
       budget.addEventListener(
         'abort',
@@ -121,6 +117,28 @@ export const voiceLive: VoiceApi = {
         { once: true },
       )
     })
+
+    // Fail closed: a proof that does not come is no ticket (ADR 0009 point 5).
+    const proof = await Promise.race([
+      Promise.resolve()
+        .then(() => challenge(budget))
+        .catch((cause: unknown) => {
+          throwIfSpent()
+          throw unavailable(cause)
+        }),
+      spent,
+    ])
+    throwIfSpent()
+
+    const { ticket, hour } = await requestTicket(input, proof, budget).catch((cause: unknown) => {
+      // `http.ts` reports the budget's abort as `canceled` or `timeout`; both
+      // are this budget's. Any other refusal, `budget_spent` and a refused
+      // proof included, is the route's and reaches the caller as `http.ts` built it.
+      throwIfSpent()
+      throw cause
+    })
+    throwIfSpent()
+
     const sdk = await Promise.race([
       import('@elevenlabs/client').catch((cause: unknown) => {
         throw unavailable(cause)
@@ -152,23 +170,28 @@ export const voiceLive: VoiceApi = {
 
 /**
  * A call's WebRTC conversation token, or a typed conversation's WebSocket
- * signed URL, with what that ticket may spend of the hour.
+ * signed URL, with what that ticket may spend of the hour. `proof` is the
+ * Turnstile token the route verifies before anything else it does.
  */
-async function requestTicket(input: VoiceInput, signal: AbortSignal): Promise<{ ticket: string; hour: VoiceBudget }> {
+async function requestTicket(
+  input: VoiceInput,
+  proof: string,
+  signal: AbortSignal,
+): Promise<{ ticket: string; hour: VoiceBudget }> {
   if (input === 'text') {
     const { signed_url, remaining_ms, resets_at } = await request<{ signed_url: string } & VoiceBudget>(TICKET_PATH, {
       method: 'POST',
-      body: { input: 'text' },
+      body: { input: 'text', turnstile_token: proof },
       ownOrigin: true,
       signal,
     })
     return { ticket: signed_url, hour: { remaining_ms, resets_at } }
   }
-  // An empty JSON body on purpose: the route answers 415 to anything that is
-  // not `application/json` (docs/api-contract.md §5), and `{}` is a call.
+  // JSON on purpose: the route answers 415 to anything that is not
+  // `application/json` (docs/api-contract.md §5), and no `input` is a call.
   const { token, remaining_ms, resets_at } = await request<{ token: string } & VoiceBudget>(TICKET_PATH, {
     method: 'POST',
-    body: {},
+    body: { turnstile_token: proof },
     ownOrigin: true,
     signal,
   })

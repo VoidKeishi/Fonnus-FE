@@ -11,11 +11,14 @@ import { MAX_CALL_MS, startSession, voiceLive } from './voice.live'
  * that turns up after that must be hung up, or she answers in the background
  * of a failed call. A browser that gives no microphone, for any reason, must
  * reject with the one code that turns the call into a typed conversation, and
- * that conversation must never touch the microphone. After it starts, the
- * SDK's disconnect has to become the one ending the screen shows, said once
- * and with the right reason, and its cap must be what the ticket said the
- * visitor's hour has left. None of it needs a microphone or a network: the
- * SDK and the token request are stubbed and their callbacks called by hand.
+ * that conversation must never touch the microphone. No ticket is asked for
+ * without the caller's proof, taken after the microphone grant so a refused
+ * microphone spends none, and a proof that never comes is a failed call, not
+ * a hung one. After it starts, the SDK's disconnect has to become the one
+ * ending the screen shows, said once and with the right reason, and its cap
+ * must be what the ticket said the visitor's hour has left. None of it needs a
+ * microphone or a network: the SDK, the proof and the token request are
+ * stubbed and their callbacks called by hand.
  */
 
 const stubs = vi.hoisted(() => ({
@@ -391,10 +394,19 @@ describe('startSession, typed', () => {
 
 describe('connect', () => {
   const getUserMedia = vi.fn<(constraints: MediaStreamConstraints) => Promise<MediaStream>>()
+  const challenge = vi.fn<(signal: AbortSignal) => Promise<string>>()
+  const PROOF = 'turnstile-proof'
+  const SIGNED_URL = 'wss://api.elevenlabs.io/v1/convai/conversation?signed'
+  const micGranted = () => {
+    getUserMedia.mockResolvedValue({ getTracks: () => [] } as unknown as MediaStream)
+  }
+  const connect = (input: VoiceInput, signal?: AbortSignal) =>
+    voiceLive.connect({ mode: 'landing-demo', input, signal, challenge })
 
   beforeEach(() => {
     vi.useRealTimers()
     vi.stubGlobal('navigator', { mediaDevices: { getUserMedia } })
+    challenge.mockResolvedValue(PROOF)
     stubs.request.mockResolvedValue({ token: 'conversation-token', ...FULL_HOUR })
     stubs.textStart.mockImplementation(() => Promise.resolve(stubConversation()))
     stubs.voiceStart.mockImplementation(() => Promise.resolve(stubConversation()))
@@ -406,17 +418,17 @@ describe('connect', () => {
   })
 
   it('starts a typed conversation on a signed URL over the WebSocket, without asking for the microphone', async () => {
-    stubs.request.mockResolvedValue({ signed_url: 'wss://api.elevenlabs.io/v1/convai/conversation?signed', ...FULL_HOUR })
-    const session = await voiceLive.connect({ mode: 'landing-demo', input: 'text' })
+    stubs.request.mockResolvedValue({ signed_url: SIGNED_URL, ...FULL_HOUR })
+    const session = await connect('text')
     expect(getUserMedia).not.toHaveBeenCalled()
     expect(stubs.request).toHaveBeenCalledWith(
       '/api/voice-demo/token',
-      expect.objectContaining({ method: 'POST', body: { input: 'text' }, ownOrigin: true }),
+      expect.objectContaining({ method: 'POST', body: { input: 'text', turnstile_token: PROOF }, ownOrigin: true }),
     )
     expect(stubs.voiceStart).not.toHaveBeenCalled()
     expect(stubs.textStart).toHaveBeenCalledWith(
       expect.objectContaining({
-        signedUrl: 'wss://api.elevenlabs.io/v1/convai/conversation?signed',
+        signedUrl: SIGNED_URL,
         connectionType: 'websocket',
         textOnly: true,
       }),
@@ -426,12 +438,23 @@ describe('connect', () => {
     await session.close()
   })
 
-  it('asks for a call’s token with the empty body it has always sent', async () => {
-    getUserMedia.mockResolvedValue({ getTracks: () => [] } as unknown as MediaStream)
-    const session = await voiceLive.connect({ mode: 'landing-demo', input: 'voice' })
+  it('asks a typed conversation for its proof first, under the connection budget', async () => {
+    stubs.request.mockResolvedValue({ signed_url: SIGNED_URL, ...FULL_HOUR })
+    const session = await connect('text')
+    expect(challenge).toHaveBeenCalledTimes(1)
+    expect(challenge).toHaveBeenCalledWith(expect.any(AbortSignal))
+    expect(challenge.mock.invocationCallOrder[0]).toBeLessThan(stubs.request.mock.invocationCallOrder[0]!)
+    await session.close()
+  })
+
+  it('asks a call for its proof once the microphone is granted, and posts it as the body’s one field', async () => {
+    micGranted()
+    const session = await connect('voice')
+    expect(getUserMedia.mock.invocationCallOrder[0]).toBeLessThan(challenge.mock.invocationCallOrder[0]!)
+    expect(challenge.mock.invocationCallOrder[0]).toBeLessThan(stubs.request.mock.invocationCallOrder[0]!)
     expect(stubs.request).toHaveBeenCalledWith('/api/voice-demo/token', {
       method: 'POST',
-      body: {},
+      body: { turnstile_token: PROOF },
       ownOrigin: true,
       signal: expect.any(AbortSignal),
     })
@@ -441,7 +464,7 @@ describe('connect', () => {
   it('asks for the microphone first, releases it, and starts a voice conversation', async () => {
     const track = { stop: vi.fn<() => void>() }
     getUserMedia.mockResolvedValue({ getTracks: () => [track] } as unknown as MediaStream)
-    const session = await voiceLive.connect({ mode: 'landing-demo', input: 'voice' })
+    const session = await connect('voice')
     expect(track.stop).toHaveBeenCalledTimes(1)
     expect(stubs.textStart).not.toHaveBeenCalled()
     expect(stubs.voiceStart).toHaveBeenCalledWith(
@@ -456,41 +479,98 @@ describe('connect', () => {
     ['refused by the page', { name: 'SecurityError' }],
     ['no microphone', { name: 'NotFoundError' }],
     ['a busy microphone', { name: 'NotReadableError' }],
-  ])('rejects as microphone unavailable, minting no token: %s', async (_, cause) => {
+  ])('rejects as microphone unavailable, taking no proof and minting no token: %s', async (_, cause) => {
     getUserMedia.mockRejectedValue(cause)
-    const connecting = voiceLive.connect({ mode: 'landing-demo', input: 'voice' })
+    const connecting = connect('voice')
     await expect(connecting).rejects.toBeInstanceOf(ApiError)
     await expect(connecting).rejects.toMatchObject({ code: 'microphone_unavailable' })
+    expect(challenge).not.toHaveBeenCalled()
     expect(stubs.request).not.toHaveBeenCalled()
   })
 
   it('rejects as microphone unavailable when the browser has no media API at all', async () => {
     vi.stubGlobal('navigator', {})
-    const connecting = voiceLive.connect({ mode: 'landing-demo', input: 'voice' })
+    const connecting = connect('voice')
     await expect(connecting).rejects.toMatchObject({ code: 'microphone_unavailable' })
+    expect(challenge).not.toHaveBeenCalled()
+    expect(stubs.request).not.toHaveBeenCalled()
+  })
+
+  it.each<VoiceInput>(['voice', 'text'])('rejects as unavailable, asking for no ticket, when no proof comes: %s', async (input) => {
+    micGranted()
+    challenge.mockRejectedValue(new Error('Turnstile failed to load'))
+    const connecting = connect(input)
+    await expect(connecting).rejects.toBeInstanceOf(ApiError)
+    await expect(connecting).rejects.toMatchObject({ code: 'voice_unavailable' })
+    expect(stubs.request).not.toHaveBeenCalled()
+  })
+
+  it('rejects as unavailable when the connection budget runs out while the proof is awaited', async () => {
+    const budget = new AbortController()
+    const timeout = vi.spyOn(AbortSignal, 'timeout').mockReturnValue(budget.signal)
+    try {
+      challenge.mockReturnValue(new Promise<string>(() => undefined))
+      const connecting = connect('text')
+      await vi.waitFor(() => {
+        expect(challenge).toHaveBeenCalled()
+      })
+      const handed = challenge.mock.calls[0]![0]
+      expect(handed.aborted).toBe(false)
+      budget.abort()
+      await expect(connecting).rejects.toMatchObject({ code: 'voice_unavailable' })
+      // The widget's waiting take hears it too, and stops waiting.
+      expect(handed.aborted).toBe(true)
+      expect(stubs.request).not.toHaveBeenCalled()
+    } finally {
+      timeout.mockRestore()
+    }
+  })
+
+  it('rejects as canceled when the caller aborts while the proof is awaited', async () => {
+    challenge.mockReturnValue(new Promise<string>(() => undefined))
+    const caller = new AbortController()
+    const connecting = connect('text', caller.signal)
+    await vi.waitFor(() => {
+      expect(challenge).toHaveBeenCalled()
+    })
+    const handed = challenge.mock.calls[0]![0]
+    expect(handed.aborted).toBe(false)
+    caller.abort()
+    await expect(connecting).rejects.toMatchObject({ kind: 'canceled', code: null })
+    expect(handed.aborted).toBe(true)
     expect(stubs.request).not.toHaveBeenCalled()
   })
 
   it('passes on the token route’s refusal, so the screen says the call could not connect', async () => {
     const refusal = new ApiError({ kind: 'server', status: 503 })
     stubs.request.mockRejectedValue(refusal)
-    await expect(voiceLive.connect({ mode: 'landing-demo', input: 'text' })).rejects.toBe(refusal)
+    await expect(connect('text')).rejects.toBe(refusal)
     expect(stubs.textStart).not.toHaveBeenCalled()
   })
 
+  it('passes on a refused proof as the route said it', async () => {
+    micGranted()
+    const refusal = new ApiError({ kind: 'forbidden', status: 403 })
+    stubs.request.mockRejectedValue(refusal)
+    const connecting = connect('voice')
+    await expect(connecting).rejects.toBe(refusal)
+    await expect(connecting).rejects.toMatchObject({ kind: 'forbidden', status: 403 })
+    expect(stubs.voiceStart).not.toHaveBeenCalled()
+  })
+
   it('passes on a spent hour as the route said it, so the screen shows when to come back', async () => {
-    getUserMedia.mockResolvedValue({ getTracks: () => [] } as unknown as MediaStream)
+    micGranted()
     const spent = new ApiError({ kind: 'ratelimited', status: 429, code: 'budget_spent' })
     stubs.request.mockRejectedValue(spent)
-    const connecting = voiceLive.connect({ mode: 'landing-demo', input: 'voice' })
+    const connecting = connect('voice')
     await expect(connecting).rejects.toBe(spent)
     await expect(connecting).rejects.toMatchObject({ kind: 'ratelimited', code: 'budget_spent' })
     expect(stubs.voiceStart).not.toHaveBeenCalled()
   })
 
   it('hands the session what the ticket’s answer said of the hour', async () => {
-    stubs.request.mockResolvedValue({ signed_url: 'wss://api.elevenlabs.io/v1/convai/conversation?signed', remaining_ms: 40_000, resets_at: RESETS_AT })
-    const session = await voiceLive.connect({ mode: 'landing-demo', input: 'text' })
+    stubs.request.mockResolvedValue({ signed_url: SIGNED_URL, remaining_ms: 40_000, resets_at: RESETS_AT })
+    const session = await connect('text')
     expect(session.budget).toEqual({ remaining_ms: 40_000, resets_at: RESETS_AT })
     await session.close()
   })

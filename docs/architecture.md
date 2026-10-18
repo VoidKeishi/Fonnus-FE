@@ -67,7 +67,7 @@ src/
     tenant.* (F3) · receptionist.* · shell.* · insights.* (Tổng quan) · calls.* (F5) · appointments.* · numbers.* · account.* (F6)
 
   server/                       Code that runs only in a route handler (ADR 0005). Only src/app/ imports it
-    env.ts                      The three Google variables and the voice demo's three (the ElevenLabs pair and the cookie secret), read per request. The only file here that reads process.env
+    env.ts                      The three Google variables and the voice demo's four (the ElevenLabs pair, the cookie secret and the Turnstile secret), read per request. The only file here that reads process.env
     leads-input.ts (+test)      Checks a posted body again, with the forms' own rules
     lead-rows.ts (+test)        A checked lead or waitlist sign-up as a spreadsheet row, a hotline report as one row per location, stamped in Vietnam time
     google-jwt.ts (+test)       The signed assertion a service account trades for an access token
@@ -78,7 +78,8 @@ src/
     elevenlabs-token.ts         mintConversationToken and mintSignedUrl: one GET each to ElevenLabs with the key, each answering the ticket and its conversation id
     elevenlabs-conversations.ts listConversations: one GET of the agent's conversations since the hour's window opened — id, status, duration and nothing else — for the refunds (ADR 0009)
     voice-demo-budget.ts (+test)  The hour's arithmetic and the signed cookie: charge the whole remainder at a mint, settle against the list, encode and verify with HMAC. Pure
-    voice-demo-handler.ts (+test)  Request in, Response out: the token's 415, 413, 400, 503, 429, 502, 200 and the budget's 503, 200
+    turnstile.ts                verifyTurnstile: one POST to Cloudflare's siteverify with the secret, the visitor's token and their address (ADR 0009 point 5)
+    voice-demo-handler.ts (+test)  Request in, Response out: the token's 415, 413, 400, 503, 403, 502, 429, 200 and the budget's 503, 200
     voice-demo.ts               Binds both handlers to the real env and the real ElevenLabs calls; the two functions the routes import
 
   session/                      Who is signed in
@@ -102,7 +103,8 @@ src/
                                 waitlist/ (waitlist-page, waitlist-panel, waitlist-field, waitlist-fields (+test): the /waitlist door — its own split frame and pill field, rebuilt rather than imported from auth/, because features never import each other)
                                 legal/ (legal-notice-page: one server component for both legal routes, copy from LEGAL_PAGES in data/)
                                 orb/ (voice-orb, orb, orb-field, use-orb-placement, orb-motion, call-overlay,
-                                call-demo-provider, use-call-demo, call-state, use-call-budget, call-budget)
+                                call-demo-provider, use-call-demo, call-state, use-call-budget, call-budget,
+                                turnstile, use-turnstile)
                                 sections/ (section-chrome, missed-calls, how-it-works, how-it-works-visuals,
                                 play-when-seen, capabilities, capability-row, capability-actions,
                                 capability-visuals, call-demo-player, call-demo-timeline, band, pricing,
@@ -244,9 +246,9 @@ the second arrived (ADR 0006 point 9); a third use follows them, it does not nee
   and the handler answers `503`, never crashes.
 - Every handler is a status ladder whose upstream calls run under one deadline, and the
   deadline sits under the browser's own timeout so the server always answers first. The
-  forms make one call; the voice demo's token route makes two (the conversation list that
-  settles the hour, then the mint), and a failed list call is logged and answered around,
-  never a refusal (ADR 0009).
+  forms make one call; the voice demo's token route makes three (Cloudflare's siteverify,
+  the conversation list that settles the hour, then the mint), and of those only a failed
+  list call is answered around rather than refused (ADR 0009).
 - A response carries a status and, for a `422`, the field list. Never text from the upstream
   service: the frontend owns every sentence the visitor reads, and a vendor's prose would not
   be Vietnamese.
@@ -392,7 +394,12 @@ the second arrived (ADR 0006 point 9); a third use follows them, it does not nee
   screen, never covered. The hour's budget of three minutes (ADR 0008, kept by the server
   since ADR 0009) reaches the screen through `api.voice.budget()` and the ticket's answer:
   `use-call-budget.ts` reads it when the call opens and when a call ends, `call-budget.ts`
-  holds the two Vietnamese labels, and nothing in the browser keeps a count.
+  holds the two Vietnamese labels, and nothing in the browser keeps a count. Every ticket
+  is minted behind Cloudflare Turnstile (ADR 0009 point 5): `turnstile.ts` injects
+  Cloudflare's script when the consent slot opens, never with the page, and runs the
+  invisible widget in a container the overlay owns; `use-turnstile.ts` hands
+  `api.voice.connect` a `challenge` function the live module calls right before it asks for
+  the ticket. A visitor the challenge fails sees the failed-connection slot, nothing new.
 - A night surface (the footer) renders inside a `data-theme="dark"` scope, so every alias
   inside it resolves to the night palette `colors.css` already defines. This is a night
   island in a light page, not a dark mode: nothing switches it.

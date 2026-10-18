@@ -86,6 +86,12 @@ here as `docs/context-field-catalogue.v1.md` and mapped in `docs/field-catalogue
 - **PDPL (Law 91/2025/QH15) and Decree 356/2025/ND-CP.** Transcripts and health details are
   personal data. The app renders consent outcomes; it never decides them, and it never shows
   caller-derived text that consent did not cover.
+- **Cloudflare Turnstile on the voice demo (ADR 0009).** After the visitor taps the orb and
+  the consent slot opens, Cloudflare's Turnstile script loads and sends their IP address,
+  TLS fingerprint and User-Agent to Cloudflare, for bot detection only, before any ticket
+  is minted. Nothing the visitor says or types goes there, and the call screen does not
+  change. A browser that blocks `challenges.cloudflare.com` cannot start the demo and is
+  told it could not connect.
 
 ### The secrets, and none reaches the browser
 
@@ -94,7 +100,8 @@ them is a secret. The session is an httpOnly cookie the browser holds and this c
 reads. The secrets are server-side variables of the host, read only in `src/server/env.ts`
 and only inside a route handler: the Google service account key that lets the lead route
 handlers append to the sheet (ADR 0005), the ElevenLabs API key that mints the voice demo's
-tickets (ADR 0006), and the key that signs the voice demo's budget cookie (ADR 0009). `.env*` is gitignored; `.env.example` is the list of what
+tickets (ADR 0006), the key that signs the voice demo's budget cookie, and the Turnstile
+secret that verifies a visitor's challenge before a ticket is minted (ADR 0009). `.env*` is gitignored; `.env.example` is the list of what
 exists, with no values.
 
 ### Personal data in the lead sheet

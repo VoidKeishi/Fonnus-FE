@@ -17,6 +17,11 @@ import type { ElevenLabsConfig, VoiceDemoConfig } from './env'
  * list, and write it back. A refusal is a bare status, or the one code the
  * screen acts on — nothing ElevenLabs said is ever echoed to the visitor.
  *
+ * Every ticket costs a Cloudflare Turnstile token, `turnstile_token` in the
+ * body, verified before the hour is read, so a script that solves no
+ * challenge never makes the route call ElevenLabs at all (ADR 0009 point 5).
+ * The budget route mints nothing and asks for none.
+ *
  * The environment, the clock and the upstream calls are injected and nothing
  * here imports `server-only`, so the ladders are tested without any of them.
  */
@@ -25,7 +30,7 @@ import type { ElevenLabsConfig, VoiceDemoConfig } from './env'
  * Started with the handler and under the browser's own 15 s timeout
  * (docs/api-contract.md §1), so the server always answers first and the
  * browser never gives up on a request that is still minting here. One
- * deadline covers the conversation list and the mint together.
+ * deadline covers siteverify, the conversation list and the mint together.
  */
 const TOKEN_DEADLINE_MS = 8_000
 
@@ -50,6 +55,29 @@ export class ElevenLabsRequestError extends Error {
   }
 }
 
+/**
+ * A siteverify call that failed — the deadline, the network, a non-2xx, or an
+ * answer without a boolean `success` — with Cloudflare's status, `null` when
+ * none came back. Carries no secret, token or response text, and is defined
+ * here for the reason `ElevenLabsRequestError` is.
+ */
+export class TurnstileRequestError extends Error {
+  readonly step = 'siteverify'
+  readonly status: number | null
+
+  constructor(status: number | null, options?: ErrorOptions) {
+    super(`Turnstile siteverify request failed${status === null ? '' : ` with ${String(status)}`}`, options)
+    this.name = 'TurnstileRequestError'
+    this.status = status
+  }
+}
+
+/**
+ * What siteverify said of a token. `codes` are Cloudflare's `error-codes`, a
+ * fixed vocabulary that names no visitor, so they may be logged.
+ */
+export type TurnstileVerdict = { ok: true } | { ok: false; codes: string[] }
+
 /** A ticket, and the conversation id ElevenLabs gave with it, `null` when it gave none. */
 export interface MintedTicket {
   ticket: string
@@ -61,6 +89,7 @@ export interface VoiceDemoDeps {
   mint: (config: ElevenLabsConfig, signal: AbortSignal) => Promise<MintedTicket>
   mintSignedUrl: (config: ElevenLabsConfig, signal: AbortSignal) => Promise<MintedTicket>
   listConversations: (config: ElevenLabsConfig, sinceUnixSeconds: number, signal: AbortSignal) => Promise<ConversationPage>
+  verifyTurnstile: (secret: string, token: string, remoteip: string | null, signal: AbortSignal) => Promise<TurnstileVerdict>
   /** Epoch milliseconds; `Date.now` unless a test fixes it. */
   now?: () => number
 }
@@ -76,6 +105,23 @@ function readInput(body: unknown): Input | null {
   return null
 }
 
+/** The body's `turnstile_token`, or `null` when it is missing or not a non-empty string: a 403. */
+function readTurnstileToken(body: unknown): string | null {
+  if (typeof body !== 'object' || body === null) return null
+  const token = (body as Record<string, unknown>).turnstile_token
+  return typeof token === 'string' && token ? token : null
+}
+
+/**
+ * The visitor's address for siteverify's optional `remoteip`: the first entry
+ * of `x-forwarded-for`, which Vercel sets (ADR 0009, "Assumed"). `null` when
+ * there is none, and Cloudflare is then asked without it.
+ */
+export function remoteIpFrom(headers: Headers): string | null {
+  const first = headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+  return first ? first : null
+}
+
 function status(code: number): Response {
   return new Response(null, { status: code })
 }
@@ -89,6 +135,17 @@ function logElevenLabsFailure(route: string, err: unknown, step: ElevenLabsReque
     return
   }
   console.error(`${route}: ElevenLabs ${step} failed (${err instanceof Error ? err.name : 'unknown'})`)
+}
+
+/** The same for siteverify — never the secret, the token or what Cloudflare answered. */
+function logTurnstileFailure(route: string, err: unknown): void {
+  if (err instanceof TurnstileRequestError) {
+    const cause = err.cause instanceof Error ? err.cause.name : 'no response'
+    const upstream = err.status === null ? cause : String(err.status)
+    console.error(`${route}: Turnstile ${err.step} failed, upstream status ${upstream}`)
+    return
+  }
+  console.error(`${route}: Turnstile siteverify failed (${err instanceof Error ? err.name : 'unknown'})`)
 }
 
 /**
@@ -139,7 +196,10 @@ export async function handleVoiceDemoBudget(request: Request, deps: VoiceDemoDep
   return Response.json(body, { status: 200, headers: headersFor(changed ? ledger : null, config, now) })
 }
 
-/** The ladder: 415, 413, 400, 503, 429, 502, then 200. */
+/**
+ * The ladder: 415, 413, 400, 503, 403 (no token), 502 (siteverify failed), 403
+ * (token refused), 429, 502 (mint failed), then 200.
+ */
 export async function handleVoiceDemoToken(request: Request, deps: VoiceDemoDeps): Promise<Response> {
   const deadline = AbortSignal.timeout(TOKEN_DEADLINE_MS)
   const clock = deps.now ?? Date.now
@@ -151,16 +211,33 @@ export async function handleVoiceDemoToken(request: Request, deps: VoiceDemoDeps
   const text = await readCappedText(request.body)
   if (text === null) return status(413)
 
-  let input: Input | null
+  let parsed: unknown
   try {
-    input = readInput(JSON.parse(text))
+    parsed = JSON.parse(text)
   } catch {
     return status(400)
   }
+  const input = readInput(parsed)
   if (input === null) return status(400)
 
   const config = deps.config()
   if (config === null) return status(503)
+
+  // Before the hour is read: a request without a solved challenge costs no
+  // call to ElevenLabs. Fail closed — Cloudflare not answering is no ticket.
+  const proof = readTurnstileToken(parsed)
+  if (proof === null) return status(403)
+  let verdict: TurnstileVerdict
+  try {
+    verdict = await deps.verifyTurnstile(config.turnstileSecret, proof, remoteIpFrom(request.headers), deadline)
+  } catch (err) {
+    logTurnstileFailure(TOKEN_ROUTE, err)
+    return status(502)
+  }
+  if (!verdict.ok) {
+    console.error(`${TOKEN_ROUTE}: Turnstile refused: ${verdict.codes.join(',')}`)
+    return status(403)
+  }
 
   const now = clock()
   const { ledger } = await readBudget(TOKEN_ROUTE, request, deps, config, deadline, now)

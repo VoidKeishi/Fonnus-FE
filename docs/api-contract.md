@@ -404,11 +404,23 @@ Not an HTTP endpoint: the interface the landing page's "Nghe thử" call screen 
 `voice` group in `src/api/contracts.ts`. Whatever carries the audio sits behind it, so the
 screen and its hook never change when the transport does.
 
-`api.voice.connect({ mode: 'landing-demo', input, signal })` resolves a `VoiceSession`. `input`
-is `voice` (a call) or `text` (the same conversation typed, for a browser that gives no
-microphone). The caller invokes `connect` inside the tap that started the call, because the
-microphone prompt needs that gesture. The session's cap is not the caller's to pass: it comes with
-the ticket ([ADR 0009](./adr/0009-voice-demo-budget-on-the-server.md) point 4).
+`api.voice.connect({ mode: 'landing-demo', input, signal, challenge })` resolves a
+`VoiceSession`. `input` is `voice` (a call) or `text` (the same conversation typed, for a browser
+that gives no microphone). The caller invokes `connect` inside the tap that started the call,
+because the microphone prompt needs that gesture. The session's cap is not the caller's to pass:
+it comes with the ticket ([ADR 0009](./adr/0009-voice-demo-budget-on-the-server.md) point 4).
+
+`challenge(signal)` resolves the proof the ticket route asks for, a Cloudflare Turnstile token
+(ADR 0009 point 5). `connect` calls it when the route is about to be called — after the microphone
+grant for a call, first thing for a text session — under the connection budget, whose signal it
+is handed. A rejection, or no answer within the budget, rejects `connect` with
+`voice_unavailable`. It may be called by both attempts of one tap, the call and the text session
+after a refused microphone, and each call must hand out a token no earlier one returned: a token
+returned is taken as spent. Since the call asks for the microphone before the proof, a refused
+microphone leaves the tap's one unused token to the text session. On the landing page it is the
+call screen's Invisible widget: Cloudflare's script loads from its exact URL and the widget is
+rendered when the consent slot opens, beside the budget read and never with the page, so the
+widget is ready by the time the visitor taps and the tap only runs the challenge.
 
 `api.voice.budget({ signal })` resolves a `VoiceBudget`, `{ remaining_ms, resets_at }`: where the
 visitor's hour stands, read from whoever mints the ticket and never kept by the client.
@@ -459,10 +471,12 @@ the page. What the client does:
   has answered about the microphone.
 - **Microphone before token, for a call.** With `input: 'voice'`, `connect` asks for the
   microphone first and releases the stream at once (the SDK opens its own), so no token is
-  minted for a visitor who refuses. Then it posts to `POST /api/voice-demo/token`, loads the SDK
-  and starts the session.
-- **No microphone, same agent.** With `input: 'text'`, `connect` skips the microphone, posts
-  `{ "input": "text" }` to the same route for a signed URL, and starts the SDK's text-only
+  minted for a visitor who refuses. Then it asks `challenge` for the proof, posts
+  `{ "turnstile_token": "…" }` to `POST /api/voice-demo/token`, loads the SDK and starts the
+  session.
+- **No microphone, same agent.** With `input: 'text'`, `connect` skips the microphone, asks
+  `challenge` for the proof, posts `{ "input": "text", "turnstile_token": "…" }` to the same route
+  for a signed URL, and starts the SDK's text-only
   conversation over a WebSocket (`signedUrl`, `connectionType: 'websocket'`, `textOnly: true`).
   Not WebRTC: there the SDK joins the room in voice, plays every agent audio track whatever
   `textOnly` says, and sends the text-only override only after joining, so the agent speaks,
@@ -473,9 +487,10 @@ the page. What the client does:
   `connect` rejects with `ApiError { kind: 'unknown', code }`: `microphone_unavailable` when
   `input` is `voice` and the browser gives no microphone for any reason (`getUserMedia` refused
   by the visitor or the page's permissions, no microphone, a busy one, or no media API at all in
-  an insecure context), and `voice_unavailable` when the SDK fails to load or to start, or the
-  token, the SDK and the connection together take more than **fifteen seconds**, counted from
-  the microphone grant for a call and from `connect` for a text session. Neither code is ever
+  an insecure context), and `voice_unavailable` when `challenge` gives no proof, the SDK fails
+  to load or to start, or the proof, the token, the SDK and the connection together take more
+  than **fifteen seconds**, counted from the microphone grant for a call and from `connect` for a
+  text session. Neither code is ever
   rendered through `messageFor`.
 - **What the screen does with a rejection.** `microphone_unavailable` makes the hook connect
   again with `input: 'text'`, inside the same tap and without a second consent; the screen then
@@ -555,13 +570,14 @@ visitor's hour stands, for the call screen to say.
 { "remaining_ms": 175000, "resets_at": null }            // the full budget
 ```
 
-No body is read. The cookie is written back only when settling changed a charge, so a refund
-is kept and a read can never overwrite the cookie a ticket's answer has just set.
+No body is read, and no Turnstile token is asked for: the read mints nothing. The cookie is
+written back only when settling changed a charge, so a refund is kept and a read can never
+overwrite the cookie a ticket's answer has just set.
 
 | Status | Body | Meaning |
 |---|---|---|
 | `200` | `{ "remaining_ms", "resets_at" }`, `Cache-Control: no-store` | Where the hour stands, settled against ElevenLabs's list when the list answered, and as charged when it did not |
-| `503` | — | `ELEVENLABS_API_KEY`, `ELEVENLABS_AGENT_ID` or `VOICE_DEMO_COOKIE_SECRET` is not set |
+| `503` | — | `ELEVENLABS_API_KEY`, `ELEVENLABS_AGENT_ID`, `VOICE_DEMO_COOKIE_SECRET` or `TURNSTILE_SECRET_KEY` is not set |
 
 ### `POST /api/voice-demo/token`
 
@@ -573,12 +589,12 @@ session caps itself on.
 
 ```jsonc
 // request, a call — Content-Type: application/json
-{}                      // or { "input": "voice" }
+{ "turnstile_token": "<Turnstile token>" }    // `"input": "voice"` may be added
 // → 200, Cache-Control: no-store, Set-Cookie: voice_demo_budget=…
 { "token": "<WebRTC conversation token>", "remaining_ms": 175000, "resets_at": 1792288800000 }
 
 // request, a text session
-{ "input": "text" }
+{ "input": "text", "turnstile_token": "<Turnstile token>" }
 // → 200, Cache-Control: no-store, Set-Cookie: voice_demo_budget=…
 { "signed_url": "wss://…", "remaining_ms": 175000, "resets_at": 1792288800000 }
 
@@ -587,7 +603,9 @@ session caps itself on.
 { "code": "budget_spent", "resets_at": 1792288800000 }
 ```
 
-- **The visitor's hour decides.** The cookie above is read and settled first; with nothing left
+- **A solved challenge first.** `turnstile_token` is checked before anything else the route asks
+  of anyone (below); without an accepted one there is no ticket, and no conversation list is read.
+- **The visitor's hour decides.** The cookie above is read and settled next; with nothing left
   the route answers `429` and mints nothing. `remaining_ms` in a `200` is what this ticket is
   charged, the whole remainder, and `resets_at` is when the full budget is back.
 - **The request must be `Content-Type: application/json`,** even for a call's empty body, so
@@ -595,8 +613,21 @@ session caps itself on.
   preflight-free request; the route sends no CORS headers.
 - **`input` is `voice` or `text`, or absent.** Absent is a call, which is what the live session
   sends for one. Any other value, or a body that is not a JSON object, is a `400`.
+- **`turnstile_token` is required**, a non-empty string; missing, empty or of another type, the
+  route answers `403` and asks neither Cloudflare nor ElevenLabs anything.
 - **Never upstream text.** A refusal has no body but the `429`'s code, and nothing ElevenLabs
-  said reaches the response.
+  or Cloudflare said reaches the response.
+
+**The Turnstile check** ([ADR 0009](./adr/0009-voice-demo-budget-on-the-server.md) point 5). The
+route sends one `POST https://challenges.cloudflare.com/turnstile/v0/siteverify`, JSON, under the
+same 8-second deadline as the rest: `secret` (`TURNSTILE_SECRET_KEY`), `response` (the token),
+`idempotency_key` (a fresh UUID) and `remoteip`, the first address of `x-forwarded-for`, when the
+request carries one. Nothing else about the visitor is sent. A token validates once and lasts 300
+seconds, so a spent or stale one is refused (`timeout-or-duplicate`). It fails closed: a refused
+token is a `403`, and Cloudflare not answering, answering a non-2xx, or answering without a
+boolean `success` is a `502` — no ticket either way. The log line names the step and Cloudflare's
+status, or for a refusal Cloudflare's `error-codes`; never the token or the secret.
+`GET /api/voice-demo/budget` needs no token.
 
 Every refusal makes `connect` reject. The `429` turns the call screen to its spent consent slot
 (above); every other one makes it say it could not connect to Linh and offer to call again
@@ -606,12 +637,13 @@ Every refusal makes `connect` reject. The `429` turns the call screen to its spe
 |---|---|---|
 | `200` | `{ "token": "…" }` or `{ "signed_url": "…" }`, each with `remaining_ms` and `resets_at`, `Cache-Control: no-store`, the cookie set | A call's token, valid for fifteen minutes, or a text session's signed URL, requested with `include_conversation_id=true` so that it opens one conversation and no more |
 | `400` | — | The body is not a JSON object, or `input` is neither `voice` nor `text` |
+| `403` | — | `turnstile_token` is missing, or Cloudflare refused it: spent, expired, or never solved. Nothing upstream is asked after it, and no cookie is written |
 | `413` | — | The body is over 48 KiB, the cap the `leads` routes share |
 | `415` | — | Not `application/json` |
 | `429` | `{ "code": "budget_spent", "resets_at" }`, `application/problem+json` | Nothing of the visitor's hour is left. No ticket is minted |
 | `429` | — (from the Vercel Firewall) | Too many tokens from this IP, should a Firewall rule be set |
-| `502` | — | ElevenLabs refused either ticket, or did not answer within the 8-second deadline, which the conversation list shares. Nothing is charged and the cookie is not written |
-| `503` | — | `ELEVENLABS_API_KEY`, `ELEVENLABS_AGENT_ID` or `VOICE_DEMO_COOKIE_SECRET` is not set. Unsetting the key is the kill switch |
+| `502` | — | ElevenLabs refused either ticket, or Cloudflare's siteverify failed, or either did not answer within the 8-second deadline, which siteverify, the conversation list and the mint share. Nothing is charged and the cookie is not written |
+| `503` | — | `ELEVENLABS_API_KEY`, `ELEVENLABS_AGENT_ID`, `VOICE_DEMO_COOKIE_SECRET` or `TURNSTILE_SECRET_KEY` is not set. Unsetting the key is the kill switch |
 
 ---
 
