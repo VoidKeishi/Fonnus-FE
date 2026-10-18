@@ -3,10 +3,11 @@ import { budgetLine, endingLine, spentLine, stateLabel } from './call-state'
 import type { CallBudget } from './use-call-budget'
 
 /*
- * The one line under the orb is how a visitor knows whether to talk, wait or
- * type. The microphone switch only changes it while she is listening in a
- * call; a typed conversation has no microphone and says whether to wait or
- * write.
+ * The one line under the orb says only what the app knows for sure. In a call
+ * that is whether it is still connecting and whether the visitor turned the
+ * microphone off; whether she speaks or listens is the SDK's guess, which lags
+ * her voice, so a call never says it. A typed conversation has no microphone
+ * and says whether to wait or write.
  */
 
 describe('stateLabel, in a call', () => {
@@ -15,13 +16,14 @@ describe('stateLabel, in a call', () => {
     expect(stateLabel('connecting', false, 'voice')).toBe('Đang kết nối…')
   })
 
-  it('says she is speaking while she speaks', () => {
-    expect(stateLabel('speaking', false, 'voice')).toBe('Fonnus đang nói')
+  it('never says whether she is speaking or listening', () => {
+    expect(stateLabel('speaking', true, 'voice')).toBeNull()
+    expect(stateLabel('listening', true, 'voice')).toBeNull()
   })
 
-  it('says she is listening, or that the microphone is off and typing works', () => {
-    expect(stateLabel('listening', true, 'voice')).toBe('Fonnus đang nghe')
+  it('says the microphone is off and typing works, whether she speaks or listens', () => {
     expect(stateLabel('listening', false, 'voice')).toBe('Micro đang tắt — bạn có thể gõ chữ')
+    expect(stateLabel('speaking', false, 'voice')).toBe('Micro đang tắt — bạn có thể gõ chữ')
   })
 })
 

@@ -293,6 +293,8 @@ export function CallOverlay({ spotRef, orbRef }: CallOverlayProps) {
           ) : (
             ending ?? (
               <div className="flex flex-col items-center gap-1 text-center">
+                {/* Kept at its height while empty, which a call mostly is: the
+                    orb follows its slot only when the slot changes size. */}
                 <div role="status" className={`min-h-[22px] ${LABEL}`}>
                   {stateLabel(demo.agent, demo.mic, 'voice')}
                 </div>
