@@ -41,7 +41,9 @@ import type { ThreadLine } from './use-call-demo'
  * nothing left it says when the next call can start and offers only the
  * waitlist. An ending that spent the rest of the hour says the same and drops
  * "Gọi lại" until the hour turns: a button that opens a call that cannot
- * connect is a promise the screen cannot keep.
+ * connect is a promise the screen cannot keep. The number is the server's
+ * (ADR 0009) and may arrive after the slot does; until it has, the slot keeps
+ * its ordinary shape.
  *
  * A typed conversation (ADR 0007 point 4) is the same screen with a smaller
  * orb, a line saying why it is typed, and the thread of lines between the
@@ -85,9 +87,9 @@ export function CallOverlay({ spotRef, orbRef }: CallOverlayProps) {
   const budgetLineId = useId()
   const threadRef = useRef<HTMLDivElement>(null)
   const { awaitingConsent, ended, failed, budget } = demo
-  /** Nothing of the hour is left: no call can start until it turns. */
-  const spent = budget.remainingMs <= 0
-  const leftLine = budgetLine(budget.remainingMs)
+  /** The server said nothing of the hour is left: no call can start until it turns. */
+  const spent = budget !== null && budget.remainingMs <= 0
+  const leftLine = budgetLine(budget)
   const showsControls = !awaitingConsent && !ended && !failed
   const typing = demo.input === 'text'
   const lineCount = demo.messages.length
@@ -116,7 +118,8 @@ export function CallOverlay({ spotRef, orbRef }: CallOverlayProps) {
   // with it; focus moves to the new slot's first action, or to the dialog when
   // the slot has none or once a call starts, instead of falling to the page
   // under it. A call that turns typed takes the microphone toggle with it,
-  // which may have had focus; the hour turning swaps the spent slot for consent.
+  // which may have had focus; the server's answer arriving swaps the ordinary
+  // slot for the spent one, and the hour turning swaps it back.
   useEffect(() => {
     if (awaitingConsent || ended || failed) {
       const target = actionsRef.current?.querySelector<HTMLElement>('a, button') ?? dialogRef.current
@@ -142,7 +145,7 @@ export function CallOverlay({ spotRef, orbRef }: CallOverlayProps) {
   const ending = ended ? (
     <div ref={actionsRef} className="flex flex-col items-center gap-4 text-center">
       <p id={slotLineId} role="status" className={SLOT_LINE}>
-        {endingLine(ended, budget.remainingMs, budget.waitMs)}
+        {endingLine(ended, budget)}
       </p>
       {/* A dropped connection sends nobody to a form — unless it ended the hour
           the visitor spent talking to Linh, which is the moment to offer the

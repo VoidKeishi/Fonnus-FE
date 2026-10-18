@@ -324,6 +324,15 @@ refuse a session (a `429`-shaped answer the seam renders as the exhausted slot) 
 hour is spent; the browser's ledger then stays only as the hint that lets the consent slot
 say what is left before the gateway answers.
 
+**Added 2026-10-18 (`docs/adr/0009-voice-demo-budget-on-the-server.md`):** this app counts the
+hour itself now, without a store: a signed `httpOnly` cookie the token route charges
+pessimistically at each mint and refunds from ElevenLabs's conversation list, a `429
+{ code: "budget_spent", resets_at }` when the hour is spent, `GET /api/voice-demo/budget` for the
+screen's numbers, and a Cloudflare Turnstile token on every mint. **What the gateway inherits:**
+the same `429` shape and the same `GET` answer `{ remaining_ms, resets_at }`, kept per caller in
+its own store, and a bot check of its choosing on the mint; the cookie, the list call and the
+Turnstile secret are this app's stand-in and are deleted with the token route.
+
 ---
 
 ## Smaller confirmations

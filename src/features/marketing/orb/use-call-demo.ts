@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api, isApiError } from '@/api'
-import type { VoiceEndReason, VoiceInput, VoiceSession } from '@/api'
+import type { VoiceBudget, VoiceEndReason, VoiceInput, VoiceSession } from '@/api'
 import type { AgentState } from './call-state'
 import { useCallBudget } from './use-call-budget'
 import type { CallBudget } from './use-call-budget'
@@ -24,10 +24,12 @@ import type { CallBudget } from './use-call-budget'
  *   dropped connection — leaves the screen open on its ending, which offers
  *   to call again while the hour has time left.
  * - The visitor has three minutes an hour, spent over any number of calls
- *   (ADR 0008). Each call is capped at what is left; its seconds count from
- *   the moment it is attached until it ends, for any reason, leaving the page
- *   included. The ledger is read in the taps that open and start a call and
- *   when one ends, never during render.
+ *   (ADR 0008), and the server keeps them (ADR 0009). The screen reads where
+ *   the hour stands as the call opens and as a call ends on its own, and each
+ *   call is capped by its ticket's answer. A number not known yet, or a read
+ *   that failed, leaves every slot in its ordinary shape, and the tap tells
+ *   the truth: a ticket refused for a spent hour turns the screen to the spent
+ *   slot, with the time from one more read.
  */
 
 /** Set on <html> while the call is open; `globals.css` turns it into the scroll lock. */
@@ -59,12 +61,13 @@ export interface CallDemo {
   /** Nothing could connect: the screen says so and offers to call again. */
   failed: boolean
   /**
-   * What is left of the hour, read when the call opens, when it starts, when
-   * it ends, and when the hour turns under a slot that says when. With nothing
-   * left the consent slot says when the next call can start, and no ending
-   * offers to call again until then.
+   * What is left of the hour as the server last said, or null while it has
+   * not: read when the call opens, when one ends on its own, when a ticket is
+   * refused for it, and when the hour turns under a slot that says when. With
+   * nothing left the consent slot says when the next call can start, and no
+   * ending offers to call again until then.
    */
-  budget: CallBudget
+  budget: CallBudget | null
   /**
    * Opens the call screen on the consent line. `returnFocusTo` is the control
    * focus goes back to when the call closes; without one, or once it has left
@@ -102,7 +105,7 @@ export function useCallDemoState(): CallDemo {
   const [messages, setMessages] = useState<readonly ThreadLine[]>([])
   const [failed, setFailed] = useState(false)
   const onSlot = open && (awaitingConsent || ended !== null)
-  const { budget, refreshBudget, startSpending, stopSpending } = useCallBudget(onSlot)
+  const { budget, refreshBudget, refreshBudgetAfterCall, setBudget, stopBudgetRead } = useCallBudget(open, onSlot)
 
   const session = useRef<VoiceSession | null>(null)
   const unsubscribe = useRef<(() => void) | null>(null)
@@ -121,10 +124,9 @@ export function useCallDemoState(): CallDemo {
     connecting.current = null
     unsubscribe.current?.()
     unsubscribe.current = null
-    stopSpending()
     void session.current?.close()
     session.current = null
-  }, [stopSpending])
+  }, [])
 
   /** Back to the screen before anything connected, with no ending, no failure and no thread. */
   const resetCall = useCallback(() => {
@@ -135,17 +137,36 @@ export function useCallDemoState(): CallDemo {
     setMessages([])
   }, [])
 
+  /**
+   * Where the hour stands once a session has ended on its own. On its cap the
+   * ticket spent all it was given, which was all that was left, so its answer
+   * already says when the hour is back, unless the hour turned during the
+   * call. Otherwise the ending keeps its ordinary shape until the server
+   * says, which it is asked a few seconds on (`use-call-budget.ts`).
+   */
+  const settleEnding = useCallback(
+    (reason: VoiceEndReason, hour: VoiceBudget) => {
+      if (reason === 'timeout' && hour.resets_at !== null && hour.resets_at > Date.now()) {
+        setBudget({ remaining_ms: 0, resets_at: hour.resets_at })
+        return
+      }
+      refreshBudgetAfterCall()
+    },
+    [setBudget, refreshBudgetAfterCall],
+  )
+
   const startCall = useCallback(() => {
     endSession()
     const id = turn.current
     resetCall()
-    // Read again: the hour may have turned, or another tab spent it, since the call opened.
-    const hour = refreshBudget()
-    if (hour.remainingMs <= 0) {
+    if (budget !== null && budget.remainingMs <= 0) {
       // Nothing to connect with: the consent slot's place says when to come back.
       setAwaitingConsent(true)
       return
     }
+    // A budget read still going, from the slot just left, would answer after
+    // the ticket and stand for an hour the ticket has already charged.
+    stopBudgetRead()
     const controller = new AbortController()
     connecting.current = controller
     setAwaitingConsent(false)
@@ -157,9 +178,6 @@ export function useCallDemoState(): CallDemo {
       }
       connecting.current = null
       session.current = next
-      // Before subscribing: a session already ended replays its ending
-      // synchronously, and that ending must find the entry to close.
-      startSpending()
       setInput(nextInput)
       unsubscribe.current = next.subscribe((event) => {
         if (event.type === 'state') {
@@ -179,8 +197,7 @@ export function useCallDemoState(): CallDemo {
         unsubscribe.current = null
         session.current = null
         void next.close()
-        stopSpending(event.reason === 'timeout')
-        refreshBudget()
+        settleEnding(event.reason, next.budget)
         setAgent('connecting')
         setEnded(event.reason)
       })
@@ -194,13 +211,33 @@ export function useCallDemoState(): CallDemo {
       setFailed(true)
     }
 
-    const connect = (nextInput: VoiceInput) =>
-      api.voice.connect({
-        mode: 'landing-demo',
-        input: nextInput,
-        signal: controller.signal,
-        maxDurationMs: hour.remainingMs,
+    /**
+     * Any rejection but the microphone's. A ticket refused for a spent hour is
+     * not a failed call: the screen goes back to consent in its spent shape.
+     * The refusal says no more than its code, so when the hour is back comes
+     * from a read, and a read that fails too leaves the call failed.
+     */
+    const refused = (err: unknown) => {
+      if (turn.current !== id) return
+      if (!isApiError(err) || err.code !== 'budget_spent') {
+        fail()
+        return
+      }
+      connecting.current = null
+      setBudget(null)
+      void refreshBudget({ recheckSpent: true }).then((outcome) => {
+        if (turn.current !== id || outcome === 'canceled') return
+        if (outcome === 'failed') {
+          fail()
+          return
+        }
+        setInput(null)
+        setAwaitingConsent(true)
       })
+    }
+
+    const connect = (nextInput: VoiceInput) =>
+      api.voice.connect({ mode: 'landing-demo', input: nextInput, signal: controller.signal })
 
     // Called in the tap's own turn: the microphone prompt needs the gesture.
     void connect('voice').then(
@@ -210,7 +247,7 @@ export function useCallDemoState(): CallDemo {
       (err: unknown) => {
         if (turn.current !== id) return
         if (!isApiError(err) || err.code !== 'microphone_unavailable') {
-          fail()
+          refused(err)
           return
         }
         // The screen turns typed now, not once the text session arrives: a
@@ -220,11 +257,11 @@ export function useCallDemoState(): CallDemo {
           (next) => {
             attach(next, 'text')
           },
-          fail,
+          refused,
         )
       },
     )
-  }, [endSession, resetCall, refreshBudget, startSpending, stopSpending])
+  }, [endSession, resetCall, budget, stopBudgetRead, settleEnding, setBudget, refreshBudget])
 
   const openCall = useCallback(
     (returnFocusTo?: HTMLElement | null) => {
@@ -236,10 +273,13 @@ export function useCallDemoState(): CallDemo {
       setMic(true)
       endSession()
       resetCall()
-      refreshBudget()
+      // The slot opens at once, in its ordinary shape; the answer may add a
+      // line or swap it for the spent shape.
+      setBudget(null)
+      void refreshBudget()
       setAwaitingConsent(true)
     },
-    [open, endSession, resetCall, refreshBudget],
+    [open, endSession, resetCall, setBudget, refreshBudget],
   )
 
   const closeCall = useCallback(() => {
@@ -293,8 +333,9 @@ export function useCallDemoState(): CallDemo {
     }
   }, [open])
 
-  // Leaving the page ends the call as the close button does, so a tab closed
-  // mid-call still records the seconds it spent rather than its whole cap.
+  // Leaving the page ends the call as the close button does, so the
+  // conversation does not run on to its cap behind a tab that is gone. Nothing
+  // is recorded here: the server learns the call's length from ElevenLabs.
   useEffect(() => {
     if (!open) return
     window.addEventListener('pagehide', closeCall)

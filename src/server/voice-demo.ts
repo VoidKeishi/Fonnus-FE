@@ -1,9 +1,17 @@
 import 'server-only'
+import { listConversations } from './elevenlabs-conversations'
 import { mintConversationToken, mintSignedUrl } from './elevenlabs-token'
-import { elevenLabsConfig } from './env'
-import { handleVoiceDemoToken } from './voice-demo-handler'
+import { voiceDemoConfig } from './env'
+import { handleVoiceDemoBudget, handleVoiceDemoToken } from './voice-demo-handler'
+import type { VoiceDemoDeps } from './voice-demo-handler'
 
-/** The token route with the real environment and the real ElevenLabs calls wired in. */
+/** The real environment and the real ElevenLabs calls, which the two voice routes share. */
+const deps: VoiceDemoDeps = { config: voiceDemoConfig, mint: mintConversationToken, mintSignedUrl, listConversations }
+
 export function voiceDemoToken(request: Request): Promise<Response> {
-  return handleVoiceDemoToken(request, { config: elevenLabsConfig, mint: mintConversationToken, mintSignedUrl })
+  return handleVoiceDemoToken(request, deps)
+}
+
+export function voiceDemoBudget(request: Request): Promise<Response> {
+  return handleVoiceDemoBudget(request, deps)
 }

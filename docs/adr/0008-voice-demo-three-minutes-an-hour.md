@@ -1,6 +1,6 @@
 # ADR 0008: The voice demo's three minutes are an hour's budget, kept by the browser
 
-**Status:** accepted · **Date:** 2026-10-15 · Amends [ADR 0006](./0006-elevenlabs-landing-voice-demo.md) point 6
+**Status:** accepted · **Date:** 2026-10-15 · Amends [ADR 0006](./0006-elevenlabs-landing-voice-demo.md) point 6 · Points 4 and 6 superseded by [ADR 0009](./0009-voice-demo-budget-on-the-server.md): the server keeps the budget in a signed cookie, the `localStorage` ledger is gone, and the token route refuses a spent hour
 
 ## Decision
 

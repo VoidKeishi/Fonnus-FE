@@ -78,9 +78,10 @@ LEADS_SPREADSHEET_ID=           # the part of the sheet's URL between /d/ and /e
    Without it they keep using the mock, which stores nothing.
 
 On a public deployment the endpoints accept requests as soon as the three variables are set,
-so put the rate limit on first. It is one Vercel Firewall rule that also covers the voice
-demo's token route, described in step 2 of the next section; the forms already show "Bạn
-thao tác hơi nhanh…" for the `429` it answers. Mark the private key as a Sensitive variable,
+so consider a rate limit first. The Hobby plan allows one Vercel Firewall rate-limit rule
+per project, over `/api/leads*` (and the voice demo's token route, if wanted), keyed on IP,
+a window of ten minutes or less; `PLAN.md` §Backlog carries it, and the forms already show
+"Bạn thao tác hơi nhanh…" for the `429` it answers. Mark the private key as a Sensitive variable,
 and redeploy after changing any of the three: a variable applies only to new deployments.
 
 ## Turn on the live voice demo
@@ -88,25 +89,33 @@ and redeploy after changing any of the three: a variable applies only to new dep
 The voice orb on the landing page holds a real conversation with a voice agent hosted on
 ElevenLabs Conversational AI (`docs/adr/0006-elevenlabs-landing-voice-demo.md`, amended by
 `docs/adr/0007-voice-demo-agent-only-and-text-fallback.md` and
-`docs/adr/0008-voice-demo-three-minutes-an-hour.md`). A visitor gets three minutes of
-conversation per hour, spent over as many calls as they like; the browser keeps the count
-in `localStorage`, so clearing site data gives a fresh hour. There is no recording and no
-mock: the visitor's browser talks to ElevenLabs directly, but only with a short-lived ticket,
+`docs/adr/0008-voice-demo-three-minutes-an-hour.md` and
+`docs/adr/0009-voice-demo-budget-on-the-server.md`). A visitor gets three minutes of
+conversation per hour, spent over as many calls as they like. The server keeps the count in
+a signed cookie: minting a ticket charges the whole of what is left, and the real length of
+each call is refunded from ElevenLabs's conversation list, so a spent hour is refused with a
+`429` whatever the browser says and clearing site data gives nothing back. There is no
+recording and no mock: the visitor's browser talks to ElevenLabs directly, but only with a short-lived ticket,
 which this app's `POST /api/voice-demo/token` obtains from ElevenLabs with a secret API key.
 With no setup that route answers `503` and the call screen says it could not connect, which
-is also what `pnpm dev` shows on a machine without the two variables below. A visitor whose
+is also what `pnpm dev` shows on a machine without the three variables below. A visitor whose
 browser gives no microphone talks to the same agent by typing, and reads the replies.
 
 1. In the ElevenLabs dashboard, open the agent and set it up as follows.
    - Under Advanced → Call limits, set `max_duration_seconds` to 180. The landing page ends
-     the call itself a few seconds earlier; this limit is the backstop.
+     the call itself a few seconds earlier; this limit is the backstop. In the same place,
+     turn **Bursting** off (on by default, it lets calls exceed the workspace's concurrency
+     at double the price) and set the agent's **Concurrency limit** to about 5 (the default,
+     -1, is no limit). These two are the ceiling under everything the budget cookie does
+     not stop.
    - Under Security, turn Authentication on and leave the allowlist empty. Authentication
      makes the agent private, so only a ticket minted with your API key can start a
      conversation. ElevenLabs advises against combining authentication with an allowlist.
    - Under Security → Overrides, enable **Text-only mode**. The text session for a visitor
      without a microphone is sent as a per-conversation override, and ElevenLabs refuses an
      override whose field is not enabled. Do not enable text-only under Advanced: that
-     would make every call text.
+     would make every call text. In the same list, make sure the override for the
+     **maximum duration** is off: enabled, a client could choose its own call length.
    - Under Privacy, set Retention to 0 days and turn Audio Saving off, so the demo keeps
      the landing page's promise to ask before recording. Both settings are documented on
      ElevenLabs's privacy page.
@@ -121,24 +130,23 @@ browser gives no microphone talks to the same agent by typing, and reads the rep
      without a microphone types, and a Vietnamese sentence takes 15–30 seconds; the page
      tells the agent the visitor is typing, but a longer timeout is the backstop. The
      setting applies to voice calls too, where it is how long Linh waits in silence.
-2. In the Vercel project, put the rate limit on first, because the route serves anyone as
-   soon as the variables below are set. The Hobby plan allows one rate-limit rule per
-   project, so a single rule covers both this route and the marketing forms: Firewall → a
-   new rule with two conditions joined by "or", "request path starts with `/api/leads`" and
-   "request path equals `/api/voice-demo/token`", action Rate Limit, fixed window of ten
-   minutes or less, keyed on IP, answering `429`. Choose the number of requests per window
-   for the traffic you expect; a visitor needs one request per call and one per form sent.
-
-   Then add two environment variables, both marked Sensitive, and redeploy, because a
-   variable applies only to new deployments. For local development, put them in
-   `.env.local` instead.
+2. In the Vercel project, add three environment variables, all marked Sensitive, and
+   redeploy, because a variable applies only to new deployments. For local development,
+   put them in `.env.local` instead.
 
 ```bash
-ELEVENLABS_API_KEY=    # an API key from the ElevenLabs dashboard, restricted to Conversational AI if it offers scopes
-ELEVENLABS_AGENT_ID=   # the agent's id; the browser never sees it
+ELEVENLABS_API_KEY=         # an API key from the ElevenLabs dashboard, restricted to Conversational AI if it offers scopes
+ELEVENLABS_AGENT_ID=        # the agent's id; the browser never sees it
+VOICE_DEMO_COOKIE_SECRET=   # a long random string (openssl rand -hex 32) that signs the budget cookie; a new value gives every visitor a fresh hour once
 ```
 
-3. There is no switch: the demo is live as soon as both variables are set and deployed.
+   The route is protected by the budget cookie, not by a rate limit: a browser whose hour
+   is spent gets a `429` from the route itself. The one Firewall rate-limit rule the Hobby
+   plan allows — over `/api/leads*` and this route, keyed on IP, a window of ten minutes or
+   less — is deferred and described in `PLAN.md` §Backlog; several devices on one clinic's
+   wifi share an address, which is why it is not the budget's key.
+
+3. There is no switch: the demo is live as soon as the three variables are set and deployed.
    To turn it off again, unset `ELEVENLABS_API_KEY` and redeploy: the route answers `503`
    and the call screen tells the visitor it could not connect and offers to call again.
 
@@ -149,7 +157,7 @@ src/
   app/            The route tree only: Next.js convention files, each page returning one feature component
   features/       One directory per product surface: auth today; receptionist, marketing, calls, … as the roadmap lands them
   api/            The one door to the network: contracts, the mock/live switch, errors
-  server/         What runs only in a route handler: the marketing forms, written to a Google Sheet, and the live voice demo's token route
+  server/         What runs only in a route handler: the marketing forms, written to a Google Sheet, and the live voice demo's token and budget routes
   session/        Who is signed in, and the gate on /app
   shell/          What every signed-in page shares: the frame and the nav
   design-system/  Brand primitives: drawn icons, logo, button, input

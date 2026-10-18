@@ -1,6 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { MAX_BODY_BYTES } from './request-body'
-import { ElevenLabsRequestError, handleVoiceDemoToken, type VoiceDemoDeps } from './voice-demo-handler'
+import { charge, COOKIE_NAME, decodeCookie, encodeCookie, HOUR_BUDGET_MS, WINDOW_MS } from './voice-demo-budget'
+import type { ConversationPage, ConversationRow, Ledger } from './voice-demo-budget'
+import {
+  ElevenLabsRequestError,
+  handleVoiceDemoBudget,
+  handleVoiceDemoToken,
+  type VoiceDemoDeps,
+} from './voice-demo-handler'
 
 /*
  * The route that spends the ElevenLabs key. Anyone can post to it, so it must
@@ -8,28 +15,56 @@ import { ElevenLabsRequestError, handleVoiceDemoToken, type VoiceDemoDeps } from
  * and "ElevenLabs failed" with different statuses, and never let the key or
  * anything ElevenLabs answered reach a visitor or a log. A call gets a WebRTC
  * token and a typed conversation a WebSocket signed URL, and nothing else is
- * asked for.
+ * asked for. And since the server keeps the visitor's hour, it must refuse a
+ * ticket when the hour is spent, never charge for one it did not mint, and
+ * keep answering when ElevenLabs's list cannot say what to refund.
  */
 
-const CONFIG = { apiKey: 'sk_test_key', agentId: 'agent_test' }
+const CONFIG = { apiKey: 'sk_test_key', agentId: 'agent_test', cookieSecret: 'test-secret-0123456789abcdef', secureCookie: true }
 const SIGNED_URL = 'wss://api.elevenlabs.io/v1/convai/conversation?agent_id=agent_test&conversation_signature=sig'
 const TEXT = JSON.stringify({ input: 'text' })
+const NOW = Date.UTC(2026, 9, 18, 2, 0, 0)
 
-function post(body: string, contentType = 'application/json'): Request {
+function post(body: string, contentType = 'application/json', cookie?: string): Request {
   return new Request('http://localhost/api/voice-demo/token', {
     method: 'POST',
-    headers: { 'Content-Type': contentType },
+    headers: { 'Content-Type': contentType, ...(cookie === undefined ? {} : { Cookie: cookie }) },
     body,
   })
 }
 
+function get(cookie?: string): Request {
+  return new Request('http://localhost/api/voice-demo/budget', cookie === undefined ? {} : { headers: { Cookie: cookie } })
+}
+
+const page = (...rows: ConversationRow[]): ConversationPage => ({ rows, complete: true })
+
+const minted = (ticket: string, conversationId: string | null = 'conv_1') => Promise.resolve({ ticket, conversationId })
+
 function deps(overrides: Partial<VoiceDemoDeps> = {}): VoiceDemoDeps {
   return {
     config: () => CONFIG,
-    mint: vi.fn(() => Promise.resolve('abc')),
-    mintSignedUrl: vi.fn(() => Promise.resolve(SIGNED_URL)),
+    mint: vi.fn(() => minted('abc')),
+    mintSignedUrl: vi.fn(() => minted(SIGNED_URL, null)),
+    listConversations: vi.fn(() => Promise.resolve(page())),
+    now: () => NOW,
     ...overrides,
   }
+}
+
+/** The `Cookie` request header a browser sends back after the response's `Set-Cookie`. */
+function cookieFrom(response: Response): string {
+  return (response.headers.get('set-cookie') ?? '').split('; ')[0] ?? ''
+}
+
+/** The ledger a `Set-Cookie` carries, read with the route's own secret. */
+function ledgerFrom(response: Response): Ledger | null {
+  return decodeCookie(cookieFrom(response).slice(COOKIE_NAME.length + 1), CONFIG.cookieSecret)
+}
+
+/** A browser whose first ticket of the hour, `conv_1`, was minted `ago` milliseconds before now. */
+function chargedCookie(ago = 60_000): string {
+  return `${COOKIE_NAME}=${encodeCookie(charge(null, 'conv_1', NOW - ago).ledger, CONFIG.cookieSecret)}`
 }
 
 let logged: MockInstance<typeof console.error>
@@ -54,10 +89,15 @@ describe('handleVoiceDemoToken', () => {
   })
 
   it('answers 503 without calling ElevenLabs when the variables are unset', async () => {
-    const mint = vi.fn(() => Promise.resolve('abc'))
-    const response = await handleVoiceDemoToken(post('{}'), deps({ config: () => null, mint }))
+    const mint = vi.fn<VoiceDemoDeps['mint']>(() => minted('abc'))
+    const listConversations = vi.fn<VoiceDemoDeps['listConversations']>(() => Promise.resolve(page()))
+    const response = await handleVoiceDemoToken(
+      post('{}', 'application/json', chargedCookie()),
+      deps({ config: () => null, mint, listConversations }),
+    )
     expect(response.status).toBe(503)
     expect(mint).not.toHaveBeenCalled()
+    expect(listConversations).not.toHaveBeenCalled()
   })
 
   it('answers a bare 502 when ElevenLabs refuses, logging its status and not the key', async () => {
@@ -92,11 +132,11 @@ describe('handleVoiceDemoToken', () => {
     expect(response.status).toBe(200)
     expect(response.headers.get('cache-control')).toBe('no-store')
     expect(response.headers.get('content-type')).toContain('application/json')
-    expect(await response.json()).toEqual({ token: 'abc' })
+    expect(await response.json()).toEqual({ token: 'abc', remaining_ms: HOUR_BUDGET_MS, resets_at: NOW + WINDOW_MS })
   })
 
   it('gives ElevenLabs the configuration and a deadline', async () => {
-    const mint = vi.fn<VoiceDemoDeps['mint']>(() => Promise.resolve('abc'))
+    const mint = vi.fn<VoiceDemoDeps['mint']>(() => minted('abc'))
     await handleVoiceDemoToken(post('{}'), deps({ mint }))
     expect(mint).toHaveBeenCalledWith(CONFIG, expect.any(AbortSignal))
   })
@@ -104,20 +144,20 @@ describe('handleVoiceDemoToken', () => {
 
 describe('handleVoiceDemoToken, by input', () => {
   it.each(['{}', '{"input":"voice"}'])('answers a call’s token for %s', async (body) => {
-    const mintSignedUrl = vi.fn<VoiceDemoDeps['mintSignedUrl']>(() => Promise.resolve(SIGNED_URL))
+    const mintSignedUrl = vi.fn<VoiceDemoDeps['mintSignedUrl']>(() => minted(SIGNED_URL))
     const response = await handleVoiceDemoToken(post(body), deps({ mintSignedUrl }))
     expect(response.status).toBe(200)
-    expect(await response.json()).toEqual({ token: 'abc' })
+    expect(await response.json()).toMatchObject({ token: 'abc' })
     expect(mintSignedUrl).not.toHaveBeenCalled()
   })
 
   it('answers a typed conversation’s signed URL as uncacheable JSON, minting no token', async () => {
-    const mint = vi.fn<VoiceDemoDeps['mint']>(() => Promise.resolve('abc'))
-    const mintSignedUrl = vi.fn<VoiceDemoDeps['mintSignedUrl']>(() => Promise.resolve(SIGNED_URL))
+    const mint = vi.fn<VoiceDemoDeps['mint']>(() => minted('abc'))
+    const mintSignedUrl = vi.fn<VoiceDemoDeps['mintSignedUrl']>(() => minted(SIGNED_URL))
     const response = await handleVoiceDemoToken(post(TEXT), deps({ mint, mintSignedUrl }))
     expect(response.status).toBe(200)
     expect(response.headers.get('cache-control')).toBe('no-store')
-    expect(await response.json()).toEqual({ signed_url: SIGNED_URL })
+    expect(await response.json()).toMatchObject({ signed_url: SIGNED_URL })
     expect(mintSignedUrl).toHaveBeenCalledWith(CONFIG, expect.any(AbortSignal))
     expect(mint).not.toHaveBeenCalled()
   })
@@ -125,8 +165,8 @@ describe('handleVoiceDemoToken, by input', () => {
   it.each(['{"input":"x"}', '{"input":null}', '[]', 'null', '"str"'])(
     'refuses %s without calling ElevenLabs',
     async (body) => {
-      const mint = vi.fn<VoiceDemoDeps['mint']>(() => Promise.resolve('abc'))
-      const mintSignedUrl = vi.fn<VoiceDemoDeps['mintSignedUrl']>(() => Promise.resolve(SIGNED_URL))
+      const mint = vi.fn<VoiceDemoDeps['mint']>(() => minted('abc'))
+      const mintSignedUrl = vi.fn<VoiceDemoDeps['mintSignedUrl']>(() => minted(SIGNED_URL))
       const response = await handleVoiceDemoToken(post(body), deps({ mint, mintSignedUrl }))
       expect(response.status).toBe(400)
       expect(mint).not.toHaveBeenCalled()
@@ -141,7 +181,7 @@ describe('handleVoiceDemoToken, by input', () => {
   })
 
   it('answers 503 to a typed conversation without calling ElevenLabs when the variables are unset', async () => {
-    const mintSignedUrl = vi.fn<VoiceDemoDeps['mintSignedUrl']>(() => Promise.resolve(SIGNED_URL))
+    const mintSignedUrl = vi.fn<VoiceDemoDeps['mintSignedUrl']>(() => minted(SIGNED_URL))
     const response = await handleVoiceDemoToken(post(TEXT), deps({ config: () => null, mintSignedUrl }))
     expect(response.status).toBe(503)
     expect(mintSignedUrl).not.toHaveBeenCalled()
@@ -162,5 +202,158 @@ describe('handleVoiceDemoToken, by input', () => {
     expect(response.status).toBe(502)
     expect(logged).toHaveBeenCalledWith('POST /api/voice-demo/token: ElevenLabs signed-url failed (TypeError)')
     expect(JSON.stringify(logged.mock.calls)).not.toContain(SIGNED_URL)
+  })
+})
+
+describe('handleVoiceDemoToken, the hour', () => {
+  it('charges a first ticket the whole hour, and sets the cookie that keeps it', async () => {
+    const response = await handleVoiceDemoToken(post('{}'), deps())
+    expect(await response.json()).toEqual({ token: 'abc', remaining_ms: 175_000, resets_at: NOW + WINDOW_MS })
+    const cookie = response.headers.get('set-cookie') ?? ''
+    expect(cookie.startsWith(`${COOKIE_NAME}=`)).toBe(true)
+    expect(cookie).toContain('; Path=/api/voice-demo;')
+    expect(cookie).toContain('; HttpOnly; Secure; SameSite=Lax')
+    const maxAge = Number(/Max-Age=(\d+)/.exec(cookie)?.[1])
+    expect(maxAge).toBeGreaterThan(0)
+    expect(maxAge).toBeLessThanOrEqual(3600)
+    expect(ledgerFrom(response)?.entries).toEqual([{ id: 'conv_1', at: NOW, ms: HOUR_BUDGET_MS }])
+  })
+
+  it('refuses a second ticket while the first is still charged, minting nothing', async () => {
+    const first = await handleVoiceDemoToken(post('{}'), deps())
+    const mint = vi.fn<VoiceDemoDeps['mint']>(() => minted('def'))
+    const mintSignedUrl = vi.fn<VoiceDemoDeps['mintSignedUrl']>(() => minted(SIGNED_URL))
+    const response = await handleVoiceDemoToken(
+      post('{}', 'application/json', cookieFrom(first)),
+      deps({ mint, mintSignedUrl, now: () => NOW + 30_000 }),
+    )
+    expect(response.status).toBe(429)
+    expect(response.headers.get('content-type')).toBe('application/problem+json')
+    expect(response.headers.get('cache-control')).toBe('no-store')
+    expect(await response.json()).toEqual({ code: 'budget_spent', resets_at: NOW + WINDOW_MS })
+    expect(ledgerFrom(response)).toEqual(ledgerFrom(first))
+    expect(mint).not.toHaveBeenCalled()
+    expect(mintSignedUrl).not.toHaveBeenCalled()
+  })
+
+  it('refunds what the first call did not use once ElevenLabs has finished with it', async () => {
+    const listConversations = vi.fn<VoiceDemoDeps['listConversations']>(() =>
+      Promise.resolve(page({ conversation_id: 'conv_1', status: 'done', call_duration_secs: 20 })),
+    )
+    const response = await handleVoiceDemoToken(
+      post('{}', 'application/json', chargedCookie()),
+      deps({ mint: () => minted('def', 'conv_2'), listConversations }),
+    )
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ token: 'def', remaining_ms: 155_000, resets_at: NOW - 60_000 + WINDOW_MS })
+    expect(listConversations).toHaveBeenCalledWith(CONFIG, Math.floor((NOW - 60_000) / 1000), expect.any(AbortSignal))
+    expect(ledgerFrom(response)?.entries).toEqual([
+      { id: 'conv_1', at: NOW - 60_000, ms: 20_000 },
+      { id: 'conv_2', at: NOW, ms: 155_000 },
+    ])
+  })
+
+  it('answers from the charges as they stand when the list fails, logging only the step and status', async () => {
+    const listConversations = vi.fn<VoiceDemoDeps['listConversations']>(() =>
+      Promise.reject(new ElevenLabsRequestError('conversations', 500)),
+    )
+    const mint = vi.fn<VoiceDemoDeps['mint']>(() => minted('def'))
+    const cookie = chargedCookie()
+    const response = await handleVoiceDemoToken(post('{}', 'application/json', cookie), deps({ mint, listConversations }))
+    expect(response.status).toBe(429)
+    expect(mint).not.toHaveBeenCalled()
+    expect(logged.mock.calls).toEqual([['POST /api/voice-demo/token: ElevenLabs conversations failed, upstream status 500']])
+  })
+
+  it('charges nothing, and leaves the cookie alone, when ElevenLabs refuses the ticket', async () => {
+    const refused = new ElevenLabsRequestError('token', 500)
+    const response = await handleVoiceDemoToken(post('{}'), deps({ mint: () => Promise.reject(refused) }))
+    expect(response.status).toBe(502)
+    expect(response.headers.get('set-cookie')).toBeNull()
+  })
+
+  it('reads a tampered cookie as none: the full budget, without asking ElevenLabs', async () => {
+    const cookie = chargedCookie()
+    const tampered = `${cookie.slice(0, -1)}${cookie.endsWith('A') ? 'B' : 'A'}`
+    const listConversations = vi.fn<VoiceDemoDeps['listConversations']>(() => Promise.resolve(page()))
+    const response = await handleVoiceDemoToken(post('{}', 'application/json', tampered), deps({ listConversations }))
+    expect(await response.json()).toMatchObject({ remaining_ms: HOUR_BUDGET_MS })
+    expect(listConversations).not.toHaveBeenCalled()
+  })
+
+  it('charges a typed conversation that came with no conversation id, for the fifteen-minute rule to refund', async () => {
+    const response = await handleVoiceDemoToken(post(TEXT), deps())
+    expect(await response.json()).toEqual({ signed_url: SIGNED_URL, remaining_ms: HOUR_BUDGET_MS, resets_at: NOW + WINDOW_MS })
+    expect(ledgerFrom(response)?.entries).toEqual([{ id: null, at: NOW, ms: HOUR_BUDGET_MS }])
+  })
+})
+
+describe('handleVoiceDemoBudget', () => {
+  it('gives a browser with no cookie the full hour without asking ElevenLabs', async () => {
+    const listConversations = vi.fn<VoiceDemoDeps['listConversations']>(() => Promise.resolve(page()))
+    const response = await handleVoiceDemoBudget(get(), deps({ listConversations }))
+    expect(response.status).toBe(200)
+    expect(response.headers.get('cache-control')).toBe('no-store')
+    expect(response.headers.get('set-cookie')).toBeNull()
+    expect(await response.json()).toEqual({ remaining_ms: HOUR_BUDGET_MS, resets_at: null })
+    expect(listConversations).not.toHaveBeenCalled()
+  })
+
+  it('settles the hour and writes the cookie back', async () => {
+    const listConversations = vi.fn<VoiceDemoDeps['listConversations']>(() =>
+      Promise.resolve(page({ conversation_id: 'conv_1', status: 'processing', call_duration_secs: 40 })),
+    )
+    const response = await handleVoiceDemoBudget(get(chargedCookie()), deps({ listConversations }))
+    expect(await response.json()).toEqual({ remaining_ms: 135_000, resets_at: NOW - 60_000 + WINDOW_MS })
+    expect(ledgerFrom(response)?.entries).toEqual([{ id: 'conv_1', at: NOW - 60_000, ms: 40_000 }])
+  })
+
+  it('says the hour is spent while the call is still in progress', async () => {
+    const listConversations = vi.fn<VoiceDemoDeps['listConversations']>(() =>
+      Promise.resolve(page({ conversation_id: 'conv_1', status: 'in-progress', call_duration_secs: 40 })),
+    )
+    const response = await handleVoiceDemoBudget(get(chargedCookie()), deps({ listConversations }))
+    expect(await response.json()).toEqual({ remaining_ms: 0, resets_at: NOW - 60_000 + WINDOW_MS })
+  })
+
+  it('leaves the cookie alone when settling changed no charge, so it cannot overwrite a ticket’s', async () => {
+    const listConversations = vi.fn<VoiceDemoDeps['listConversations']>(() =>
+      Promise.resolve(page({ conversation_id: 'conv_1', status: 'in-progress', call_duration_secs: 40 })),
+    )
+    const response = await handleVoiceDemoBudget(get(chargedCookie()), deps({ listConversations }))
+    expect(response.status).toBe(200)
+    expect(response.headers.get('set-cookie')).toBeNull()
+  })
+
+  it('writes the settled ledger back when a refund changed it', async () => {
+    const listConversations = vi.fn<VoiceDemoDeps['listConversations']>(() =>
+      Promise.resolve(page({ conversation_id: 'conv_1', status: 'done', call_duration_secs: 15 })),
+    )
+    const response = await handleVoiceDemoBudget(get(chargedCookie()), deps({ listConversations }))
+    expect(response.headers.get('set-cookie')).toContain('; HttpOnly; Secure; SameSite=Lax')
+    expect(ledgerFrom(response)).toEqual({ v: 1, windowStart: NOW - 60_000, entries: [{ id: 'conv_1', at: NOW - 60_000, ms: 15_000 }] })
+  })
+
+  it('answers from the charges as they stand when the list fails, logging only the step and status', async () => {
+    const timedOut = new ElevenLabsRequestError('conversations', null, { cause: new DOMException('timed out', 'TimeoutError') })
+    const cookie = chargedCookie()
+    const response = await handleVoiceDemoBudget(get(cookie), deps({ listConversations: () => Promise.reject(timedOut) }))
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ remaining_ms: 0, resets_at: NOW - 60_000 + WINDOW_MS })
+    expect(response.headers.get('set-cookie')).toBeNull()
+    expect(logged.mock.calls).toEqual([['GET /api/voice-demo/budget: ElevenLabs conversations failed, upstream status TimeoutError']])
+    expect(JSON.stringify(logged.mock.calls)).not.toContain(cookie.slice(COOKIE_NAME.length + 1, COOKIE_NAME.length + 20))
+  })
+
+  it('reads a cookie from an hour that has ended as none', async () => {
+    const response = await handleVoiceDemoBudget(get(chargedCookie(WINDOW_MS)), deps())
+    expect(await response.json()).toEqual({ remaining_ms: HOUR_BUDGET_MS, resets_at: null })
+  })
+
+  it('answers 503 without calling ElevenLabs when the variables are unset', async () => {
+    const listConversations = vi.fn<VoiceDemoDeps['listConversations']>(() => Promise.resolve(page()))
+    const response = await handleVoiceDemoBudget(get(chargedCookie()), deps({ config: () => null, listConversations }))
+    expect(response.status).toBe(503)
+    expect(listConversations).not.toHaveBeenCalled()
   })
 })

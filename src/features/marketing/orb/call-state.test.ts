@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { HOUR_BUDGET_MS } from './call-budget'
 import { budgetLine, endingLine, spentLine, stateLabel } from './call-state'
+import type { CallBudget } from './use-call-budget'
 
 /*
  * The one line under the orb is how a visitor knows whether to talk, wait or
@@ -44,21 +44,31 @@ describe('stateLabel, typed', () => {
 /*
  * Where the hour stands is said at two moments only (ADR 0008): on consent,
  * and on the ending of the call that spent it. A sentence that says "gọi lại"
- * without saying when would send the visitor into a call that cannot connect.
+ * without saying when would send the visitor into a call that cannot connect,
+ * and a number the server has not given yet must not be said at all.
  */
 
+const RESETS_AT = Date.UTC(2026, 9, 18, 3, 0, 0)
+const left = (remainingMs: number, waitMs = 50 * 60_000): CallBudget => ({ remainingMs, resetsAt: RESETS_AT, waitMs })
+const spent = (waitMs: number): CallBudget => ({ remainingMs: 0, resetsAt: RESETS_AT, waitMs })
+const FULL: CallBudget = { remainingMs: 175_000, resetsAt: null, waitMs: 0 }
+
 describe('budgetLine', () => {
+  it('says nothing before the server has answered', () => {
+    expect(budgetLine(null)).toBeNull()
+  })
+
   it('says nothing while the whole hour is left', () => {
-    expect(budgetLine(HOUR_BUDGET_MS)).toBeNull()
+    expect(budgetLine(FULL)).toBeNull()
   })
 
   it('says what is left once part of the hour is spent', () => {
-    expect(budgetLine(155_000)).toBe('Giờ này bạn còn 2 phút 35 giây gọi thử.')
-    expect(budgetLine(40_000)).toBe('Giờ này bạn còn 40 giây gọi thử.')
+    expect(budgetLine(left(155_000))).toBe('Giờ này bạn còn 2 phút 35 giây gọi thử.')
+    expect(budgetLine(left(40_000))).toBe('Giờ này bạn còn 40 giây gọi thử.')
   })
 
   it('says nothing when nothing is left: the spent slot says it instead', () => {
-    expect(budgetLine(0)).toBeNull()
+    expect(budgetLine(spent(30 * 60_000))).toBeNull()
   })
 })
 
@@ -72,28 +82,29 @@ describe('spentLine', () => {
 
 describe('endingLine', () => {
   it('says the hour is spent, and when it comes back, when the call ends on its cap', () => {
-    expect(endingLine('timeout', 0, 57 * 60_000)).toBe(
+    expect(endingLine('timeout', spent(57 * 60_000))).toBe(
       'Hết 3 phút gọi thử trong giờ này — gọi lại được sau 57 phút. Ở phòng khám của bạn, Linh nghe máy cả ngày.',
     )
   })
 
   it('says only that the three minutes are up when the hour turned during the call', () => {
-    expect(endingLine('timeout', HOUR_BUDGET_MS, 0)).toBe(
-      'Hết 3 phút gọi thử. Ở phòng khám của bạn, Linh nghe máy cả ngày.',
-    )
+    const line = 'Hết 3 phút gọi thử. Ở phòng khám của bạn, Linh nghe máy cả ngày.'
+    expect(endingLine('timeout', FULL)).toBe(line)
+    expect(endingLine('timeout', null)).toBe(line)
   })
 
-  it('keeps today’s lines while the hour has time left', () => {
-    expect(endingLine('agent', 60_000, 50 * 60_000)).toBe(
-      'Linh đã kết thúc cuộc gọi thử. Ở phòng khám của bạn, Linh nghe máy cả ngày.',
-    )
-    expect(endingLine('error', 60_000, 50 * 60_000)).toBe('Mất kết nối với Linh.')
+  it('keeps today’s lines while the hour has time left, or before the server has said', () => {
+    const agent = 'Linh đã kết thúc cuộc gọi thử. Ở phòng khám của bạn, Linh nghe máy cả ngày.'
+    expect(endingLine('agent', left(60_000))).toBe(agent)
+    expect(endingLine('agent', null)).toBe(agent)
+    expect(endingLine('error', left(60_000))).toBe('Mất kết nối với Linh.')
+    expect(endingLine('error', null)).toBe('Mất kết nối với Linh.')
   })
 
   it('adds when the next call can start once the call spent the rest of the hour', () => {
-    expect(endingLine('agent', 0, 30_000)).toBe(
+    expect(endingLine('agent', spent(30_000))).toBe(
       'Linh đã kết thúc cuộc gọi thử. Ở phòng khám của bạn, Linh nghe máy cả ngày. Gọi lại được sau 1 phút.',
     )
-    expect(endingLine('error', 0, 12 * 60_000)).toBe('Mất kết nối với Linh. Gọi lại được sau 12 phút.')
+    expect(endingLine('error', spent(12 * 60_000))).toBe('Mất kết nối với Linh. Gọi lại được sau 12 phút.')
   })
 })

@@ -40,9 +40,10 @@ export interface RequestOptions {
    * The path is this app's own, used as written instead of under
    * `API_BASE_URL`.
    *
-   * Set only by the `leads` group, which this app's route handlers receive
-   * (ADR 0005). In production `API_BASE_URL` is Fonnus-BE's origin, and the
-   * lead forms must not go there.
+   * Set only by the `leads` group (ADR 0005) and the `voice` group's two
+   * routes (ADR 0006, ADR 0009), which this app's own route handlers receive.
+   * In production `API_BASE_URL` is Fonnus-BE's origin, and neither must go
+   * there.
    */
   ownOrigin?: boolean
 }

@@ -404,15 +404,22 @@ Not an HTTP endpoint: the interface the landing page's "Nghe thử" call screen 
 `voice` group in `src/api/contracts.ts`. Whatever carries the audio sits behind it, so the
 screen and its hook never change when the transport does.
 
-`api.voice.connect({ mode: 'landing-demo', input, signal, maxDurationMs })` resolves a
-`VoiceSession`. `input` is `voice` (a call) or `text` (the same conversation typed, for a browser
-that gives no microphone). `maxDurationMs`, optional, is the screen's own cap for this session in
-milliseconds; the implementation clamps it to its own maximum and ends the session with `timeout`
-when it elapses, and without it the maximum applies. The caller invokes `connect` inside the tap
-that started the call, because the microphone prompt needs that gesture. The session has:
+`api.voice.connect({ mode: 'landing-demo', input, signal })` resolves a `VoiceSession`. `input`
+is `voice` (a call) or `text` (the same conversation typed, for a browser that gives no
+microphone). The caller invokes `connect` inside the tap that started the call, because the
+microphone prompt needs that gesture. The session's cap is not the caller's to pass: it comes with
+the ticket ([ADR 0009](./adr/0009-voice-demo-budget-on-the-server.md) point 4).
+
+`api.voice.budget({ signal })` resolves a `VoiceBudget`, `{ remaining_ms, resets_at }`: where the
+visitor's hour stands, read from whoever mints the ticket and never kept by the client.
+`remaining_ms` is what is left of the three minutes; `resets_at` is when the full budget is back,
+in epoch milliseconds, and `null` while the full budget is there.
+
+The session has:
 
 | Member | What it does |
 |---|---|
+| `budget` | The `VoiceBudget` the ticket's answer carried: what this session may spend, and when the hour is back |
 | `subscribe(listener)` | Delivers events and returns the unsubscribe. A new listener is first handed, synchronously, every `message` so far and then the latest of the other events. Nothing is delivered after `close()` resolves |
 | `setMicEnabled(on)` | The screen's entire microphone surface. The session owns `getUserMedia` and everything downstream of it. A no-op in a text session |
 | `sendText(text)` | A chip or a typed line. A text session also emits it back as the visitor's `message` |
@@ -438,7 +445,7 @@ One implementation stands behind the interface, and there is no mock
 ([ADR 0007](./adr/0007-voice-demo-agent-only-and-text-fallback.md)): a faked conversation is a
 recording, and the demo answers with the agent or not at all. `voice` is therefore not in
 `API_GROUPS`, and `NEXT_PUBLIC_MOCK_FAILURE_RATE` does not reach it; its error paths are reached
-by unsetting `ELEVENLABS_API_KEY` (the token route's `503`) and by the unit tests of
+by unsetting `ELEVENLABS_API_KEY` (the `503` of both routes below) and by the unit tests of
 `voice.live.ts`. That **live implementation** is the ElevenLabs session of
 [ADR 0006](./adr/0006-elevenlabs-landing-voice-demo.md), not Fonnus-BE's: the browser connects
 to a private ElevenLabs agent with a ticket this app mints (below) — a conversation token and
@@ -478,19 +485,32 @@ the page. What the client does:
   được với Linh lúc này. Bạn thử gọi lại sau một lát." and "Gọi lại", with no sign-up link.
   Nothing stands in for the agent.
 - **A cap of 175 seconds at most**, under the agent's own 180, so the ending is the app's: the
-  session emits `ended { reason: 'timeout' }` and closes itself. The screen passes what is left of
-  the visitor's three minutes an hour as `maxDurationMs`, so the cap is often shorter
-  ([ADR 0008](./adr/0008-voice-demo-three-minutes-an-hour.md)); the hour is counted in the
-  browser, above this interface, and never by the implementation. It applies to a text session
-  unchanged.
+  session emits `ended { reason: 'timeout' }` and closes itself. The cap is the ticket's
+  `remaining_ms`, what is left of the visitor's three minutes an hour, when that is shorter
+  ([ADR 0008](./adr/0008-voice-demo-three-minutes-an-hour.md)). The hour is counted on the
+  server, by the route that mints the ticket ([ADR 0009](./adr/0009-voice-demo-budget-on-the-server.md));
+  the client reads it and never keeps it. It applies to a text session unchanged.
+- **Where the hour stands, on the screen.** The consent slot opens at once with its one line, and
+  `budget()` runs as it opens: its answer adds "Giờ này bạn còn … gọi thử." when part of the hour
+  is spent, or swaps the slot for its spent shape when nothing is left. A read that fails leaves
+  the slot as it is, and the tap gets the real answer: a `budget_spent` refusal (kind
+  `ratelimited`) sends the screen back to the consent slot in its spent shape, with `resets_at`
+  from a second `budget()`, since `http.ts` keeps a refusal's `code` and nothing else; if that
+  read fails too, the call is shown as failed. An ending on `timeout` is spent by construction and
+  takes its `resets_at` from `session.budget`; an `agent` or `error` ending keeps "Gọi lại" and
+  reads `budget()` once, five seconds after the call, whose answer may drop it. ElevenLabs lists
+  a call as `in-progress` for a few seconds after hang-up, so a read at once would still see the
+  ticket's full charge. For the same reason a read after a `budget_spent` refusal that answers
+  "spent" is made once more five seconds later. A budget read still going when a ticket is asked
+  for is dropped.
 - **Endings.** `agent` (the receptionist hung up) shows a closing line with "Vào danh sách chờ"
   (to `/waitlist`) and "Gọi lại"; `error` (the connection dropped after the call started) shows
   "Mất kết nối với Linh." and "Gọi lại". `timeout` means the hour is spent: its line says when
   the next call can start, and it offers "Vào danh sách chờ" only. An `agent` or `error` ending
   that spent the rest of the hour says the same, drops "Gọi lại" and offers "Vào danh sách chờ"
   (for `error` too: the visitor has had their three minutes with Linh, ADR 0008 point 5). The
-  wait it names is as of the moment the slot appeared; it is not counted down, and the slot turns
-  back into its ordinary shape when the hour does. "Gọi lại" connects again, a call first,
+  wait it names is as of the answer that said it; it is not counted down, and the slot reads
+  `budget()` again at `resets_at` and turns back into its ordinary shape when the hour does. "Gọi lại" connects again, a call first,
   without a second consent. `user` is the visitor closing the screen and shows nothing.
 - **Loudness.** `getAmplitude()` is the agent's output volume while she speaks in a call, and
   `null` otherwise, in a text session, or once the session has ended; the orb draws its own idle
@@ -502,46 +522,96 @@ the page. What the client does:
 When Fonnus-BE serves a web voice gateway into the pipeline, it implements this same interface
 in `voice.live.ts` and the token route is deleted.
 
+### The visitor's hour: the `voice_demo_budget` cookie
+
+The two routes below keep the visitor's three minutes an hour in one cookie they write and no
+script can read ([ADR 0009](./adr/0009-voice-demo-budget-on-the-server.md)):
+`voice_demo_budget`, `HttpOnly`, `Secure` in production (not in development, which a phone on
+the LAN reaches over plain http), `SameSite=Lax`, `Path=/api/voice-demo`, and a
+`Max-Age` that ends with the hour. It holds the window's opening time and one entry per ticket
+minted in it, and is signed with HMAC-SHA256 under `VOICE_DEMO_COOKIE_SECRET`; a cookie that does
+not verify, does not parse, or names an hour that has ended reads as no cookie, which is the full
+budget. The window is fixed: it opens with the first ticket and the full budget is back an hour
+later.
+
+- **Charged first, refunded from ElevenLabs.** A ticket is charged the whole remainder when it is
+  minted. Every read lists the agent's conversations started since the window opened and
+  re-charges each ticket's conversation at its real `call_duration_secs` once its `status` is
+  `processing`, `done` or `failed`; one still `initiated` or `in-progress` stays charged in full,
+  and a ticket whose conversation has not appeared fifteen minutes after it was minted is
+  refunded entirely — only when the one page of 100 holds the whole list (`has_more` is
+  `false`), since a row missing from an incomplete page may only be off it. When the list call
+  fails, the charges stand as they were.
+- **Unauthenticated.** This cookie is the only one read, and a `401` is never answered.
+
+### `GET /api/voice-demo/budget`
+
+**Not Fonnus-BE's.** This app's own route handler, beside the token route below. Where the
+visitor's hour stands, for the call screen to say.
+
+```jsonc
+// → 200, Cache-Control: no-store, Set-Cookie: voice_demo_budget=… when a refund changed it
+{ "remaining_ms": 135000, "resets_at": 1792288800000 }   // part of the hour spent
+{ "remaining_ms": 175000, "resets_at": null }            // the full budget
+```
+
+No body is read. The cookie is written back only when settling changed a charge, so a refund
+is kept and a read can never overwrite the cookie a ticket's answer has just set.
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `{ "remaining_ms", "resets_at" }`, `Cache-Control: no-store` | Where the hour stands, settled against ElevenLabs's list when the list answered, and as charged when it did not |
+| `503` | — | `ELEVENLABS_API_KEY`, `ELEVENLABS_AGENT_ID` or `VOICE_DEMO_COOKIE_SECRET` is not set |
+
 ### `POST /api/voice-demo/token`
 
 **Not Fonnus-BE's.** This app's own route handler, on this app's origin and outside
 `/api/v1`, like §6. It mints the ticket the live voice session hands to ElevenLabs, using a key
 that never reaches the browser: a WebRTC conversation token for a call, a WebSocket signed URL
-for a text session.
+for a text session. Each comes with what the ticket may spend of the visitor's hour, which the
+session caps itself on.
 
 ```jsonc
 // request, a call — Content-Type: application/json
 {}                      // or { "input": "voice" }
-// → 200, Cache-Control: no-store
-{ "token": "<WebRTC conversation token>" }
+// → 200, Cache-Control: no-store, Set-Cookie: voice_demo_budget=…
+{ "token": "<WebRTC conversation token>", "remaining_ms": 175000, "resets_at": 1792288800000 }
 
 // request, a text session
 { "input": "text" }
-// → 200, Cache-Control: no-store
-{ "signed_url": "wss://…" }
+// → 200, Cache-Control: no-store, Set-Cookie: voice_demo_budget=…
+{ "signed_url": "wss://…", "remaining_ms": 175000, "resets_at": 1792288800000 }
+
+// nothing of the hour left
+// → 429, Content-Type: application/problem+json, Cache-Control: no-store
+{ "code": "budget_spent", "resets_at": 1792288800000 }
 ```
 
-- **Unauthenticated.** No cookie is read and a `401` is never answered.
+- **The visitor's hour decides.** The cookie above is read and settled first; with nothing left
+  the route answers `429` and mints nothing. `remaining_ms` in a `200` is what this ticket is
+  charged, the whole remainder, and `resets_at` is when the full budget is back.
 - **The request must be `Content-Type: application/json`,** even for a call's empty body, so
   that another site cannot make a visitor's browser mint a ticket with a simple,
   preflight-free request; the route sends no CORS headers.
 - **`input` is `voice` or `text`, or absent.** Absent is a call, which is what the live session
   sends for one. Any other value, or a body that is not a JSON object, is a `400`.
-- **Never upstream text.** A refusal has no body, and nothing ElevenLabs said reaches the
-  response.
+- **Never upstream text.** A refusal has no body but the `429`'s code, and nothing ElevenLabs
+  said reaches the response.
 
-Every refusal makes `connect` reject, and the call screen says it could not connect to Linh and
-offers to call again ([ADR 0007](./adr/0007-voice-demo-agent-only-and-text-fallback.md) point 5).
+Every refusal makes `connect` reject. The `429` turns the call screen to its spent consent slot
+(above); every other one makes it say it could not connect to Linh and offer to call again
+([ADR 0007](./adr/0007-voice-demo-agent-only-and-text-fallback.md) point 5).
 
 | Status | Body | Meaning |
 |---|---|---|
-| `200` | `{ "token": "…" }` or `{ "signed_url": "…" }`, `Cache-Control: no-store` | A call's token, valid for fifteen minutes, or a text session's signed URL, requested with `include_conversation_id=true` so that it opens one conversation and no more |
+| `200` | `{ "token": "…" }` or `{ "signed_url": "…" }`, each with `remaining_ms` and `resets_at`, `Cache-Control: no-store`, the cookie set | A call's token, valid for fifteen minutes, or a text session's signed URL, requested with `include_conversation_id=true` so that it opens one conversation and no more |
 | `400` | — | The body is not a JSON object, or `input` is neither `voice` nor `text` |
 | `413` | — | The body is over 48 KiB, the cap the `leads` routes share |
 | `415` | — | Not `application/json` |
-| `429` | — (from the Vercel Firewall) | Too many tokens from this IP |
-| `502` | — | ElevenLabs refused either ticket, or did not answer within the 8-second deadline |
-| `503` | — | `ELEVENLABS_API_KEY` or `ELEVENLABS_AGENT_ID` is not set. Unsetting the key is the kill switch |
+| `429` | `{ "code": "budget_spent", "resets_at" }`, `application/problem+json` | Nothing of the visitor's hour is left. No ticket is minted |
+| `429` | — (from the Vercel Firewall) | Too many tokens from this IP, should a Firewall rule be set |
+| `502` | — | ElevenLabs refused either ticket, or did not answer within the 8-second deadline, which the conversation list shares. Nothing is charged and the cookie is not written |
+| `503` | — | `ELEVENLABS_API_KEY`, `ELEVENLABS_AGENT_ID` or `VOICE_DEMO_COOKIE_SECRET` is not set. Unsetting the key is the kill switch |
 
 ---
 
@@ -694,7 +764,7 @@ format. Do not implement from this section.
 |---|---|---|
 | **Setup assistant chat** | Streaming (SSE) | Sends a turn, receives interleaved text deltas and structured `Partial<ReceptionistConfig>` patches. The assistant gets exactly the write authority today's canned parser has — it proposes a patch, the client applies it through the same path as a form |
 | **Voice session** | WebSocket or WebRTC | Bidirectional audio plus a transcript event stream. The client owns no codec decisions; it toggles a microphone boolean |
-| **Landing voice demo** | Decided for the stand-in | Unauthenticated. Until Fonnus-BE has a web voice gateway, the demo talks to an ElevenLabs agent with a token from this app (§5, [ADR 0006](./adr/0006-elevenlabs-landing-voice-demo.md)). The per-IP budget, the duration cap and the kill switch are in Q21's answer, and the gateway inherits them |
+| **Landing voice demo** | Decided for the stand-in | Unauthenticated. Until Fonnus-BE has a web voice gateway, the demo talks to an ElevenLabs agent with a token from this app (§5, [ADR 0006](./adr/0006-elevenlabs-landing-voice-demo.md)). Each browser has three minutes an hour, kept in the signed cookie of [ADR 0009](./adr/0009-voice-demo-budget-on-the-server.md); the duration cap and the kill switch are in Q21's answer, and the gateway inherits all three. A Vercel Firewall rate-limit rule is deferred to the backlog |
 | `GET /calls` | — | The "Cuộc gọi" tab, currently a placeholder |
 | `GET /appointments` | — | The "Lịch hẹn" tab |
 | `GET /numbers` | — | FPT inventory pool for number provisioning; sets `assigned_phone` |
