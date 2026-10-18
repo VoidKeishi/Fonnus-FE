@@ -94,11 +94,13 @@ ElevenLabs Conversational AI (`docs/adr/0006-elevenlabs-landing-voice-demo.md`, 
 conversation per hour, spent over as many calls as they like. The server keeps the count in
 a signed cookie: minting a ticket charges the whole of what is left, and the real length of
 each call is refunded from ElevenLabs's conversation list, so a spent hour is refused with a
-`429` whatever the browser says and clearing site data gives nothing back. There is no
+`429` whatever the browser says and clearing site data gives nothing back. Every ticket is
+minted behind an invisible Cloudflare Turnstile check, so a script without a browser pays
+for each fresh hour with a solved challenge. There is no
 recording and no mock: the visitor's browser talks to ElevenLabs directly, but only with a short-lived ticket,
 which this app's `POST /api/voice-demo/token` obtains from ElevenLabs with a secret API key.
 With no setup that route answers `503` and the call screen says it could not connect, which
-is also what `pnpm dev` shows on a machine without the three variables below. A visitor whose
+is also what `pnpm dev` shows on a machine without the variables below. A visitor whose
 browser gives no microphone talks to the same agent by typing, and reads the replies.
 
 1. In the ElevenLabs dashboard, open the agent and set it up as follows.
@@ -130,23 +132,33 @@ browser gives no microphone talks to the same agent by typing, and reads the rep
      without a microphone types, and a Vietnamese sentence takes 15–30 seconds; the page
      tells the agent the visitor is typing, but a longer timeout is the backstop. The
      setting applies to voice calls too, where it is how long Linh waits in silence.
-2. In the Vercel project, add three environment variables, all marked Sensitive, and
-   redeploy, because a variable applies only to new deployments. For local development,
-   put them in `.env.local` instead.
+2. In the Cloudflare dashboard, create a Turnstile widget in **Invisible** mode for
+   `fonnus.ai` and the Vercel preview hostnames. It gives a site key, which is public, and
+   a secret key. For local development `.env.example` already carries Cloudflare's
+   always-pass test pair, so no widget is needed to hear the agent on your machine.
+3. In the Vercel project, add five environment variables — the first four marked
+   Sensitive — and redeploy, because a variable applies only to new deployments. For
+   local development, put them in `.env.local` instead.
 
 ```bash
-ELEVENLABS_API_KEY=         # an API key from the ElevenLabs dashboard, restricted to Conversational AI if it offers scopes
-ELEVENLABS_AGENT_ID=        # the agent's id; the browser never sees it
-VOICE_DEMO_COOKIE_SECRET=   # a long random string (openssl rand -hex 32) that signs the budget cookie; a new value gives every visitor a fresh hour once
+ELEVENLABS_API_KEY=                # an API key from the ElevenLabs dashboard, restricted to Conversational AI if it offers scopes; it must be allowed to list conversations
+ELEVENLABS_AGENT_ID=               # the agent's id; the browser never sees it
+VOICE_DEMO_COOKIE_SECRET=          # a long random string (openssl rand -hex 32) that signs the budget cookie; a new value gives every visitor a fresh hour once
+TURNSTILE_SECRET_KEY=              # the widget's secret key
+NEXT_PUBLIC_TURNSTILE_SITE_KEY=    # the widget's site key; public, inlined into the page
 ```
 
-   The route is protected by the budget cookie, not by a rate limit: a browser whose hour
-   is spent gets a `429` from the route itself. The one Firewall rate-limit rule the Hobby
-   plan allows — over `/api/leads*` and this route, keyed on IP, a window of ten minutes or
+   The route is protected by the budget cookie and the Turnstile check, not by a rate
+   limit: a browser whose hour is spent gets a `429` from the route itself, and a request
+   without a valid challenge gets a `403`. The one Firewall rate-limit rule the Hobby plan
+   allows — over `/api/leads*` and this route, keyed on IP, a window of ten minutes or
    less — is deferred and described in `PLAN.md` §Backlog; several devices on one clinic's
-   wifi share an address, which is why it is not the budget's key.
+   wifi share an address, which is why it is not the budget's key. Turnstile's script is
+   fetched from Cloudflare's own URL when the consent slot opens; a content security
+   policy, when one arrives, must allow `script-src` and `frame-src` for
+   `https://challenges.cloudflare.com`.
 
-3. There is no switch: the demo is live as soon as the three variables are set and deployed.
+4. There is no switch: the demo is live as soon as the five variables are set and deployed.
    To turn it off again, unset `ELEVENLABS_API_KEY` and redeploy: the route answers `503`
    and the call screen tells the visitor it could not connect and offers to call again.
 

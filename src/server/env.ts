@@ -5,8 +5,10 @@ import { normalizePrivateKey } from './google-jwt'
  * The server-side counterpart of `src/api/env.ts`, and the only file under
  * `src/server/` that reads `process.env` (`eslint.config.mjs`). It holds two
  * groups of secrets, one function each: the leads spreadsheet's Google
- * credentials (ADR 0005) and the landing voice demo's ElevenLabs key and agent
- * with the secret that signs its budget cookie (ADR 0006, ADR 0009). None is
+ * credentials (ADR 0005) and the landing voice demo's four — the ElevenLabs
+ * key and agent, the secret that signs its budget cookie, and the Turnstile
+ * secret its ticket route verifies a visitor's proof with (ADR 0006, ADR
+ * 0009). None is
  * prefixed `NEXT_PUBLIC_`, so none is inlined into a bundle, and the
  * `server-only` import above fails the build if a client file ever reaches
  * this one.
@@ -46,17 +48,21 @@ export interface VoiceDemoConfig extends ElevenLabsConfig {
    * cookie is dropped and every tap would be a fresh hour.
    */
   secureCookie: boolean
+  /** Verifies the Turnstile token every ticket costs (ADR 0009 point 5). */
+  turnstileSecret: string
 }
 
 /**
- * `null` when any of the three is unset or empty, and both voice routes answer
+ * `null` when any of the four is unset or empty, and both voice routes answer
  * 503. Unsetting the key is the voice demo's kill switch (ADR 0006 point 6);
- * without the cookie secret there is no budget to keep, so no ticket either.
+ * without the cookie secret there is no budget to keep, and without the
+ * Turnstile secret no proof to check, so no ticket either (ADR 0009 point 6).
  */
 export function voiceDemoConfig(): VoiceDemoConfig | null {
   const apiKey = process.env.ELEVENLABS_API_KEY?.trim() ?? ''
   const agentId = process.env.ELEVENLABS_AGENT_ID?.trim() ?? ''
   const cookieSecret = process.env.VOICE_DEMO_COOKIE_SECRET?.trim() ?? ''
-  if (!apiKey || !agentId || !cookieSecret) return null
-  return { apiKey, agentId, cookieSecret, secureCookie: process.env.NODE_ENV === 'production' }
+  const turnstileSecret = process.env.TURNSTILE_SECRET_KEY?.trim() ?? ''
+  if (!apiKey || !agentId || !cookieSecret || !turnstileSecret) return null
+  return { apiKey, agentId, cookieSecret, secureCookie: process.env.NODE_ENV === 'production', turnstileSecret }
 }

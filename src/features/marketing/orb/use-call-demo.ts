@@ -76,9 +76,11 @@ export interface CallDemo {
   openCall: (returnFocusTo?: HTMLElement | null) => void
   /**
    * Connects. Called from the consent button and from "Gọi lại", inside the
-   * tap: the microphone prompt needs it.
+   * tap: the microphone prompt needs it. `challenge` is the call screen's
+   * Turnstile widget (`use-turnstile.ts`), which every ticket costs; both
+   * attempts of the tap are handed it.
    */
-  startCall: () => void
+  startCall: (challenge: (signal: AbortSignal) => Promise<string>) => void
   closeCall: () => void
   /** The control the current call was opened from, as handed to `openCall`. */
   returnFocusTo: () => HTMLElement | null
@@ -155,7 +157,7 @@ export function useCallDemoState(): CallDemo {
     [setBudget, refreshBudgetAfterCall],
   )
 
-  const startCall = useCallback(() => {
+  const startCall = useCallback((challenge: (signal: AbortSignal) => Promise<string>) => {
     endSession()
     const id = turn.current
     resetCall()
@@ -237,7 +239,7 @@ export function useCallDemoState(): CallDemo {
     }
 
     const connect = (nextInput: VoiceInput) =>
-      api.voice.connect({ mode: 'landing-demo', input: nextInput, signal: controller.signal })
+      api.voice.connect({ mode: 'landing-demo', input: nextInput, signal: controller.signal, challenge })
 
     // Called in the tap's own turn: the microphone prompt needs the gesture.
     void connect('voice').then(

@@ -17,6 +17,7 @@ import {
 import { useCallDemo } from './call-demo-provider'
 import { budgetLine, endingLine, spentLine, stateLabel } from './call-state'
 import type { ThreadLine } from './use-call-demo'
+import { useTurnstile } from './use-turnstile'
 
 /*
  * The call screen. Three things and nothing else: the orb, a way to type, and a
@@ -52,6 +53,10 @@ import type { ThreadLine } from './use-call-demo'
  * the top rather than centred: the orb is placed on its slot when the slot
  * changes size, not when it moves, so a thread that grows must not push the
  * slot about.
+ *
+ * One more element draws nothing: the container of the Invisible Turnstile
+ * widget every call's ticket costs (ADR 0009 point 5), mounted with the dialog
+ * in every shape so the widget outlives a slot swap.
  */
 
 /* Same treatment as the hero: Chấm nhịp behind the orb only, centred on its slot. */
@@ -86,6 +91,8 @@ export function CallOverlay({ spotRef, orbRef }: CallOverlayProps) {
   const slotLineId = useId()
   const budgetLineId = useId()
   const threadRef = useRef<HTMLDivElement>(null)
+  const turnstileRef = useRef<HTMLDivElement>(null)
+  const challenge = useTurnstile(demo.open, turnstileRef)
   const { awaitingConsent, ended, failed, budget } = demo
   /** The server said nothing of the hour is left: no call can start until it turns. */
   const spent = budget !== null && budget.remainingMs <= 0
@@ -135,6 +142,10 @@ export function CallOverlay({ spotRef, orbRef }: CallOverlayProps) {
     if (thread) thread.scrollTop = thread.scrollHeight
   }, [lineCount])
 
+  const startCall = () => {
+    demo.startCall(challenge)
+  }
+
   const send = () => {
     if (!typed.trim()) return
     demo.ask(typed)
@@ -159,7 +170,7 @@ export function CallOverlay({ spotRef, orbRef }: CallOverlayProps) {
         {spent ? null : (
           <Button
             variant="secondary"
-            onClick={demo.startCall}
+            onClick={startCall}
             aria-describedby={ended === 'error' ? slotLineId : undefined}
           >
             {CALL_AGAIN_LABEL}
@@ -173,7 +184,7 @@ export function CallOverlay({ spotRef, orbRef }: CallOverlayProps) {
         {CONNECT_FAILED_LINE}
       </p>
       {/* No sign-up link: a visitor the demo failed is not sent to a form. */}
-      <Button variant="secondary" onClick={demo.startCall} aria-describedby={slotLineId}>
+      <Button variant="secondary" onClick={startCall} aria-describedby={slotLineId}>
         {CALL_AGAIN_LABEL}
       </Button>
     </div>
@@ -181,6 +192,8 @@ export function CallOverlay({ spotRef, orbRef }: CallOverlayProps) {
 
   return (
     <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} className="outline-none">
+      {/* Cloudflare's own markup goes in here; React renders nothing into it. */}
+      <div ref={turnstileRef} aria-hidden="true" className="fixed size-0 overflow-clip" />
       <div className="fixed inset-0 isolate z-60 grid grid-rows-[auto_1fr_auto] bg-surface-page px-[clamp(16px,4vw,40px)] pt-5 pb-[clamp(20px,4vh,40px)] motion-safe:animate-[fnFadeIn_320ms_var(--ease-arc)]">
         <Pattern
           name="dots"
@@ -237,7 +250,7 @@ export function CallOverlay({ spotRef, orbRef }: CallOverlayProps) {
               )}
               <Button
                 variant="primary"
-                onClick={demo.startCall}
+                onClick={startCall}
                 aria-describedby={leftLine === null ? slotLineId : `${slotLineId} ${budgetLineId}`}
               >
                 {START_LABEL}

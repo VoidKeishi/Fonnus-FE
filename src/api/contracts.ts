@@ -256,8 +256,9 @@ export interface VoiceApi {
    * Rejects with `microphone_unavailable` when `input` is `voice` and the
    * browser gives no microphone, for any reason; the caller then connects
    * again with `text`. Rejects with `voice_unavailable` when nothing could
-   * connect in time, or with whatever `http.ts` makes of the ticket's refusal:
-   * `budget_spent` (kind `ratelimited`) when nothing of the hour is left.
+   * connect in time or `challenge` gave no proof, or with whatever `http.ts`
+   * makes of the ticket's refusal: `budget_spent` (kind `ratelimited`) when
+   * nothing of the hour is left, `forbidden` when the route refused the proof.
    *
    * The session's cap comes with its ticket, not from the caller: see
    * `VoiceSession.budget`.
@@ -266,6 +267,20 @@ export interface VoiceApi {
     mode: 'landing-demo';
     input: VoiceInput;
     signal?: AbortSignal | undefined;
+    /**
+     * The proof the ticket route asks for (ADR 0009 point 5), obtained when
+     * the route is about to be called: after the microphone grant for a call,
+     * first thing for a text session, under the connection budget, whose
+     * signal it is handed. A rejection, or no answer within the budget, is
+     * `voice_unavailable`: no proof, no ticket.
+     *
+     * It may be called more than once in one tap — the voice attempt and the
+     * text one after a refused microphone — and must then hand out a token no
+     * earlier call returned: a token returned is taken as spent. The live
+     * implementation calls it only after the microphone grant, so a refused
+     * microphone leaves the tap's one unused token to the text attempt.
+     */
+    challenge: (signal: AbortSignal) => Promise<string>;
   }): Promise<VoiceSession>;
 }
 

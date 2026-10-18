@@ -186,6 +186,10 @@ and refunded no further, so the cookie stays under the 4 KB a browser keeps.
   Settled by the first `GET /api/voice-demo/budget` with a cookie, on the production key.
 - A budget read five seconds after hang-up finds the conversation past `in-progress`. If it
   usually does not, the delay grows, or the ending reads twice.
+- An Invisible widget runs inside a zero-size, `aria-hidden` container in the call dialog,
+  and `reset` followed by `execute` on a widget rendered with `execution: 'execute'` gives a
+  fresh token each tap. Settled by two taps in a row with the network panel open: two
+  siteverify calls, both successful. If the container matters, it gets a size off-screen.
 - Vercel's `x-forwarded-for` is the visitor's address for `remoteip`. `remoteip` is optional
   to Cloudflare, so a wrong value weakens the check and breaks nothing.
 

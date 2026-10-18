@@ -430,7 +430,10 @@ Newest first. One line per session that taught something; the rule itself goes a
   `in-progress` and would flip the ending to spent and back five seconds later — the review
   caught it — so an ending waits five seconds before its one read, and only the read after a
   `429` repeats once; and when a server answer swaps a slot's buttons under a focused one,
-  focus has to be handed on, the same rule as 2026-10-11.
+  focus has to be handed on, the same rule as 2026-10-11. Not visual, from the Turnstile
+  half: a client module that names a third-party URL has to be imported dynamically or the
+  URL lands in the landing page's first-load chunk with nothing fetched — now a bullet in
+  `.claude/rules/next-code.md` §Server and client boundary.
 
 - **2026-10-15 (landing page, the call screen gets an hour's budget)** — Giving the "Nghe
   thử" call three minutes an hour added one sentence with a clock in it, "gọi lại được sau

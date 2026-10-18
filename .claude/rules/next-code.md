@@ -26,6 +26,12 @@ marked `'use client'`.
   server component rejects it.
 - A client component that calls `useSearchParams` on a prerendered route sits
   inside `<Suspense>`, or `next build` fails. `next dev` does not show this.
+- A client module that names a third-party origin — a script URL, a vendor SDK —
+  is reached through a dynamic `import()` inside the handler that needs it, never
+  a static import from a component on the page. A static import puts the URL
+  and the module into the page's first-load chunk even when nothing is fetched
+  (`src/features/marketing/orb/use-turnstile.ts`, `src/api/voice.live.ts`).
+  `grep -rn "<host>" .next/static` after `pnpm build` is the check.
 - Content the server must render but a client state switches between — the two billing
   periods of a plan — stays in a server component: the provider writes the state on a
   `group` wrapper as `data-*`, and each server-rendered block hides itself with a group
