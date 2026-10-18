@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import type { RefObject } from 'react'
 import Link from 'next/link'
-import { Button, buttonClassName, Icon, Pattern } from '@/design-system'
+import { Button, buttonClassName, Icon } from '@/design-system'
 import {
   CALL_AGAIN_LABEL,
   CONNECT_FAILED_LINE,
@@ -16,6 +16,8 @@ import {
 import { CallChips } from './call-chips'
 import { CallCountdown } from './call-countdown'
 import { useCallDemo } from './call-demo-provider'
+import { createDotField } from './dot-field'
+import type { DotField } from './dot-field'
 import { budgetLine, endingLine, spentLine, stateLabel } from './call-state'
 import type { ThreadLine } from './use-call-demo'
 import { useTurnstile } from './use-turnstile'
@@ -56,14 +58,15 @@ import { useTurnstile } from './use-turnstile'
  * changes size, not when it moves, so a thread that grows must not push the
  * slot about.
  *
+ * Behind it all is Chấm nhịp, the dotted field her voice moves
+ * (`dot-field.ts`): mounted here, centred on the orb's slot, and advanced by
+ * the orb's own loop, which this screen reaches through `dotFieldRef`.
+ *
  * One more element draws nothing: the container of the Invisible Turnstile
  * widget every call's ticket costs (ADR 0009 point 5), mounted with the dialog
  * in every shape so the widget outlives a slot swap.
  */
 
-/* Same treatment as the hero: Chấm nhịp behind the orb only, centred on its slot. */
-const DOTS_MASK =
-  'radial-gradient(circle at 50% 46%, var(--text-heading) 0%, color-mix(in srgb, var(--text-heading) 55%, transparent) 16%, transparent 38%)'
 const FAST = 'transition-colors duration-[var(--duration-fast)] ease-out'
 const ROUND = `grid size-10 flex-none cursor-pointer place-items-center rounded-[50%] border-none ${FAST}`
 const IDLE = 'bg-surface-card text-text-body'
@@ -79,9 +82,11 @@ interface CallOverlayProps {
    * opened from anywhere else.
    */
   orbRef: RefObject<HTMLElement | null>
+  /** Where the dotted field is handed to the orb's loop while this screen is open. */
+  dotFieldRef: RefObject<DotField | null>
 }
 
-export function CallOverlay({ spotRef, orbRef }: CallOverlayProps) {
+export function CallOverlay({ spotRef, orbRef, dotFieldRef }: CallOverlayProps) {
   const demo = useCallDemo()
   const { returnFocusTo } = demo
   const [typed, setTyped] = useState('')
@@ -94,6 +99,8 @@ export function CallOverlay({ spotRef, orbRef }: CallOverlayProps) {
   const budgetLineId = useId()
   const threadRef = useRef<HTMLDivElement>(null)
   const turnstileRef = useRef<HTMLDivElement>(null)
+  const fieldRef = useRef<HTMLCanvasElement>(null)
+  useDotField(fieldRef, spotRef, dotFieldRef)
   const challenge = useTurnstile(demo.open, turnstileRef)
   const { awaitingConsent, ended, failed, budget } = demo
   /** The server said nothing of the hour is left: no call can start until it turns. */
@@ -197,10 +204,10 @@ export function CallOverlay({ spotRef, orbRef }: CallOverlayProps) {
       {/* Cloudflare's own markup goes in here; React renders nothing into it. */}
       <div ref={turnstileRef} aria-hidden="true" className="fixed size-0 overflow-clip" />
       <div className="fixed inset-0 isolate z-60 grid grid-rows-[auto_1fr_auto] bg-surface-page px-[clamp(16px,4vw,40px)] pt-5 pb-[clamp(20px,4vh,40px)] motion-safe:animate-[fnFadeIn_320ms_var(--ease-arc)]">
-        <Pattern
-          name="dots"
-          className="text-text-heading [@media(max-width:900px)]:hidden!"
-          style={{ zIndex: -1, maskImage: DOTS_MASK, WebkitMaskImage: DOTS_MASK }}
+        <canvas
+          ref={fieldRef}
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 -z-1 size-full text-text-heading"
         />
         <div className="flex items-center justify-between gap-4">
           <div className="grid grid-cols-[auto_1fr] items-center gap-x-3 text-ui leading-(--leading-body) text-text-muted">
@@ -230,8 +237,8 @@ export function CallOverlay({ spotRef, orbRef }: CallOverlayProps) {
               : 'grid place-items-center content-center gap-[60px]'
           }
         >
-          {/* Wide gap: the waves finish fading before they reach the label. Typed,
-              the orb is smaller and gives its room to the thread. */}
+          {/* Wide gap: the dotted field opens around the orb without crowding the
+              label. Typed, the orb is smaller and gives its room to the thread. */}
           <div
             ref={spotRef}
             aria-hidden="true"
@@ -388,6 +395,34 @@ function ThreadTurn({ line }: { line: ThreadLine }) {
       <p className="m-0 text-body-sm leading-[1.55] text-text-body">{line.text}</p>
     </div>
   )
+}
+
+/**
+ * Mounts the dotted field on its canvas and hands it to the orb's loop. It is
+ * re-laid out whenever the canvas or the orb's slot changes size; an
+ * observer's first report, which `observe()` always delivers, draws the
+ * resting field.
+ */
+function useDotField(
+  canvasRef: RefObject<HTMLCanvasElement | null>,
+  spotRef: RefObject<HTMLElement | null>,
+  dotFieldRef: RefObject<DotField | null>,
+) {
+  useEffect(() => {
+    const canvas = canvasRef.current
+    const spot = spotRef.current
+    if (!canvas || !spot) return
+    const field = createDotField(canvas, spot)
+    if (!field) return
+    const resized = new ResizeObserver(field.layout)
+    resized.observe(canvas)
+    resized.observe(spot)
+    dotFieldRef.current = field
+    return () => {
+      resized.disconnect()
+      dotFieldRef.current = null
+    }
+  }, [canvasRef, spotRef, dotFieldRef])
 }
 
 /**

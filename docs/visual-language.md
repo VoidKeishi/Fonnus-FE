@@ -163,7 +163,7 @@ prop, which does this for you).
 | Name         | Vietnamese     | Tile      | Ground        | Where                                              |
 | ------------ | -------------- | --------- | ------------- | -------------------------------------------------- |
 | `rings`      | Vòng reo       | 40 × 20   | paper         | opening slides (unused on the site so far)         |
-| `dots`       | Chấm nhịp      | 22 (+110) | paper         | the hero and the call overlay, radially masked behind the orb, hidden below 900px |
+| `dots`       | Chấm nhịp      | 22 (+110) | paper         | the hero, radially masked behind the orb, hidden below 900px; the call screen draws the same grid on a canvas at every width (`orb/dot-field.ts`), where it is her voice's only picture: it opens from close around the orb to about three orb radii as she speaks, peaks send a ripple that moves the dots without brightening them, and its ink dots never pass 22% (the terracotta dot keeps 75%) |
 | `arcs`       | Cung chéo      | 26        | blush / terracotta | the Bảo mật section (masked under the cards); the featured plan card in cream; the sign-in panel; the assistant panel's header strip at ~8% |
 | `grid`       | Lưới lịch      | 28        | paper / milk  | hours and holidays cards (`Card pattern="grid"`); every `EmptyState` |
 | `ticks`      | Dấu thanh      | 24, −12°  | sage only     | nothing at present — it belonged to `Notice tone="sage"` and the handoff bubble, both retired with the gate chips (Sept 2026). Sage only, when a resolved state next needs one |

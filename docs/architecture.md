@@ -102,7 +102,7 @@ src/
                                 hero/ (hero, clinic-logos)
                                 waitlist/ (waitlist-page, waitlist-panel, waitlist-field, waitlist-fields (+test): the /waitlist door — its own split frame and pill field, rebuilt rather than imported from auth/, because features never import each other)
                                 legal/ (legal-notice-page: one server component for both legal routes, copy from LEGAL_PAGES in data/)
-                                orb/ (voice-orb, orb, orb-field, use-orb-placement, orb-motion, call-overlay,
+                                orb/ (voice-orb, orb, orb-field, dot-field, use-orb-placement, orb-motion, call-overlay,
                                 call-countdown, call-chips, call-demo-provider, use-call-demo, call-state, use-call-budget, call-budget,
                                 turnstile, use-turnstile)
                                 sections/ (section-chrome, missed-calls, how-it-works, how-it-works-visuals,

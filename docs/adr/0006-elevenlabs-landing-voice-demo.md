@@ -145,8 +145,10 @@ exists, one file changes and no screen does.
 - The hostnames the SDK dials (`api.elevenlabs.io` and the WebRTC endpoints) are what a CSP
   under F7 must allow. Settled by reading the network panel during the first live call and
   recorded in F7's ADR.
-- `getOutputVolume()` from the SDK is a usable loudness for the orb's waves at the envelope
-  `orb-motion.ts` already applies. Settled by looking at the orb during the first live call.
+- `getOutputVolume()` from the SDK is a usable loudness for the orb and for the dotted field
+  behind it on the call screen, at the envelopes and thresholds `orb-motion.ts` applies
+  (`FIELD_LOUD`, `RIPPLE_RISE`, `RIPPLE_RISE_SHARE`). Settled by looking at both during the
+  first live call.
 - A Vercel Firewall fixed-window rule can key on IP over one path and answer `429`, as ADR
   0005 assumed for `/api/leads*`. That rule has not been created yet either.
 
