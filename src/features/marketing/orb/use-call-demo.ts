@@ -204,8 +204,8 @@ export function useCallDemoState(): CallDemo {
         }
         if (event.reason === 'user') return
         // Ended on its own: the screen stays open on the ending. Dropping the
-        // session stills the orb (no amplitude), and `connecting` stops its
-        // synthetic pulse should she have been mid-sentence.
+        // session stills the orb (no amplitude), and `connecting` ends her turn
+        // should she have been mid-sentence.
         unsubscribe.current?.()
         unsubscribe.current = null
         session.current = null

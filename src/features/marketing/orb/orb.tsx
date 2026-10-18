@@ -18,10 +18,12 @@ import type { OrbMode } from './orb-motion'
  * the dotted field behind it (`dot-field.ts`), which the same loop advances.
  */
 
-/** The pulse she breathes with when there is no waveform to follow. */
-const SYNTHETIC_HZ = 1.1
-const SYNTHETIC_MID = 0.45
-const SYNTHETIC_SWING = 0.35
+/*
+ * The swell a visitor who asked for less motion sees, held still while she
+ * speaks. Only a real voice moves the orb otherwise: a typed conversation has
+ * no loudness, and the orb stays as still as the dotted field behind it.
+ */
+const STILL_AMP = 0.45
 /** Below this, a fading `--amp` is written as 0 and the envelope stops. */
 const AMP_FLOOR = 0.001
 
@@ -115,11 +117,11 @@ function useOrbAnimation(
   speaking: boolean,
   getAmplitude: () => number | null,
 ) {
-  const voice = useRef({ speaking, since: 0, getAmplitude })
+  const voice = useRef({ speaking, getAmplitude })
   const onVoiceChange = useRef<(() => void) | null>(null)
 
   useEffect(() => {
-    voice.current = { speaking, since: performance.now(), getAmplitude }
+    voice.current = { speaking, getAmplitude }
     onVoiceChange.current?.()
   }, [speaking, getAmplitude])
 
@@ -147,17 +149,12 @@ function useOrbAnimation(
       }
       const dt = now - lastFrame
       lastFrame = now
-      const { speaking: talking, since, getAmplitude: loudness } = voice.current
+      const { speaking: talking, getAmplitude: loudness } = voice.current
       const level = talking ? loudness() : null
-      if (talking || amp > 0) {
-        const target = talking
-          ? (level ??
-            SYNTHETIC_MID + SYNTHETIC_SWING * Math.sin(((now - since) / 1000) * SYNTHETIC_HZ * Math.PI * 2))
-          : 0
-        const next = envelopeStep(amp, target, dt, ORB_ENVELOPE)
-        writeAmp(!talking && next < AMP_FLOOR ? 0 : next)
+      if (level !== null || amp > 0) {
+        const next = envelopeStep(amp, level ?? 0, dt, ORB_ENVELOPE)
+        writeAmp(level === null && next < AMP_FLOOR ? 0 : next)
       }
-      // Only a real voice moves the dots; the synthetic pulse is the orb's alone.
       const dotsMoving = dotFieldRef.current?.advance(now, level) ?? false
       // With no field to draw, a silent orb has nothing left to do this frame.
       if (field || talking || amp > 0 || dotsMoving) raf = requestAnimationFrame(frame)
@@ -171,7 +168,8 @@ function useOrbAnimation(
       if (raf || document.hidden) return
       if (reduced.matches) {
         field?.draw(STILL_FRAME_MS)
-        writeAmp(voice.current.speaking ? SYNTHETIC_MID : 0)
+        const { speaking: talking, getAmplitude: loudness } = voice.current
+        writeAmp(talking && loudness() !== null ? STILL_AMP : 0)
         dotFieldRef.current?.settle()
         return
       }
