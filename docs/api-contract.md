@@ -535,7 +535,7 @@ offers to call again ([ADR 0007](./adr/0007-voice-demo-agent-only-and-text-fallb
 
 | Status | Body | Meaning |
 |---|---|---|
-| `200` | `{ "token": "…" }` or `{ "signed_url": "…" }`, `Cache-Control: no-store` | A call's token, valid for fifteen minutes, or a text session's signed URL |
+| `200` | `{ "token": "…" }` or `{ "signed_url": "…" }`, `Cache-Control: no-store` | A call's token, valid for fifteen minutes, or a text session's signed URL, requested with `include_conversation_id=true` so that it opens one conversation and no more |
 | `400` | — | The body is not a JSON object, or `input` is neither `voice` nor `text` |
 | `413` | — | The body is over 48 KiB, the cap the `leads` routes share |
 | `415` | — | Not `application/json` |
