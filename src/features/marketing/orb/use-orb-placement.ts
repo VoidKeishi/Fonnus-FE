@@ -78,7 +78,7 @@ export function useOrbPlacement(callOpen: boolean): OrbPlacement {
     return restingMode(dockBox)
   }, [])
 
-  /** `place`, plus the React side of the pose: the label, the waves, what can be pressed. */
+  /** `place`, plus the React side of the pose: the label, the call's stacking, what can be pressed. */
   const sync = useCallback(() => {
     const next = place()
     if (next) setResting(next)

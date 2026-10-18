@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import type { RefObject } from 'react'
 import { Icon } from '@/design-system'
+import type { DotField } from './dot-field'
 import { FIELD_FRAME_MS, STILL_FRAME_MS, createOrbField } from './orb-field'
 import { ORB_ENVELOPE, envelopeStep } from './orb-motion'
 import type { OrbMode } from './orb-motion'
@@ -8,25 +9,14 @@ import type { OrbMode } from './orb-motion'
 /*
  * The orb is one button laid out at its base size (280px) and scaled into place
  * by `use-orb-placement.ts`. Everything inside is sized in % so it stays sharp
- * at every scale, and everything that reacts to the voice — body scale, wave
- * brightness and spread, bloom — is a calc() off one custom property, `--amp`,
- * which the animation loop below writes. Driving them from CSS rather than
- * from React state is what keeps a 60fps envelope from re-rendering the tree.
+ * at every scale, and what reacts to the voice on the sphere — its scale and
+ * its bloom — is a calc() off one custom property, `--amp`, which the
+ * animation loop below writes. Driving them from CSS rather than from React
+ * state is what keeps a 60fps envelope from re-rendering the tree.
+ *
+ * The orb draws nothing around itself: on the call screen her voice shows in
+ * the dotted field behind it (`dot-field.ts`), which the same loop advances.
  */
-
-/** Three reads as a ripple; more turns into a target. */
-const WAVE_COUNT = 3
-const WAVE_PERIOD_MS = 2600
-const WAVE_STAGGER_MS = 900
-/*
- * The waves mount with the call screen, so their delays are negative: each
- * ring starts mid-flight in the same phase it would hold had it been running
- * all along, 900ms behind the one before, instead of waiting at the orb's edge.
- */
-const WAVES = Array.from({ length: WAVE_COUNT }, (_, i) => ({
-  id: i,
-  delay: -((WAVE_PERIOD_MS - i * WAVE_STAGGER_MS) % WAVE_PERIOD_MS),
-}))
 
 /** The pulse she breathes with when there is no waveform to follow. */
 const SYNTHETIC_HZ = 1.1
@@ -57,15 +47,17 @@ interface OrbProps {
   orbRef: RefObject<HTMLButtonElement | null>
   /** Null until placed: invisible and not yet pressable. */
   mode: OrbMode | null
-  /** True whenever she is talking; drives the waves. */
+  /** True whenever she is talking; drives the envelope. */
   speaking: boolean
   getAmplitude: () => number | null
+  /** The call screen's dotted field while it is mounted. */
+  dotFieldRef: RefObject<DotField | null>
   onClick: () => void
 }
 
-export function Orb({ orbRef, mode, speaking, getAmplitude, onClick }: OrbProps) {
+export function Orb({ orbRef, mode, speaking, getAmplitude, dotFieldRef, onClick }: OrbProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  useOrbAnimation(orbRef, canvasRef, speaking, getAmplitude)
+  useOrbAnimation(orbRef, canvasRef, dotFieldRef, speaking, getAmplitude)
 
   return (
     <button
@@ -82,24 +74,6 @@ export function Orb({ orbRef, mode, speaking, getAmplitude, onClick }: OrbProps)
         mode === null ? 'pointer-events-none' : 'cursor-pointer',
       ].join(' ')}
     >
-      {/* Two forces act on the waves at once: the keyframes carry each ring
-          outward on its own steady beat, and --amp decides how bright and how
-          far it gets. Only on the call screen. */}
-      {mode === 'call' ? (
-        <span
-          aria-hidden="true"
-          className="absolute inset-0 opacity-(--amp) [transform:scale(calc(1+var(--amp)*0.14))] motion-reduce:[transform:none]"
-        >
-          {WAVES.map((wave) => (
-            <span
-              key={wave.id}
-              className="absolute -inset-[8%] animate-[fnWave_2600ms_var(--ease-arc)_infinite] rounded-[50%] shadow-[inset_0_0_0_2px_color-mix(in_srgb,var(--text-eyebrow)_50%,transparent)]"
-              style={{ animationDelay: `${String(wave.delay)}ms` }}
-            />
-          ))}
-        </span>
-      ) : null}
-
       {/* Scaled straight off the amplitude rather than by a keyframe, so the
           sphere swells on the actual syllable. */}
       <span className="absolute inset-0 block rounded-[50%] [transform:scale(calc(1+var(--amp)*0.075))] motion-reduce:[transform:none]">
@@ -127,14 +101,17 @@ export function Orb({ orbRef, mode, speaking, getAmplitude, onClick }: OrbProps)
 }
 
 /**
- * The orb's one animation loop: the canvas field at ~30fps, and the `--amp`
- * envelope every frame. It stops while the tab is hidden, the envelope rests
+ * The page's one animation loop for the orb: the canvas field at ~30fps, the
+ * `--amp` envelope every frame, and the call screen's dotted field whenever it
+ * is mounted and moving. It stops while the tab is hidden, the envelope rests
  * once she is silent and `--amp` has decayed to 0, and a visitor who asked for
- * less motion gets one still frame and no loop at all — `--amp` then snaps.
+ * less motion gets one still frame and no loop at all — `--amp` then snaps and
+ * the dotted field stays at rest.
  */
 function useOrbAnimation(
   orbRef: RefObject<HTMLButtonElement | null>,
   canvasRef: RefObject<HTMLCanvasElement | null>,
+  dotFieldRef: RefObject<DotField | null>,
   speaking: boolean,
   getAmplitude: () => number | null,
 ) {
@@ -154,6 +131,7 @@ function useOrbAnimation(
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)')
     let raf = 0
     let lastField = -Infinity
+    let lastFrame = -Infinity
     let amp = 0
 
     const writeAmp = (value: number) => {
@@ -167,17 +145,22 @@ function useOrbAnimation(
         lastField = now
         field.draw(now)
       }
+      const dt = now - lastFrame
+      lastFrame = now
       const { speaking: talking, since, getAmplitude: loudness } = voice.current
+      const level = talking ? loudness() : null
       if (talking || amp > 0) {
         const target = talking
-          ? (loudness() ??
+          ? (level ??
             SYNTHETIC_MID + SYNTHETIC_SWING * Math.sin(((now - since) / 1000) * SYNTHETIC_HZ * Math.PI * 2))
           : 0
-        const next = envelopeStep(amp, target, ORB_ENVELOPE)
+        const next = envelopeStep(amp, target, dt, ORB_ENVELOPE)
         writeAmp(!talking && next < AMP_FLOOR ? 0 : next)
       }
+      // Only a real voice moves the dots; the synthetic pulse is the orb's alone.
+      const dotsMoving = dotFieldRef.current?.advance(now, level) ?? false
       // With no field to draw, a silent orb has nothing left to do this frame.
-      if (field || talking || amp > 0) raf = requestAnimationFrame(frame)
+      if (field || talking || amp > 0 || dotsMoving) raf = requestAnimationFrame(frame)
     }
 
     const stop = () => {
@@ -189,6 +172,7 @@ function useOrbAnimation(
       if (reduced.matches) {
         field?.draw(STILL_FRAME_MS)
         writeAmp(voice.current.speaking ? SYNTHETIC_MID : 0)
+        dotFieldRef.current?.settle()
         return
       }
       raf = requestAnimationFrame(frame)
@@ -213,5 +197,5 @@ function useOrbAnimation(
       reduced.removeEventListener('change', onMotionPreference)
       orb.style.setProperty('--amp', '0')
     }
-  }, [orbRef, canvasRef])
+  }, [orbRef, canvasRef, dotFieldRef])
 }
