@@ -31,9 +31,14 @@ export function mintConversationToken(config: ElevenLabsConfig, signal: AbortSig
   return fetchTicket('token', TOKEN_URL, TOKEN_FIELD, config, signal)
 }
 
-/** The same, for the signed URL a text-only conversation opens its WebSocket with. */
+/**
+ * The same, for the signed URL a text-only conversation opens its WebSocket
+ * with. Asked for with `include_conversation_id`, which ElevenLabs documents as
+ * making the URL single-use: without it the same URL opens conversations for
+ * fifteen minutes.
+ */
 export function mintSignedUrl(config: ElevenLabsConfig, signal: AbortSignal): Promise<string> {
-  return fetchTicket('signed-url', SIGNED_URL_URL, SIGNED_URL_FIELD, config, signal)
+  return fetchTicket('signed-url', SIGNED_URL_URL, SIGNED_URL_FIELD, config, signal, { include_conversation_id: 'true' })
 }
 
 async function fetchTicket(
@@ -42,10 +47,12 @@ async function fetchTicket(
   field: string,
   config: ElevenLabsConfig,
   signal: AbortSignal,
+  query: Record<string, string> = {},
 ): Promise<string> {
+  const params = new URLSearchParams({ agent_id: config.agentId, ...query })
   let response: Response
   try {
-    response = await fetch(`${url}?agent_id=${encodeURIComponent(config.agentId)}`, {
+    response = await fetch(`${url}?${params.toString()}`, {
       headers: { 'xi-api-key': config.apiKey, Accept: 'application/json' },
       signal,
     })
