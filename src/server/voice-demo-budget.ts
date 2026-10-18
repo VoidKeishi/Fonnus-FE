@@ -21,12 +21,13 @@ import { createHmac, timingSafeEqual } from 'node:crypto'
  */
 
 /**
- * `MAX_CALL_MS` of `src/api/voice.live.ts`, the per-call cap ADR 0006 chose
- * under the agent's own 180 seconds: one uninterrupted call spends the hour.
+ * `MAX_CALL_MS` of `src/api/voice.live.ts`, the per-call cap, exactly the
+ * three minutes the screen counts down and under the agent's own 190 seconds
+ * (ADR 0010): one uninterrupted call spends the hour.
  * Repeated rather than imported, since this directory imports nothing of
  * `src/api/` but its four pure files.
  */
-export const HOUR_BUDGET_MS = 175_000
+export const HOUR_BUDGET_MS = 180_000
 export const WINDOW_MS = 3_600_000
 /** How long either ticket opens a conversation for, as ElevenLabs documents both. */
 export const TICKET_LIFETIME_MS = 900_000

@@ -1,9 +1,9 @@
 /**
  * Copy for the "Nghe thử" call screen on the landing page: the suggestion
  * chips, and the lines and buttons of the states around the conversation —
- * consent before the microphone, the hour's budget, the endings, a call that
- * could not connect, and the typed conversation a browser without a microphone
- * gets (ADR 0006, ADR 0007, ADR 0008).
+ * consent before the microphone, the hour's budget and its countdown, the
+ * endings, a call that could not connect, and the typed conversation a browser
+ * without a microphone gets (ADR 0006, ADR 0007, ADR 0008, ADR 0010).
  *
  * A chip is a question the caller asks, handled exactly as a typed line is:
  * handed to the voice session (`api.voice`), which is always the ElevenLabs
@@ -37,6 +37,16 @@ export const budgetLeftLine = (remaining: string) => `Giờ này bạn còn ${re
 /** Instead of the consent line, when nothing of the hour is left. */
 export const budgetSpentLine = (wait: string) =>
   `Bạn đã dùng hết 3 phút gọi thử trong giờ này — gọi lại được sau ${wait}. Ở phòng khám của bạn, Linh nghe máy cả ngày.`
+
+/**
+ * Under the call screen's title while a session runs (ADR 0010): what is left
+ * of the hour's three minutes, already said as "2:39", over all three.
+ */
+export const countdownLine = (left: string) => `${left} / 3:00`
+export const COUNTDOWN_LABEL = 'Thời gian gọi thử còn lại'
+/** Said once to a screen reader, as the countdown crosses `COUNTDOWN_WARNING_MS`. */
+export const COUNTDOWN_WARNING_LINE = 'Còn 30 giây gọi thử.'
+export const COUNTDOWN_WARNING_MS = 30_000
 
 /** The call that spent the hour ended on its cap. */
 export const endedTimeoutLine = (wait: string) =>

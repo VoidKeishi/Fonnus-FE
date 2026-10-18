@@ -223,7 +223,7 @@ describe('handleVoiceDemoToken, by input', () => {
 describe('handleVoiceDemoToken, the hour', () => {
   it('charges a first ticket the whole hour, and sets the cookie that keeps it', async () => {
     const response = await handleVoiceDemoToken(post(CALL), deps())
-    expect(await response.json()).toEqual({ token: 'abc', remaining_ms: 175_000, resets_at: NOW + WINDOW_MS })
+    expect(await response.json()).toEqual({ token: 'abc', remaining_ms: 180_000, resets_at: NOW + WINDOW_MS })
     const cookie = response.headers.get('set-cookie') ?? ''
     expect(cookie.startsWith(`${COOKIE_NAME}=`)).toBe(true)
     expect(cookie).toContain('; Path=/api/voice-demo;')
@@ -260,11 +260,11 @@ describe('handleVoiceDemoToken, the hour', () => {
       deps({ mint: () => minted('def', 'conv_2'), listConversations }),
     )
     expect(response.status).toBe(200)
-    expect(await response.json()).toEqual({ token: 'def', remaining_ms: 155_000, resets_at: NOW - 60_000 + WINDOW_MS })
+    expect(await response.json()).toEqual({ token: 'def', remaining_ms: 160_000, resets_at: NOW - 60_000 + WINDOW_MS })
     expect(listConversations).toHaveBeenCalledWith(CONFIG, Math.floor((NOW - 60_000) / 1000), expect.any(AbortSignal))
     expect(ledgerFrom(response)?.entries).toEqual([
       { id: 'conv_1', at: NOW - 60_000, ms: 20_000 },
-      { id: 'conv_2', at: NOW, ms: 155_000 },
+      { id: 'conv_2', at: NOW, ms: 160_000 },
     ])
   })
 
@@ -319,7 +319,7 @@ describe('handleVoiceDemoBudget', () => {
       Promise.resolve(page({ conversation_id: 'conv_1', status: 'processing', call_duration_secs: 40 })),
     )
     const response = await handleVoiceDemoBudget(get(chargedCookie()), deps({ listConversations }))
-    expect(await response.json()).toEqual({ remaining_ms: 135_000, resets_at: NOW - 60_000 + WINDOW_MS })
+    expect(await response.json()).toEqual({ remaining_ms: 140_000, resets_at: NOW - 60_000 + WINDOW_MS })
     expect(ledgerFrom(response)?.entries).toEqual([{ id: 'conv_1', at: NOW - 60_000, ms: 40_000 }])
   })
 

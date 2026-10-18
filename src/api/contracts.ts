@@ -199,6 +199,13 @@ export interface VoiceSession {
   readonly budget: VoiceBudget;
 
   /**
+   * When that cap ends the session, in epoch milliseconds: what the call
+   * screen counts down to (ADR 0010). Read from the moment `connect`
+   * resolves; it does not move.
+   */
+  readonly endsAt: number;
+
+  /**
    * Returns the unsubscribe. A new listener is first handed, synchronously,
    * every `message` so far and then the latest of the other events, so a
    * caller that subscribes after `connect` resolves still learns that she is

@@ -222,7 +222,7 @@ describe('startSession, once the conversation has started', () => {
     expect(events).toHaveLength(count)
   })
 
-  it('hangs up on its own cap at 175 seconds', async () => {
+  it('hangs up on its own cap at 180 seconds', async () => {
     const { events, conversation } = await started()
     await vi.advanceTimersByTimeAsync(MAX_CALL_MS - 1)
     expect(endings(events)).toEqual([])
@@ -240,7 +240,7 @@ describe('startSession, once the conversation has started', () => {
     expect(conversation.endSession).toHaveBeenCalledTimes(1)
   })
 
-  it('never lets the ticket’s budget run past its own 175 seconds', async () => {
+  it('never lets the ticket’s budget run past its own 180 seconds', async () => {
     const { events } = await started('voice', { remaining_ms: 10 * 60_000, resets_at: RESETS_AT })
     await vi.advanceTimersByTimeAsync(MAX_CALL_MS - 1)
     expect(endings(events)).toEqual([])
@@ -248,7 +248,7 @@ describe('startSession, once the conversation has started', () => {
     expect(endings(events)).toEqual([{ type: 'ended', reason: 'timeout' }])
   })
 
-  it('holds an answer with no usable budget to its own 175 seconds, never to zero', async () => {
+  it('holds an answer with no usable budget to its own 180 seconds, never to zero', async () => {
     const { events } = await started('voice', { remaining_ms: Number.NaN, resets_at: RESETS_AT })
     await vi.advanceTimersByTimeAsync(MAX_CALL_MS - 1)
     expect(endings(events)).toEqual([])
@@ -260,6 +260,20 @@ describe('startSession, once the conversation has started', () => {
     const hour = { remaining_ms: 40_000, resets_at: RESETS_AT }
     const { session } = await started('voice', hour)
     expect(session.budget).toEqual(hour)
+  })
+
+  it('says when its cap hangs up, so the countdown on screen reaches zero at the cut', async () => {
+    const { session, events } = await started('voice', { remaining_ms: 40_000, resets_at: RESETS_AT })
+    const endsAt = session.endsAt
+    expect(endsAt).toBe(Date.now() + 40_000)
+    await vi.advanceTimersByTimeAsync(endsAt - Date.now())
+    expect(endings(events)).toEqual([{ type: 'ended', reason: 'timeout' }])
+    expect(session.endsAt).toBe(endsAt)
+  })
+
+  it('counts down from its own 180 seconds when the ticket allows more', async () => {
+    const { session } = await started('text', { remaining_ms: 10 * 60_000, resets_at: RESETS_AT })
+    expect(session.endsAt).toBe(Date.now() + MAX_CALL_MS)
   })
 
   it('ends once, as the visitor’s doing, when closed, and hears nothing after', async () => {

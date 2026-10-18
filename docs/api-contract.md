@@ -432,6 +432,7 @@ The session has:
 | Member | What it does |
 |---|---|
 | `budget` | The `VoiceBudget` the ticket's answer carried: what this session may spend, and when the hour is back |
+| `endsAt` | When the session's cap ends it, in epoch milliseconds, set as the cap's timer starts and never moved. The call screen counts down to it under its title, `2:39 / 3:00`, while the session runs ([ADR 0010](./adr/0010-voice-demo-countdown.md)) |
 | `subscribe(listener)` | Delivers events and returns the unsubscribe. A new listener is first handed, synchronously, every `message` so far and then the latest of the other events. Nothing is delivered after `close()` resolves |
 | `setMicEnabled(on)` | The screen's entire microphone surface. The session owns `getUserMedia` and everything downstream of it. A no-op in a text session |
 | `sendText(text)` | A chip or a typed line. A text session also emits it back as the visitor's `message` |
@@ -499,8 +500,8 @@ the page. What the client does:
   microphone toggle. Every other rejection, of either attempt, is a failed call: "Không kết nối
   được với Linh lúc này. Bạn thử gọi lại sau một lát." and "Gọi lại", with no sign-up link.
   Nothing stands in for the agent.
-- **A cap of 175 seconds at most**, under the agent's own 180, so the ending is the app's: the
-  session emits `ended { reason: 'timeout' }` and closes itself. The cap is the ticket's
+- **A cap of 180 seconds at most**, under the agent's own 190, so the ending is the app's: the
+  session emits `ended { reason: 'timeout' }` and closes itself at `endsAt`. The cap is the ticket's
   `remaining_ms`, what is left of the visitor's three minutes an hour, when that is shorter
   ([ADR 0008](./adr/0008-voice-demo-three-minutes-an-hour.md)). The hour is counted on the
   server, by the route that mints the ticket ([ADR 0009](./adr/0009-voice-demo-budget-on-the-server.md));
@@ -530,7 +531,7 @@ the page. What the client does:
 - **Loudness.** `getAmplitude()` is the agent's output volume while she speaks in a call, and
   `null` otherwise, in a text session, or once the session has ended; the orb draws its own idle
   pulse while she listens.
-- **The agent's own cap.** When ElevenLabs ends the call at its 180 s `max_duration_seconds`
+- **The agent's own cap.** When ElevenLabs ends the call at its 190 s `max_duration_seconds`
   before the client's own timer does, the disconnect arrives as an error with the context
   `max_duration_exceeded`; the session reports it as `timeout`, not `error`.
 
@@ -567,7 +568,7 @@ visitor's hour stands, for the call screen to say.
 ```jsonc
 // → 200, Cache-Control: no-store, Set-Cookie: voice_demo_budget=… when a refund changed it
 { "remaining_ms": 135000, "resets_at": 1792288800000 }   // part of the hour spent
-{ "remaining_ms": 175000, "resets_at": null }            // the full budget
+{ "remaining_ms": 180000, "resets_at": null }            // the full budget
 ```
 
 No body is read, and no Turnstile token is asked for: the read mints nothing. The cookie is
@@ -591,12 +592,12 @@ session caps itself on.
 // request, a call — Content-Type: application/json
 { "turnstile_token": "<Turnstile token>" }    // `"input": "voice"` may be added
 // → 200, Cache-Control: no-store, Set-Cookie: voice_demo_budget=…
-{ "token": "<WebRTC conversation token>", "remaining_ms": 175000, "resets_at": 1792288800000 }
+{ "token": "<WebRTC conversation token>", "remaining_ms": 180000, "resets_at": 1792288800000 }
 
 // request, a text session
 { "input": "text", "turnstile_token": "<Turnstile token>" }
 // → 200, Cache-Control: no-store, Set-Cookie: voice_demo_budget=…
-{ "signed_url": "wss://…", "remaining_ms": 175000, "resets_at": 1792288800000 }
+{ "signed_url": "wss://…", "remaining_ms": 180000, "resets_at": 1792288800000 }
 
 // nothing of the hour left
 // → 429, Content-Type: application/problem+json, Cache-Control: no-store

@@ -14,6 +14,7 @@ import {
   TEXT_PLACEHOLDER,
   WAITLIST_LABEL,
 } from '@/data/call-demo'
+import { CallCountdown } from './call-countdown'
 import { useCallDemo } from './call-demo-provider'
 import { budgetLine, endingLine, spentLine, stateLabel } from './call-state'
 import type { ThreadLine } from './use-call-demo'
@@ -37,8 +38,9 @@ import { useTurnstile } from './use-turnstile'
  * controls, which have nothing to talk to, but keep the room reserved for them
  * so the orb does not move.
  *
- * The hour's budget (ADR 0008) shows in two of them and nowhere during a
- * call. Consent says what is left when part of the hour is spent, and with
+ * The hour's budget (ADR 0008) shows in words in two of them. While a session
+ * runs it is the countdown under the title instead (ADR 0010), which every
+ * other shape leaves empty. Consent says what is left when part of the hour is spent, and with
  * nothing left it says when the next call can start and offers only the
  * waitlist. An ending that spent the rest of the hour says the same and drops
  * "Gọi lại" until the hour turns: a button that opens a call that cannot
@@ -201,9 +203,15 @@ export function CallOverlay({ spotRef, orbRef }: CallOverlayProps) {
           style={{ zIndex: -1, maskImage: DOTS_MASK, WebkitMaskImage: DOTS_MASK }}
         />
         <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3 text-ui leading-(--leading-body) text-text-muted">
+          <div className="grid grid-cols-[auto_1fr] items-center gap-x-3 text-ui leading-(--leading-body) text-text-muted">
             <span className="size-2 rounded-[50%] bg-text-eyebrow" />
             <span id={titleId}>Nha khoa Minh Anh · bản mô phỏng</span>
+            {/* Its line is reserved from the first frame: the orb is placed on
+                its slot when the slot changes size, not when it moves, so a
+                header that grew as the call connected would leave it off. */}
+            <div className="col-start-2 min-h-[1lh]">
+              {demo.endsAt === null ? null : <CallCountdown key={demo.endsAt} endsAt={demo.endsAt} />}
+            </div>
           </div>
           <button
             type="button"

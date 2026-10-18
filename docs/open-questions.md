@@ -333,6 +333,11 @@ the same `429` shape and the same `GET` answer `{ remaining_ms, resets_at }`, ke
 its own store, and a bot check of its choosing on the mint; the cookie, the list call and the
 Turnstile secret are this app's stand-in and are deleted with the token route.
 
+**Added 2026-10-18 (`docs/adr/0010-voice-demo-countdown.md`):** the call screen now counts the
+three minutes down while a session runs, so the budget is exactly 180 seconds, the client's cap
+is 180 s and the agent's `max_duration_seconds` is 190. **What the gateway inherits:** its
+session gives `endsAt`, the moment its own cap ends the call, which the countdown reads.
+
 ---
 
 ## Smaller confirmations

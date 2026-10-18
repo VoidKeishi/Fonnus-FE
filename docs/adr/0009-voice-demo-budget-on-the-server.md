@@ -1,6 +1,6 @@
 # ADR 0009: The voice demo's hour is kept by the server, in a signed cookie, and every ticket is minted behind a Turnstile check
 
-**Status:** accepted · **Date:** 2026-10-18 · Amends [ADR 0006](./0006-elevenlabs-landing-voice-demo.md) point 6 · Supersedes [ADR 0008](./0008-voice-demo-three-minutes-an-hour.md) points 4 and 6
+**Status:** accepted · **Date:** 2026-10-18 · Amends [ADR 0006](./0006-elevenlabs-landing-voice-demo.md) point 6 · Supersedes [ADR 0008](./0008-voice-demo-three-minutes-an-hour.md) points 4 and 6 · Points 1 and 2 amended by [ADR 0010](./0010-voice-demo-countdown.md): `HOUR_BUDGET_MS` is 180 seconds
 
 ## Decision
 
