@@ -61,6 +61,11 @@ export interface CallDemo {
   /** Nothing could connect: the screen says so and offers to call again. */
   failed: boolean
   /**
+   * When the running session's cap ends it, in epoch milliseconds, for the
+   * countdown under the title (ADR 0010); null while no session runs.
+   */
+  endsAt: number | null
+  /**
    * What is left of the hour as the server last said, or null while it has
    * not: read when the call opens, when one ends on its own, when a ticket is
    * refused for it, and when the hour turns under a slot that says when. With
@@ -106,6 +111,7 @@ export function useCallDemoState(): CallDemo {
   const [input, setInput] = useState<VoiceInput | null>(null)
   const [messages, setMessages] = useState<readonly ThreadLine[]>([])
   const [failed, setFailed] = useState(false)
+  const [endsAt, setEndsAt] = useState<number | null>(null)
   const onSlot = open && (awaitingConsent || ended !== null)
   const { budget, refreshBudget, refreshBudgetAfterCall, setBudget, stopBudgetRead } = useCallBudget(open, onSlot)
 
@@ -137,6 +143,7 @@ export function useCallDemoState(): CallDemo {
     setFailed(false)
     setInput(null)
     setMessages([])
+    setEndsAt(null)
   }, [])
 
   /**
@@ -181,6 +188,7 @@ export function useCallDemoState(): CallDemo {
       connecting.current = null
       session.current = next
       setInput(nextInput)
+      setEndsAt(next.endsAt)
       unsubscribe.current = next.subscribe((event) => {
         if (event.type === 'state') {
           setAgent(event.state)
@@ -202,6 +210,7 @@ export function useCallDemoState(): CallDemo {
         settleEnding(event.reason, next.budget)
         setAgent('connecting')
         setEnded(event.reason)
+        setEndsAt(null)
       })
       // A tap on the mic button while still connecting lands here, not in the void.
       if (!micRef.current) void next.setMicEnabled(false)
@@ -359,6 +368,7 @@ export function useCallDemoState(): CallDemo {
       input,
       messages,
       failed,
+      endsAt,
       budget,
       openCall,
       startCall,
@@ -378,6 +388,7 @@ export function useCallDemoState(): CallDemo {
       input,
       messages,
       failed,
+      endsAt,
       budget,
       openCall,
       startCall,

@@ -18,6 +18,25 @@ export function remainingLabel(ms: number): string {
   return `${String(minutes)} phút ${String(rest)} giây`
 }
 
+/**
+ * What is left of a running call, as the countdown under the title says it
+ * (ADR 0010): "2:39". Whole seconds rounded up, so "0:00" shows at the cut and
+ * not a second before it.
+ */
+export function clockLabel(ms: number): string {
+  const seconds = Math.max(0, Math.ceil(ms / 1000))
+  return `${String(Math.floor(seconds / 60))}:${String(seconds % 60).padStart(2, '0')}`
+}
+
+/**
+ * How long until `clockLabel` says another number: rounded up, it changes as
+ * what is left crosses a whole second. Never 0, which would spin the timer
+ * while what is left sits on a whole second.
+ */
+export function nextTickMs(leftMs: number): number {
+  return leftMs % 1000 || 1000
+}
+
 /** How long until the budget is back, in whole minutes rounded up: "42 phút", never "0 phút". */
 export function waitLabel(ms: number): string {
   return `${String(Math.max(1, Math.ceil(ms / 60_000)))} phút`

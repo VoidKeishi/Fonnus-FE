@@ -51,7 +51,7 @@ describe('stateLabel, typed', () => {
 const RESETS_AT = Date.UTC(2026, 9, 18, 3, 0, 0)
 const left = (remainingMs: number, waitMs = 50 * 60_000): CallBudget => ({ remainingMs, resetsAt: RESETS_AT, waitMs })
 const spent = (waitMs: number): CallBudget => ({ remainingMs: 0, resetsAt: RESETS_AT, waitMs })
-const FULL: CallBudget = { remainingMs: 175_000, resetsAt: null, waitMs: 0 }
+const FULL: CallBudget = { remainingMs: 180_000, resetsAt: null, waitMs: 0 }
 
 describe('budgetLine', () => {
   it('says nothing before the server has answered', () => {

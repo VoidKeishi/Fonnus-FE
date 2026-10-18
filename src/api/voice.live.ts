@@ -53,12 +53,13 @@ import { createVoiceEvents } from './voice-events'
  */
 const CONNECT_BUDGET_MS = 15_000
 /**
- * The agent's own `max_duration_seconds` is 180. Closing first keeps the
- * ending the app's, with the app's words (ADR 0006 point 6). What the ticket
- * may spend of the visitor's hour (ADR 0009) can only shorten it. Exported for
- * the tests.
+ * Exactly the three minutes the call screen counts down (ADR 0010). The
+ * agent's own `max_duration_seconds` is 190: closing first keeps the ending
+ * the app's, with the app's words (ADR 0006 point 6). What the ticket may
+ * spend of the visitor's hour (ADR 0009) can only shorten it. Exported for the
+ * tests.
  */
-export const MAX_CALL_MS = 175_000
+export const MAX_CALL_MS = 180_000
 
 const TICKET_PATH = '/api/voice-demo/token'
 const BUDGET_PATH = '/api/voice-demo/budget'
@@ -268,6 +269,8 @@ export function startSession(
   /** The SDK reported a disconnect before `startSession` resolved. */
   let droppedEarly = false
   let capTimer: ReturnType<typeof setTimeout> | undefined
+  /** Set where `capTimer` is armed, before the session is handed over. */
+  let endsAt = Number.POSITIVE_INFINITY
 
   const setMode = (next: Mode) => {
     mode = next
@@ -283,6 +286,10 @@ export function startSession(
 
   const session: VoiceSession = {
     budget: hour,
+
+    get endsAt() {
+      return endsAt
+    },
 
     subscribe(listener) {
       return events.subscribe(listener)
@@ -370,7 +377,7 @@ export function startSession(
         }
         // A close or the cap ended it first and already said why.
         if (closing || ended) return
-        // The agent's own 180 s cap, if it beats the client's one (a
+        // The agent's own 190 s cap, if it beats the client's one (a
         // throttled background tab): still the duration cap, not a failure.
         if (details.reason === 'error' && details.context?.type === 'max_duration_exceeded') {
           end('timeout')
@@ -398,13 +405,12 @@ export function startSession(
         // Connected and nothing said yet: she waits for the visitor, rather
         // than the line sitting on "connecting" until her first message.
         if (text && mode === null) setMode('listening')
-        capTimer = setTimeout(
-          () => {
-            end('timeout')
-            void started.endSession().catch(() => undefined)
-          },
-          capFor(hour),
-        )
+        const cap = capFor(hour)
+        endsAt = Date.now() + cap
+        capTimer = setTimeout(() => {
+          end('timeout')
+          void started.endSession().catch(() => undefined)
+        }, cap)
         resolve(session)
       },
       (cause: unknown) => {

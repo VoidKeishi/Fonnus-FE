@@ -1,6 +1,6 @@
 # ADR 0007: The voice demo has no recording, and a visitor without a microphone talks to the agent in text
 
-**Status:** accepted · **Date:** 2026-10-11 · Amends [ADR 0006](./0006-elevenlabs-landing-voice-demo.md) points 2, 7 and 10
+**Status:** accepted · **Date:** 2026-10-11 · Amends [ADR 0006](./0006-elevenlabs-landing-voice-demo.md) points 2, 7 and 10 · Point 6 amended by [ADR 0010](./0010-voice-demo-countdown.md): the cap is 180 seconds
 
 ## Decision
 

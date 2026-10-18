@@ -63,7 +63,7 @@ src/
     leads.mock.ts · leads.live.ts  The contact form, the hotline report and the waitlist. Live posts to this app's own /api/leads… (ADR 0005)
     lead-limits.ts              The length caps and the 20-location limit, read by the forms and by server/
     voice-events.ts (+test)     The event stream every voice session shares: the latest event handed to a new listener, nothing after close. Pure, imports nothing
-    voice.live.ts (+test)       The ElevenLabs session, loaded on the first call (ADR 0006, 0007): voice input (microphone, token, SDK, WebRTC) or text input (signed URL, SDK, text-only over WebSocket), 15 s connect budget, capped at what the ticket's answer allows under 175 s; `budget()` reads the hour (ADR 0009). The one group with no mock: always live
+    voice.live.ts (+test)       The ElevenLabs session, loaded on the first call (ADR 0006, 0007): voice input (microphone, token, SDK, WebRTC) or text input (signed URL, SDK, text-only over WebSocket), 15 s connect budget, capped at what the ticket's answer allows under 180 s, and says when (`endsAt`, ADR 0010); `budget()` reads the hour (ADR 0009). The one group with no mock: always live
     tenant.* (F3) · receptionist.* · shell.* · insights.* (Tổng quan) · calls.* (F5) · appointments.* · numbers.* · account.* (F6)
 
   server/                       Code that runs only in a route handler (ADR 0005). Only src/app/ imports it
@@ -103,7 +103,7 @@ src/
                                 waitlist/ (waitlist-page, waitlist-panel, waitlist-field, waitlist-fields (+test): the /waitlist door — its own split frame and pill field, rebuilt rather than imported from auth/, because features never import each other)
                                 legal/ (legal-notice-page: one server component for both legal routes, copy from LEGAL_PAGES in data/)
                                 orb/ (voice-orb, orb, orb-field, use-orb-placement, orb-motion, call-overlay,
-                                call-demo-provider, use-call-demo, call-state, use-call-budget, call-budget,
+                                call-countdown, call-demo-provider, use-call-demo, call-state, use-call-budget, call-budget,
                                 turnstile, use-turnstile)
                                 sections/ (section-chrome, missed-calls, how-it-works, how-it-works-visuals,
                                 play-when-seen, capabilities, capability-row, capability-actions,
@@ -394,7 +394,9 @@ the second arrived (ADR 0006 point 9); a third use follows them, it does not nee
   screen, never covered. The hour's budget of three minutes (ADR 0008, kept by the server
   since ADR 0009) reaches the screen through `api.voice.budget()` and the ticket's answer:
   `use-call-budget.ts` reads it when the call opens and when a call ends, `call-budget.ts`
-  holds the two Vietnamese labels, and nothing in the browser keeps a count. Every ticket
+  holds the labels, and nothing in the browser keeps a count. While a session runs,
+  `call-countdown.tsx` counts down to the session's `endsAt` under the screen's title
+  (ADR 0010). Every ticket
   is minted behind Cloudflare Turnstile (ADR 0009 point 5): `turnstile.ts` injects
   Cloudflare's script when the consent slot opens, never with the page, and runs the
   invisible widget in a container the overlay owns; `use-turnstile.ts` hands

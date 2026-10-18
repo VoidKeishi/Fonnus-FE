@@ -104,8 +104,8 @@ is also what `pnpm dev` shows on a machine without the variables below. A visito
 browser gives no microphone talks to the same agent by typing, and reads the replies.
 
 1. In the ElevenLabs dashboard, open the agent and set it up as follows.
-   - Under Advanced → Call limits, set `max_duration_seconds` to 180. The landing page ends
-     the call itself a few seconds earlier; this limit is the backstop. In the same place,
+   - Under Advanced → Call limits, set `max_duration_seconds` to 190. The landing page ends
+     the call itself at three minutes, ten seconds earlier; this limit is the backstop. In the same place,
      turn **Bursting** off (on by default, it lets calls exceed the workspace's concurrency
      at double the price) and set the agent's **Concurrency limit** to about 5 (the default,
      -1, is no limit). These two are the ceiling under everything the budget cookie does
