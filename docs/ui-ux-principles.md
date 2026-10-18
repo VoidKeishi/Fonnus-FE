@@ -368,6 +368,13 @@ are English.
   nothing a visitor could still be reading after it has stopped being true. It is not a
   countdown: the number is as of when the slot appeared, and the screen says so where it
   matters (`docs/api-contract.md` §voice). From the call screen's spent hour.
+- A number the screen has asked for and not yet received is not a number. The slot keeps
+  its ordinary shape — the consent line and "Bắt đầu gọi", an ending and "Gọi lại" — and
+  the answer, when it comes, adds the sentence or swaps the shape; a read that fails
+  changes nothing, and the tap gets the real answer from the server. Never a placeholder
+  number, never a spinner in a sentence, never a button hidden on a guess. Every swap
+  keeps a focus target (`.claude/rules/next-code.md` §Rendering). From the call screen's
+  hour moving to the server.
 
 ---
 
@@ -412,6 +419,18 @@ works (`0914378064` / `111002`).
 ## Lessons log
 
 Newest first. One line per session that taught something; the rule itself goes above.
+
+- **2026-10-18 (landing page, the hour's budget moves to the server)** — The consent slot
+  used to know "còn 40 giây" before it was painted, because the number was in
+  `localStorage`; now it comes from `GET /api/voice-demo/budget` and may land a second
+  after the slot, or not at all. The first draft of the design gated the slot on the
+  answer; the build settled on the opposite and it is now §9's last bullet: unknown renders
+  the ordinary shape, the answer adds to it, and the tap tells the truth. Two things it
+  dragged along: a budget read right after a hang-up sees ElevenLabs's pessimistic
+  `in-progress` and would flip the ending to spent and back five seconds later — the review
+  caught it — so an ending waits five seconds before its one read, and only the read after a
+  `429` repeats once; and when a server answer swaps a slot's buttons under a focused one,
+  focus has to be handed on, the same rule as 2026-10-11.
 
 - **2026-10-15 (landing page, the call screen gets an hour's budget)** — Giving the "Nghe
   thử" call three minutes an hour added one sentence with a clock in it, "gọi lại được sau

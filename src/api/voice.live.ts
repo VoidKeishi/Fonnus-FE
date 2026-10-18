@@ -19,11 +19,24 @@
  * starts: `microphone_unavailable` (voice only: the browser gave no microphone,
  * for any reason, and the caller connects again with `text`),
  * `voice_unavailable` (the SDK failed to load or start, or no connection within
- * the budget below), and whatever `http.ts` makes of the token route's refusal.
+ * the budget below), and whatever `http.ts` makes of the token route's refusal
+ * — `budget_spent` among them, when the visitor's hour is spent.
+ *
+ * The hour is the route's (ADR 0009): `budget` reads it from
+ * `GET /api/voice-demo/budget`, and each ticket's answer says what that
+ * session may spend, which is where the session's cap comes from.
  */
-import type { VoiceAgentState, VoiceApi, VoiceEndReason, VoiceEvent, VoiceInput, VoiceSession } from './contracts'
+import type {
+  VoiceAgentState,
+  VoiceApi,
+  VoiceBudget,
+  VoiceEndReason,
+  VoiceEvent,
+  VoiceInput,
+  VoiceSession,
+} from './contracts'
 import { ApiError } from './errors'
-import { request } from './http'
+import { http, request } from './http'
 import { createVoiceEvents } from './voice-events'
 
 /*
@@ -35,13 +48,14 @@ import { createVoiceEvents } from './voice-events'
 const CONNECT_BUDGET_MS = 15_000
 /**
  * The agent's own `max_duration_seconds` is 180. Closing first keeps the
- * ending the app's, with the app's words (ADR 0006 point 6). A caller's
- * `maxDurationMs` — what is left of the visitor's hour (ADR 0008) — can only
- * shorten it. Exported for the tests.
+ * ending the app's, with the app's words (ADR 0006 point 6). What the ticket
+ * may spend of the visitor's hour (ADR 0009) can only shorten it. Exported for
+ * the tests.
  */
 export const MAX_CALL_MS = 175_000
 
 const TICKET_PATH = '/api/voice-demo/token'
+const BUDGET_PATH = '/api/voice-demo/budget'
 
 /**
  * The part of the SDK's `VoiceConversation` and `TextConversation` this file
@@ -70,7 +84,11 @@ function throwIfAborted(signal: AbortSignal | undefined): void {
 }
 
 export const voiceLive: VoiceApi = {
-  async connect({ input, signal, maxDurationMs }) {
+  budget(opts) {
+    return http.get<VoiceBudget>(BUDGET_PATH, { ownOrigin: true, signal: opts?.signal })
+  },
+
+  async connect({ input, signal }) {
     throwIfAborted(signal)
     if (input === 'voice') await askForMicrophone(signal)
 
@@ -83,8 +101,10 @@ export const voiceLive: VoiceApi = {
       if (budget.aborted) throw unavailable()
     }
 
-    const ticket = await requestTicket(input, budget).catch((cause: unknown) => {
-      // `http.ts` reports the budget's abort as `canceled` or `timeout`; both are this budget's.
+    const { ticket, hour } = await requestTicket(input, budget).catch((cause: unknown) => {
+      // `http.ts` reports the budget's abort as `canceled` or `timeout`; both
+      // are this budget's. Any other refusal, `budget_spent` included, is the
+      // route's and reaches the caller as `http.ts` built it.
       throwIfSpent()
       throw cause
     })
@@ -125,31 +145,44 @@ export const voiceLive: VoiceApi = {
           : sdk.VoiceConversation.startSession({ conversationToken: ticket, connectionType: 'webrtc', ...callbacks }),
       budget,
       signal,
-      maxDurationMs,
+      hour,
     )
   },
 }
 
-/** A call's WebRTC conversation token, or a typed conversation's WebSocket signed URL. */
-async function requestTicket(input: VoiceInput, signal: AbortSignal): Promise<string> {
+/**
+ * A call's WebRTC conversation token, or a typed conversation's WebSocket
+ * signed URL, with what that ticket may spend of the hour.
+ */
+async function requestTicket(input: VoiceInput, signal: AbortSignal): Promise<{ ticket: string; hour: VoiceBudget }> {
   if (input === 'text') {
-    const answer = await request<{ signed_url: string }>(TICKET_PATH, {
+    const { signed_url, remaining_ms, resets_at } = await request<{ signed_url: string } & VoiceBudget>(TICKET_PATH, {
       method: 'POST',
       body: { input: 'text' },
       ownOrigin: true,
       signal,
     })
-    return answer.signed_url
+    return { ticket: signed_url, hour: { remaining_ms, resets_at } }
   }
   // An empty JSON body on purpose: the route answers 415 to anything that is
   // not `application/json` (docs/api-contract.md §5), and `{}` is a call.
-  const { token } = await request<{ token: string }>(TICKET_PATH, {
+  const { token, remaining_ms, resets_at } = await request<{ token: string } & VoiceBudget>(TICKET_PATH, {
     method: 'POST',
     body: {},
     ownOrigin: true,
     signal,
   })
-  return token
+  return { ticket: token, hour: { remaining_ms, resets_at } }
+}
+
+/**
+ * How long the session may run: what its ticket may spend, never past
+ * `MAX_CALL_MS`. An answer without a usable number is held to the maximum,
+ * not to zero, which would hang up the moment she answers.
+ */
+function capFor(hour: VoiceBudget): number {
+  const remaining = hour.remaining_ms
+  return Number.isFinite(remaining) ? Math.min(MAX_CALL_MS, Math.max(0, remaining)) : MAX_CALL_MS
 }
 
 /**
@@ -187,16 +220,16 @@ interface Callbacks {
  * Starts the conversation under what is left of the connect budget and wraps
  * it as a `VoiceSession`. A conversation that arrives after the budget fired
  * is ended unheard, and its callbacks change nothing. `signal` is the caller's
- * own, read only to tell an abort from the budget running out. The session
- * ends with `timeout` after `maxDurationMs`, clamped to `MAX_CALL_MS`.
- * Exported for the tests.
+ * own, read only to tell an abort from the budget running out. `hour` is the
+ * ticket's answer: the session ends with `timeout` once its `remaining_ms` has
+ * run, clamped to `MAX_CALL_MS`. Exported for the tests.
  */
 export function startSession(
   input: VoiceInput,
   start: (callbacks: Callbacks) => Promise<Conversation>,
   budget: AbortSignal,
   signal: AbortSignal | undefined,
-  maxDurationMs?: number,
+  hour: VoiceBudget,
 ): Promise<VoiceSession> {
   // A text conversation's lines are kept, not replaced by the next event: the
   // SDK may deliver her first one before this resolves and anyone subscribes.
@@ -226,6 +259,8 @@ export function startSession(
   }
 
   const session: VoiceSession = {
+    budget: hour,
+
     subscribe(listener) {
       return events.subscribe(listener)
     },
@@ -345,7 +380,7 @@ export function startSession(
             end('timeout')
             void started.endSession().catch(() => undefined)
           },
-          Math.min(MAX_CALL_MS, Math.max(0, maxDurationMs ?? MAX_CALL_MS)),
+          capFor(hour),
         )
         resolve(session)
       },

@@ -42,7 +42,8 @@ src/
     api/leads/hotline-report/route.ts   POST /api/leads/hotline-report: one row per location
     api/leads/waitlist/route.ts         POST /api/leads/waitlist: one row per person joining the waitlist
     waitlist/page.tsx           /waitlist, the one call to action of the marketing pages while the product opens in batches. Outside both route groups: no header pill or footer (its own split frame, like the sign-in door), no auth layout
-    api/voice-demo/token/route.ts       POST: the live demo's ticket — a WebRTC conversation token for a voice call, a WebSocket signed URL for a text session (ADR 0006, 0007)
+    api/voice-demo/token/route.ts       POST: the live demo's ticket — a WebRTC conversation token for a voice call, a WebSocket signed URL for a text session — charged against the hour's budget cookie, 429 when it is spent (ADR 0006, 0007, 0009)
+    api/voice-demo/budget/route.ts      GET: what is left of the visitor's hour and when it is back, from the same cookie (ADR 0009)
     (marketing)/                F4. layout (header, footer, the call demo's provider), page, cham-diem-hotline/page.tsx (static, the hotline report), chinh-sach-bao-mat/ and dieu-khoan-dich-vu/ (static, noindex: the notice that each legal text is not published yet), error.tsx
     (auth)/                     layout (AuthShell, F1b), dang-nhap/, dang-ky/ (F1b), error.tsx [backlog]
     app/                        layout: RequireSession → AppShell (→ ConfigProvider, F3). error.tsx [backlog]
@@ -62,11 +63,11 @@ src/
     leads.mock.ts · leads.live.ts  The contact form, the hotline report and the waitlist. Live posts to this app's own /api/leads… (ADR 0005)
     lead-limits.ts              The length caps and the 20-location limit, read by the forms and by server/
     voice-events.ts (+test)     The event stream every voice session shares: the latest event handed to a new listener, nothing after close. Pure, imports nothing
-    voice.live.ts (+test)       The ElevenLabs session, loaded on the first call (ADR 0006, 0007): voice input (microphone, token, SDK, WebRTC) or text input (signed URL, SDK, text-only over WebSocket), 15 s connect budget, 175 s cap. The one group with no mock: always live
+    voice.live.ts (+test)       The ElevenLabs session, loaded on the first call (ADR 0006, 0007): voice input (microphone, token, SDK, WebRTC) or text input (signed URL, SDK, text-only over WebSocket), 15 s connect budget, capped at what the ticket's answer allows under 175 s; `budget()` reads the hour (ADR 0009). The one group with no mock: always live
     tenant.* (F3) · receptionist.* · shell.* · insights.* (Tổng quan) · calls.* (F5) · appointments.* · numbers.* · account.* (F6)
 
   server/                       Code that runs only in a route handler (ADR 0005). Only src/app/ imports it
-    env.ts                      The three Google variables and the two ElevenLabs ones, read per request. The only file here that reads process.env
+    env.ts                      The three Google variables and the voice demo's three (the ElevenLabs pair and the cookie secret), read per request. The only file here that reads process.env
     leads-input.ts (+test)      Checks a posted body again, with the forms' own rules
     lead-rows.ts (+test)        A checked lead or waitlist sign-up as a spreadsheet row, a hotline report as one row per location, stamped in Vietnam time
     google-jwt.ts (+test)       The signed assertion a service account trades for an access token
@@ -74,9 +75,11 @@ src/
     sheets.ts                   appendRows: one call to spreadsheets.values.append
     request-body.ts (+test)     The JSON media-type check and the body reader capped at 48 KB, sized from api/lead-limits.ts
     leads-handler.ts            Request in, Response out: 415, 413, 400, 422, 503, 202
-    elevenlabs-token.ts         mintConversationToken and mintSignedUrl: one GET each to ElevenLabs with the key
-    voice-demo-handler.ts (+test)  Request in, Response out: 415, 413, 400, 503, 502, 200
-    voice-demo.ts               Binds the handler to the real env and the real mint; the one function the route imports
+    elevenlabs-token.ts         mintConversationToken and mintSignedUrl: one GET each to ElevenLabs with the key, each answering the ticket and its conversation id
+    elevenlabs-conversations.ts listConversations: one GET of the agent's conversations since the hour's window opened — id, status, duration and nothing else — for the refunds (ADR 0009)
+    voice-demo-budget.ts (+test)  The hour's arithmetic and the signed cookie: charge the whole remainder at a mint, settle against the list, encode and verify with HMAC. Pure
+    voice-demo-handler.ts (+test)  Request in, Response out: the token's 415, 413, 400, 503, 429, 502, 200 and the budget's 503, 200
+    voice-demo.ts               Binds both handlers to the real env and the real ElevenLabs calls; the two functions the routes import
 
   session/                      Who is signed in
     session.ts                  The localStorage hint, through useSyncExternalStore
@@ -99,7 +102,7 @@ src/
                                 waitlist/ (waitlist-page, waitlist-panel, waitlist-field, waitlist-fields (+test): the /waitlist door — its own split frame and pill field, rebuilt rather than imported from auth/, because features never import each other)
                                 legal/ (legal-notice-page: one server component for both legal routes, copy from LEGAL_PAGES in data/)
                                 orb/ (voice-orb, orb, orb-field, use-orb-placement, orb-motion, call-overlay,
-                                call-demo-provider, use-call-demo, call-state)
+                                call-demo-provider, use-call-demo, call-state, use-call-budget, call-budget)
                                 sections/ (section-chrome, missed-calls, how-it-works, how-it-works-visuals,
                                 play-when-seen, capabilities, capability-row, capability-actions,
                                 capability-visuals, call-demo-player, call-demo-timeline, band, pricing,
@@ -221,7 +224,7 @@ No gate enforces these; the pm's review does.
 - No `loading.tsx` under `/app`: a client page draws its own skeleton from its state, and
   `RequireSession` already draws the shell's.
 - Four kinds of `route.ts` exist: `healthz`, the `leads` handlers of ADR 0005, the voice
-  demo's token of ADR 0006, and `llms.txt`. A `route.ts` exports the method and hands the
+  demo's token and budget of ADR 0006 and 0009, and `llms.txt`. A `route.ts` exports the method and hands the
   request to one function: in `src/server/` when the handler holds a secret or writes
   anywhere, in the feature when it only renders data the pages already show (`llms.txt`,
   static). No route handler proxies Fonnus-BE, and there is no server action (ADR 0003
@@ -239,15 +242,20 @@ the second arrived (ADR 0006 point 9); a third use follows them, it does not nee
 - `env.ts` exposes one function per group of variables, read inside the function, per
   request, so `next build` needs no secret. It returns `null` when the group is incomplete,
   and the handler answers `503`, never crashes.
-- Every handler is a status ladder that ends in one upstream call under one deadline, and
-  the deadline sits under the browser's own timeout so the server always answers first.
+- Every handler is a status ladder whose upstream calls run under one deadline, and the
+  deadline sits under the browser's own timeout so the server always answers first. The
+  forms make one call; the voice demo's token route makes two (the conversation list that
+  settles the hour, then the mint), and a failed list call is logged and answered around,
+  never a refusal (ADR 0009).
 - A response carries a status and, for a `422`, the field list. Never text from the upstream
   service: the frontend owns every sentence the visitor reads, and a vendor's prose would not
   be Vietnamese.
 - A log line carries the step and the upstream status. Never a field a visitor typed, never
   a key, never a token.
 - Rate limiting is a Vercel Firewall rule on the route's path, not code: function instances
-  share no memory. The rule lives in the Vercel project and `README.md` records it.
+  share no memory. The rule lives in the Vercel project and `README.md` records it. The one
+  count a route keeps itself is the voice demo's hour, and it keeps it in a cookie the visitor
+  carries and the route signs (ADR 0009) — still no memory shared between instances.
 - The lint fence stands: only `src/app/` imports `src/server/`, and `src/server/` imports only
   itself, the four pure `src/api/` files named in `eslint.config.mjs`, and `node:` built-ins.
 
@@ -381,10 +389,10 @@ the second arrived (ADR 0006 point 9); a third use follows them, it does not nee
   orb. The call goes through `api.voice`, which is always the ElevenLabs agent (ADR 0006,
   amended by ADR 0007): there is no mock and no recording. A visitor whose browser gives no
   microphone gets a text session with the same agent; a connection that fails is said on
-  screen, never covered. The hour's budget of three minutes (ADR 0008) is the call demo's
-  own rule, not the transport's: `call-budget.ts` is the pure arithmetic and the labels,
-  `call-budget-store.ts` the `localStorage` read and write inside function calls, and the
-  hook hands the remainder to `api.voice.connect` as `maxDurationMs`.
+  screen, never covered. The hour's budget of three minutes (ADR 0008, kept by the server
+  since ADR 0009) reaches the screen through `api.voice.budget()` and the ticket's answer:
+  `use-call-budget.ts` reads it when the call opens and when a call ends, `call-budget.ts`
+  holds the two Vietnamese labels, and nothing in the browser keeps a count.
 - A night surface (the footer) renders inside a `data-theme="dark"` scope, so every alias
   inside it resolves to the night palette `colors.css` already defines. This is a night
   island in a light page, not a dark mode: nothing switches it.

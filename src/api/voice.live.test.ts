@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Mock } from 'vitest'
-import type { VoiceEvent, VoiceInput, VoiceSession } from './contracts'
+import type { VoiceBudget, VoiceEvent, VoiceInput, VoiceSession } from './contracts'
 import { ApiError } from './errors'
 import { MAX_CALL_MS, startSession, voiceLive } from './voice.live'
 
@@ -13,17 +13,23 @@ import { MAX_CALL_MS, startSession, voiceLive } from './voice.live'
  * reject with the one code that turns the call into a typed conversation, and
  * that conversation must never touch the microphone. After it starts, the
  * SDK's disconnect has to become the one ending the screen shows, said once
- * and with the right reason. None of it needs a microphone or a network: the
+ * and with the right reason, and its cap must be what the ticket said the
+ * visitor's hour has left. None of it needs a microphone or a network: the
  * SDK and the token request are stubbed and their callbacks called by hand.
  */
 
 const stubs = vi.hoisted(() => ({
-  request: vi.fn<(path: string, opts: Record<string, unknown>) => Promise<Record<string, string>>>(),
+  request: vi.fn<(path: string, opts: Record<string, unknown>) => Promise<Record<string, unknown>>>(),
+  get: vi.fn<(path: string, opts: Record<string, unknown>) => Promise<unknown>>(),
   textStart: vi.fn<(options: Record<string, unknown>) => Promise<unknown>>(),
   voiceStart: vi.fn<(options: Record<string, unknown>) => Promise<unknown>>(),
 }))
 
-vi.mock('./http', () => ({ request: stubs.request }))
+vi.mock('./http', () => ({ request: stubs.request, http: { get: stubs.get } }))
+
+const RESETS_AT = Date.UTC(2026, 9, 18, 3, 0, 0)
+/** A first ticket of the hour: all of it to spend. */
+const FULL_HOUR: VoiceBudget = { remaining_ms: MAX_CALL_MS, resets_at: RESETS_AT }
 vi.mock('@elevenlabs/client', () => ({
   Conversation: { startSession: stubs.textStart },
   VoiceConversation: { startSession: stubs.voiceStart },
@@ -54,7 +60,7 @@ function stubConversation(): StubConversation {
  * Starts a session on the stub, under a budget made of the caller's signal and
  * a stand-in for `AbortSignal.timeout` the test aborts by hand, combined as `connect` combines them.
  */
-function open(input: VoiceInput = 'voice', maxDurationMs?: number) {
+function open(input: VoiceInput = 'voice', hour: VoiceBudget = FULL_HOUR) {
   const caller = new AbortController()
   const timeout = new AbortController()
   const conversation = stubConversation()
@@ -74,7 +80,7 @@ function open(input: VoiceInput = 'voice', maxDurationMs?: number) {
     start,
     AbortSignal.any([caller.signal, timeout.signal]),
     caller.signal,
-    maxDurationMs,
+    hour,
   )
   const { callbacks, resolve, reject } = sdk
   if (!callbacks || !resolve || !reject) throw new Error('startSession did not call start')
@@ -82,8 +88,8 @@ function open(input: VoiceInput = 'voice', maxDurationMs?: number) {
 }
 
 /** Opens a session, lets the SDK hand the conversation over, and records every event. */
-async function started(input: VoiceInput = 'voice', maxDurationMs?: number) {
-  const opened = open(input, maxDurationMs)
+async function started(input: VoiceInput = 'voice', hour: VoiceBudget = FULL_HOUR) {
+  const opened = open(input, hour)
   opened.resolve()
   const session: VoiceSession = await opened.pending
   const events: VoiceEvent[] = []
@@ -222,8 +228,8 @@ describe('startSession, once the conversation has started', () => {
     expect(conversation.endSession).toHaveBeenCalledTimes(1)
   })
 
-  it('hangs up at the screen’s own cap, what is left of the hour, with the same ending', async () => {
-    const { events, conversation } = await started('voice', 40_000)
+  it('hangs up when what the ticket said is left of the hour has run, with the same ending', async () => {
+    const { events, conversation } = await started('voice', { remaining_ms: 40_000, resets_at: RESETS_AT })
     await vi.advanceTimersByTimeAsync(40_000 - 1)
     expect(endings(events)).toEqual([])
     await vi.advanceTimersByTimeAsync(1)
@@ -231,12 +237,26 @@ describe('startSession, once the conversation has started', () => {
     expect(conversation.endSession).toHaveBeenCalledTimes(1)
   })
 
-  it('never lets the screen’s cap run past its own 175 seconds', async () => {
-    const { events } = await started('voice', 10 * 60_000)
+  it('never lets the ticket’s budget run past its own 175 seconds', async () => {
+    const { events } = await started('voice', { remaining_ms: 10 * 60_000, resets_at: RESETS_AT })
     await vi.advanceTimersByTimeAsync(MAX_CALL_MS - 1)
     expect(endings(events)).toEqual([])
     await vi.advanceTimersByTimeAsync(1)
     expect(endings(events)).toEqual([{ type: 'ended', reason: 'timeout' }])
+  })
+
+  it('holds an answer with no usable budget to its own 175 seconds, never to zero', async () => {
+    const { events } = await started('voice', { remaining_ms: Number.NaN, resets_at: RESETS_AT })
+    await vi.advanceTimersByTimeAsync(MAX_CALL_MS - 1)
+    expect(endings(events)).toEqual([])
+    await vi.advanceTimersByTimeAsync(1)
+    expect(endings(events)).toEqual([{ type: 'ended', reason: 'timeout' }])
+  })
+
+  it('says what its ticket may spend and when the hour is back', async () => {
+    const hour = { remaining_ms: 40_000, resets_at: RESETS_AT }
+    const { session } = await started('voice', hour)
+    expect(session.budget).toEqual(hour)
   })
 
   it('ends once, as the visitor’s doing, when closed, and hears nothing after', async () => {
@@ -375,7 +395,7 @@ describe('connect', () => {
   beforeEach(() => {
     vi.useRealTimers()
     vi.stubGlobal('navigator', { mediaDevices: { getUserMedia } })
-    stubs.request.mockResolvedValue({ token: 'conversation-token' })
+    stubs.request.mockResolvedValue({ token: 'conversation-token', ...FULL_HOUR })
     stubs.textStart.mockImplementation(() => Promise.resolve(stubConversation()))
     stubs.voiceStart.mockImplementation(() => Promise.resolve(stubConversation()))
   })
@@ -386,7 +406,7 @@ describe('connect', () => {
   })
 
   it('starts a typed conversation on a signed URL over the WebSocket, without asking for the microphone', async () => {
-    stubs.request.mockResolvedValue({ signed_url: 'wss://api.elevenlabs.io/v1/convai/conversation?signed' })
+    stubs.request.mockResolvedValue({ signed_url: 'wss://api.elevenlabs.io/v1/convai/conversation?signed', ...FULL_HOUR })
     const session = await voiceLive.connect({ mode: 'landing-demo', input: 'text' })
     expect(getUserMedia).not.toHaveBeenCalled()
     expect(stubs.request).toHaveBeenCalledWith(
@@ -456,5 +476,36 @@ describe('connect', () => {
     stubs.request.mockRejectedValue(refusal)
     await expect(voiceLive.connect({ mode: 'landing-demo', input: 'text' })).rejects.toBe(refusal)
     expect(stubs.textStart).not.toHaveBeenCalled()
+  })
+
+  it('passes on a spent hour as the route said it, so the screen shows when to come back', async () => {
+    getUserMedia.mockResolvedValue({ getTracks: () => [] } as unknown as MediaStream)
+    const spent = new ApiError({ kind: 'ratelimited', status: 429, code: 'budget_spent' })
+    stubs.request.mockRejectedValue(spent)
+    const connecting = voiceLive.connect({ mode: 'landing-demo', input: 'voice' })
+    await expect(connecting).rejects.toBe(spent)
+    await expect(connecting).rejects.toMatchObject({ kind: 'ratelimited', code: 'budget_spent' })
+    expect(stubs.voiceStart).not.toHaveBeenCalled()
+  })
+
+  it('hands the session what the ticket’s answer said of the hour', async () => {
+    stubs.request.mockResolvedValue({ signed_url: 'wss://api.elevenlabs.io/v1/convai/conversation?signed', remaining_ms: 40_000, resets_at: RESETS_AT })
+    const session = await voiceLive.connect({ mode: 'landing-demo', input: 'text' })
+    expect(session.budget).toEqual({ remaining_ms: 40_000, resets_at: RESETS_AT })
+    await session.close()
+  })
+})
+
+describe('budget', () => {
+  afterEach(() => {
+    vi.resetAllMocks()
+  })
+
+  it('reads the hour from this app’s own route, with the caller’s signal', async () => {
+    const hour = { remaining_ms: 135_000, resets_at: RESETS_AT }
+    stubs.get.mockResolvedValue(hour)
+    const controller = new AbortController()
+    await expect(voiceLive.budget({ signal: controller.signal })).resolves.toEqual(hour)
+    expect(stubs.get).toHaveBeenCalledWith('/api/voice-demo/budget', { ownOrigin: true, signal: controller.signal })
   })
 })

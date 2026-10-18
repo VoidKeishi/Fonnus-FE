@@ -87,13 +87,14 @@ here as `docs/context-field-catalogue.v1.md` and mapped in `docs/field-catalogue
   personal data. The app renders consent outcomes; it never decides them, and it never shows
   caller-derived text that consent did not cover.
 
-### One secret, and it never reaches the browser
+### The secrets, and none reaches the browser
 
 Every `NEXT_PUBLIC_*` value is inlined into the JavaScript the browser downloads, so none of
 them is a secret. The session is an httpOnly cookie the browser holds and this code never
-reads. The one secret is the Google service account key that lets the lead route handlers
-append to the sheet: it is a server-side variable of the host, read only in
-`src/server/env.ts` (ADR 0005). `.env*` is gitignored; `.env.example` is the list of what
+reads. The secrets are server-side variables of the host, read only in `src/server/env.ts`
+and only inside a route handler: the Google service account key that lets the lead route
+handlers append to the sheet (ADR 0005), the ElevenLabs API key that mints the voice demo's
+tickets (ADR 0006), and the key that signs the voice demo's budget cookie (ADR 0009). `.env*` is gitignored; `.env.example` is the list of what
 exists, with no values.
 
 ### Personal data in the lead sheet

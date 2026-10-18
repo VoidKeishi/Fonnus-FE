@@ -177,10 +177,27 @@ export type VoiceEvent =
   | { type: 'ended'; reason: VoiceEndReason };
 
 /**
+ * Where the visitor's hour stands: three minutes of conversation an hour, kept
+ * by whoever mints the ticket (ADR 0008, ADR 0009). Epoch milliseconds.
+ */
+export interface VoiceBudget {
+  remaining_ms: number;
+  /** When the full budget is back; `null` while the full budget is there. */
+  resets_at: number | null;
+}
+
+/**
  * One conversation with the receptionist. The landing demo's today; the F3
  * try-out's once Fonnus-BE serves a voice gateway (ADR 0006).
  */
 export interface VoiceSession {
+  /**
+   * What this ticket may spend and when the hour is back, as the ticket's
+   * answer said. The session ends itself with `timeout` once `remaining_ms`
+   * has run, at the implementation's own maximum at most.
+   */
+  readonly budget: VoiceBudget;
+
   /**
    * Returns the unsubscribe. A new listener is first handed, synchronously,
    * every `message` so far and then the latest of the other events, so a
@@ -227,24 +244,28 @@ export interface VoiceSession {
 
 export interface VoiceApi {
   /**
+   * Where the visitor's hour stands. Read, never kept: the screen asks again
+   * whenever it needs the number (ADR 0009 point 4).
+   */
+  budget(opts?: Signal): Promise<VoiceBudget>;
+
+  /**
    * Opens a session. Call it from inside the click that asked for the call:
    * an implementation that plays audio needs that gesture for autoplay.
    *
    * Rejects with `microphone_unavailable` when `input` is `voice` and the
    * browser gives no microphone, for any reason; the caller then connects
    * again with `text`. Rejects with `voice_unavailable` when nothing could
-   * connect in time, or with whatever `http.ts` makes of the ticket's refusal.
+   * connect in time, or with whatever `http.ts` makes of the ticket's refusal:
+   * `budget_spent` (kind `ratelimited`) when nothing of the hour is left.
    *
-   * `maxDurationMs` is the screen's own cap for this session, in milliseconds:
-   * what is left of the visitor's hour (ADR 0008). The implementation clamps it
-   * to its own maximum (175 s today) and ends the session with `timeout` when
-   * it elapses; omitted means the implementation's maximum.
+   * The session's cap comes with its ticket, not from the caller: see
+   * `VoiceSession.budget`.
    */
   connect(opts: {
     mode: 'landing-demo';
     input: VoiceInput;
     signal?: AbortSignal | undefined;
-    maxDurationMs?: number | undefined;
   }): Promise<VoiceSession>;
 }
 
