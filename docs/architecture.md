@@ -103,7 +103,7 @@ src/
                                 waitlist/ (waitlist-page, waitlist-panel, waitlist-field, waitlist-fields (+test): the /waitlist door — its own split frame and pill field, rebuilt rather than imported from auth/, because features never import each other)
                                 legal/ (legal-notice-page: one server component for both legal routes, copy from LEGAL_PAGES in data/)
                                 orb/ (voice-orb, orb, orb-field, use-orb-placement, orb-motion, call-overlay,
-                                call-countdown, call-demo-provider, use-call-demo, call-state, use-call-budget, call-budget,
+                                call-countdown, call-chips, call-demo-provider, use-call-demo, call-state, use-call-budget, call-budget,
                                 turnstile, use-turnstile)
                                 sections/ (section-chrome, missed-calls, how-it-works, how-it-works-visuals,
                                 play-when-seen, capabilities, capability-row, capability-actions,
@@ -126,7 +126,7 @@ src/
     choice · chips · tiles · rows · save-bar · tabs · disclosure · slider · icon-button · play-button ·
     token-area · charts · table · use-appear · use-element-width · speak · index.ts   each with its first consumer
 
-  data/                         Copy with no markup: auth.ts, content.ts, waitlist.ts (the night panel of /waitlist), call-demo.ts (the call screen's copy: chips, consent, endings, the failed-connection line), pricing.ts, call-demos.ts (the scripted calls under "Khả năng"), hotline-report.ts (the figures and sample report of /cham-diem-hotline), site.ts (the production origin, the site's name, tagline and description, and the pages a crawler is sent to — read by the root layout, robots, the sitemap and llms.txt)
+  data/                         Copy with no markup: auth.ts, content.ts, waitlist.ts (the night panel of /waitlist), call-demo.ts (the call screen's copy: the product owner's four-level tree of suggestion chips, consent, endings, the failed-connection line), pricing.ts, call-demos.ts (the scripted calls under "Khả năng"), hotline-report.ts (the figures and sample report of /cham-diem-hotline), site.ts (the production origin, the site's name, tagline and description, and the pages a crawler is sent to — read by the root layout, robots, the sitemap and llms.txt)
   styles/tokens/                Byte copies from ../Fonnus-Web-UI (ADR 0002)
 ```
 

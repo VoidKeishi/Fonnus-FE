@@ -4,7 +4,6 @@ import Link from 'next/link'
 import { Button, buttonClassName, Icon, Pattern } from '@/design-system'
 import {
   CALL_AGAIN_LABEL,
-  CHIPS,
   CONNECT_FAILED_LINE,
   CONSENT_LINE,
   SPEAKER_LABELS,
@@ -14,6 +13,7 @@ import {
   TEXT_PLACEHOLDER,
   WAITLIST_LABEL,
 } from '@/data/call-demo'
+import { CallChips } from './call-chips'
 import { CallCountdown } from './call-countdown'
 import { useCallDemo } from './call-demo-provider'
 import { budgetLine, endingLine, spentLine, stateLabel } from './call-state'
@@ -311,20 +311,9 @@ export function CallOverlay({ spotRef, orbRef }: CallOverlayProps) {
 
       {showsControls ? (
         <div className="fixed bottom-[clamp(20px,4vh,40px)] left-1/2 z-80 flex w-[min(760px,calc(100vw-32px))] -translate-x-1/2 flex-col items-center gap-4 motion-safe:animate-[fnFadeIn_420ms_var(--ease-arc)_120ms_both]">
-          <div className="flex max-w-full flex-nowrap justify-start gap-2.5 overflow-x-auto p-1 whitespace-nowrap">
-            {CHIPS.map((chip) => (
-              <button
-                key={chip.label}
-                type="button"
-                onClick={() => {
-                  demo.ask(chip.label)
-                }}
-                className={`flex-none cursor-pointer rounded-pill border-none bg-surface-card px-4 py-2.5 font-ui text-ui font-medium text-text-body shadow-[inset_0_0_0_1px_var(--border-strong)] hover:bg-action-secondary-hover ${FAST}`}
-              >
-                {chip.label}
-              </button>
-            ))}
-          </div>
+          {/* The dialog, not the typed line, when the chips run out under
+              focus: focusing an input would open a phone's keyboard. */}
+          <CallChips ask={demo.ask} fallbackFocus={dialogRef} />
 
           <div className="flex w-full items-center gap-2.5 rounded-pill bg-surface-card py-2.5 pr-3 pl-[22px] shadow-[inset_0_0_0_1px_var(--border-hairline),var(--shadow-overlay)]">
             {/* The pill carries the hairline and the shadow; the global

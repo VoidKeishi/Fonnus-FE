@@ -89,8 +89,11 @@ export interface CallDemo {
   closeCall: () => void
   /** The control the current call was opened from, as handed to `openCall`. */
   returnFocusTo: () => HTMLElement | null
-  /** A suggestion chip or the typed box. */
-  ask: (text: string) => void
+  /**
+   * A suggestion chip or the typed box. False when nothing took it: no session
+   * yet, while the call connects, so a chip tapped then leads nowhere.
+   */
+  ask: (text: string) => boolean
   /** The visitor is typing in the box; keeps her from ending a conversation she thinks is silent. */
   noteActivity: () => void
   toggleMic: () => void
@@ -301,8 +304,9 @@ export function useCallDemoState(): CallDemo {
   }, [endSession, resetCall])
 
   const ask = useCallback((text: string) => {
-    if (!text.trim()) return
-    session.current?.sendText(text)
+    if (!text.trim() || !session.current) return false
+    session.current.sendText(text)
+    return true
   }, [])
 
   const noteActivity = useCallback(() => {

@@ -3,11 +3,13 @@ import {
   budgetLeftLine,
   budgetSpentLine,
   callAgainAfterLine,
+  CHIP_TREE,
   ENDED_AGENT_LINE,
   ENDED_ERROR_LINE,
   ENDED_TIMEOUT_LINE,
   endedTimeoutLine,
 } from '@/data/call-demo'
+import type { SuggestionChip } from '@/data/call-demo'
 import { remainingLabel, waitLabel } from './call-budget'
 import type { CallBudget } from './use-call-budget'
 
@@ -58,4 +60,20 @@ export function endingLine(reason: VoiceEndReason, budget: CallBudget | null): s
   if (reason === 'timeout') return waitMs === null ? ENDED_TIMEOUT_LINE : endedTimeoutLine(waitLabel(waitMs))
   const line = reason === 'agent' ? ENDED_AGENT_LINE : ENDED_ERROR_LINE
   return waitMs === null ? line : `${line} ${callAgainAfterLine(waitLabel(waitMs))}`
+}
+
+/**
+ * The chips shown once `chip` is sent, given every label sent by a chip in
+ * this call, `chip` among them. A sent label is never offered again, by its
+ * words: the tree repeats some. A chip with no set of its own, or whose set
+ * is all sent, leads back to the first set, and that can run out too.
+ */
+export function chipsAfter(
+  chip: SuggestionChip,
+  sent: ReadonlySet<string>,
+  first: readonly SuggestionChip[] = CHIP_TREE,
+): readonly SuggestionChip[] {
+  const unsent = (set: readonly SuggestionChip[]) => set.filter((next) => !sent.has(next.label))
+  const followUps = unsent(chip.next ?? [])
+  return followUps.length > 0 ? followUps : unsent(first)
 }
