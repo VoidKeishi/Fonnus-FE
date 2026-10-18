@@ -317,8 +317,8 @@ export function startSession(
 
     getAmplitude() {
       if (ended || !conversation || text) return null
-      // Her voice only: the orb reads the amplitude while she speaks and draws its
-      // own idle pulse otherwise, so a listening level would be dead weight.
+      // Her voice only: the orb and the dotted field follow it while she speaks and
+      // rest otherwise, so a listening level would be dead weight.
       return mode === 'speaking' ? conversation.getOutputVolume() : null
     },
 
