@@ -18,14 +18,17 @@ import type { CallBudget } from './use-call-budget'
 export type AgentState = VoiceAgentState
 
 /**
- * The voice call keeps the prototype's four sentences. A typed conversation
- * names her, and has no microphone to mention.
+ * A typed conversation names her, and has no microphone to mention. A voice
+ * call says nothing of whether she speaks or listens, the owner's call: the
+ * SDK's mode change lags her voice, so the prototype's "Fonnus đang nói" stayed
+ * on after she had stopped, and the orb already moves with her voice. What a
+ * call still says comes from the app's own state: connecting, and a microphone
+ * the visitor turned off, whatever her mode. Null is an empty line.
  */
-export function stateLabel(agent: AgentState, mic: boolean, input: VoiceInput): string {
+export function stateLabel(agent: AgentState, mic: boolean, input: VoiceInput): string | null {
   if (agent === 'connecting') return 'Đang kết nối…'
   if (input === 'text') return agent === 'speaking' ? 'Linh đang trả lời…' : 'Linh đang chờ bạn nhắn'
-  if (agent === 'speaking') return 'Fonnus đang nói'
-  return mic ? 'Fonnus đang nghe' : 'Micro đang tắt — bạn có thể gõ chữ'
+  return mic ? null : 'Micro đang tắt — bạn có thể gõ chữ'
 }
 
 /**

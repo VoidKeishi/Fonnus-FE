@@ -443,8 +443,10 @@ The session has:
 Events are only what the screen reads:
 
 - `{ type: 'state', state }`, with `state` ∈ `connecting` · `speaking` · `listening`. In a call
-  the line under the orb renders them as "Đang kết nối…", "Fonnus đang nói" and "Fonnus đang
-  nghe" (or "Micro đang tắt — bạn có thể gõ chữ" while the microphone is off). In a text session
+  the line under the orb says "Đang kết nối…" while connecting and, after that, only "Micro đang
+  tắt — bạn có thể gõ chữ" while the microphone is off: `speaking` and `listening` come from the
+  SDK's mode change, which lags her voice, so the line never names them, and the orb's
+  movement with `getAmplitude()` shows her speaking. In a text session
   `speaking` means her reply is on its way and `listening` that she waits for the visitor:
   "Đang kết nối…", "Linh đang trả lời…", "Linh đang chờ bạn nhắn".
 - `{ type: 'message', from, text }`, with `from` ∈ `agent` · `visitor`: one line of a text
