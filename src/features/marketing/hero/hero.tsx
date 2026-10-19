@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { buttonClassName, Icon, Pattern } from '@/design-system'
+import { Icon, Pattern } from '@/design-system'
 import { CLINIC_LOGOS, ClinicMark } from './clinic-logos'
 
 /*
@@ -9,6 +9,19 @@ import { CLINIC_LOGOS, ClinicMark } from './clinic-logos'
  */
 const DOTS_MASK =
   'radial-gradient(circle at 76% 44%, var(--text-heading) 0%, color-mix(in srgb, var(--text-heading) 55%, transparent) 16%, transparent 38%)'
+
+/*
+ * Sized to the waitlist page design rather than the Button scale: 52px tall,
+ * semibold 15.5px, a 1px lift on hover. The header's waitlist button is drawn
+ * the same way, smaller, and says why the look is written out.
+ */
+const WAITLIST_CTA = [
+  'group mt-10 inline-flex h-13 items-center justify-center gap-2.5 rounded-pill px-[26px]',
+  'bg-action-primary font-ui text-[15.5px] leading-[1.2] font-semibold whitespace-nowrap text-text-on-accent no-underline',
+  'cursor-pointer transition-[background-color,translate,scale] duration-200 ease-out',
+  'hover:-translate-y-px hover:bg-action-primary-hover active:scale-[var(--press-scale)]',
+  'focus-visible:outline-none focus-visible:shadow-[var(--ring-focus)]',
+].join(' ')
 
 /**
  * Three things and nothing else: the claim, one way onto the waitlist, and the
@@ -66,7 +79,7 @@ export function Hero() {
             Lễ tân AI nghe máy cho phòng khám của bạn 24/7, bằng tiếng Việt.
           </p>
 
-          <Link href="/waitlist" className={`${buttonClassName({ size: 'lg' })} group mt-10`}>
+          <Link href="/waitlist" className={WAITLIST_CTA}>
             Vào danh sách chờ
             <Icon
               name="arrow-right"

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { RefObject } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { buttonClassName, Icon, Logo, LogoMark } from '@/design-system'
+import { Icon, Logo, LogoMark } from '@/design-system'
 import { NAV_GROUPS } from '@/data/content'
 import type { NavGroup, NavItem } from '@/data/content'
 import { NavItemLink } from './nav-item-link'
@@ -58,6 +58,20 @@ const PILL_SCROLLED =
 /* The open menu's wash, held for the page you are on. */
 const WASH = 'bg-[color-mix(in_srgb,var(--text-eyebrow)_11%,transparent)] text-text-body'
 const FAST = 'transition-colors duration-[var(--duration-fast)] ease-out'
+/*
+ * Sized to the waitlist page design rather than the Button scale: 44px tall,
+ * semibold, a 1px lift on hover. Composing over a Button size would leave gap,
+ * weight and padding to Tailwind's rule order, so the look is written out here.
+ * Tailwind's translate and scale utilities write their own properties, not
+ * `transform`, hence the transition list.
+ */
+const WAITLIST_CTA = [
+  'inline-flex h-11 shrink-0 items-center justify-center gap-2.5 rounded-pill pr-5 pl-4 [@media(max-width:560px)]:pr-4 [@media(max-width:560px)]:pl-3.5',
+  'bg-action-primary font-ui text-body-sm leading-[1.2] font-semibold whitespace-nowrap text-text-on-accent no-underline',
+  'cursor-pointer transition-[background-color,translate,scale] duration-200 ease-out',
+  'hover:-translate-y-px hover:bg-action-primary-hover active:scale-[var(--press-scale)]',
+  'focus-visible:outline-none focus-visible:shadow-[var(--ring-focus)]',
+].join(' ')
 
 /** Opens the call demo, returning focus to the given control on close; undefined off `/`. */
 type OpenDemo = ((returnFocusTo: HTMLElement | null) => void) | undefined
@@ -153,9 +167,11 @@ export function Header() {
     <>
       {/* Same inset as a landing section, so the pill shares the content column. */}
       <header className="pointer-events-none fixed inset-x-0 top-0 z-40 flex justify-center px-[clamp(20px,5vw,64px)] pt-[22px]">
+        {/* The tighter phone inset and gap keep the waitlist button and the menu toggle inside a 375px pill. */}
         <div
           className={[
             'pointer-events-auto box-border flex items-center gap-[clamp(12px,2vw,28px)] rounded-pill pr-3 pl-[26px]',
+            '[@media(max-width:900px)]:pl-[18px] [@media(max-width:560px)]:gap-2',
             'backdrop-saturate-180',
             GLASS_EDGE,
             'transition-[height,width,background-color,box-shadow] duration-[var(--duration-base)] ease-out',
@@ -224,7 +240,7 @@ interface ActionsProps {
 function Actions({ drawerOpen, onToggleDrawer, toggleRef }: ActionsProps) {
   return (
     <div className="ml-auto flex shrink-0 items-center gap-2">
-      <Link href="/waitlist" className={`${buttonClassName({ size: 'sm' })} shrink-0`}>
+      <Link href="/waitlist" className={WAITLIST_CTA}>
         <LogoMark size={18} arcClassName="motion-safe:animate-[fnLift_3.2s_var(--ease-arc)_infinite]" />
         Danh sách chờ
       </Link>
