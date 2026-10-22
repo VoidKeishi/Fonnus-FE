@@ -1,29 +1,33 @@
 import { describe, expect, it } from 'vitest'
 import {
-  FIELD_AT_REST,
-  FIELD_ENVELOPE,
+  AURA_ENVELOPE,
+  AURA_HAZE,
+  AURA_LOBES,
+  AURA_MAX,
+  AURA_NEAR,
+  AURA_REACH,
+  BULGE_MS,
   ORB_ENVELOPE,
-  RIPPLE_LIFE_MS,
-  edgeWeight,
+  auraLoudness,
+  createAuraState,
   envelopeStep,
-  fieldEdge,
-  fieldSpread,
+  isPeak,
+  lobeBulge,
   movesByFlight,
   orbPose,
-  rippleOffset,
-  rippleStrength,
-  startsRipple,
-  stepField,
-  swellOffset,
+  placeBlob,
+  stepAura,
+  visualAmplitude,
 } from './orb-motion'
-import type { FieldState } from './orb-motion'
+import type { AuraState, BlobPlacement } from './orb-motion'
 
 /*
  * The orb has to land exactly on the hero's dock, leave for the corner at the
- * same line every time, and swell with a real voice, and the dotted field
- * behind it has to breathe with that voice without ever snapping or ringing.
- * All of that is arithmetic the DOM code only feeds; a mistake here shows up
- * as an orb that drifts off the dock, or a field that jitters or never moves.
+ * same line every time, and on the call screen answer her voice with an aura
+ * that swells unevenly, never rings and never pulses all round. All of that is
+ * arithmetic the DOM code only feeds; a mistake here shows up as an orb that
+ * drifts off the dock, or an aura that flickers, mirrors itself or blooms
+ * past its canvas.
  */
 
 const FRAME_60HZ = 1000 / 60
@@ -96,11 +100,11 @@ describe('movesByFlight', () => {
 })
 
 describe('envelopeStep', () => {
-  it('opens the orb fast on a syllable', () => {
+  it('brightens the sphere fast on a syllable', () => {
     expect(envelopeStep(0, 1, FRAME_60HZ, ORB_ENVELOPE)).toBeCloseTo(0.45, 2)
   })
 
-  it('lets the orb settle slowly through a pause', () => {
+  it('lets the sphere settle slowly through a pause', () => {
     expect(envelopeStep(1, 0, FRAME_60HZ, ORB_ENVELOPE)).toBeCloseTo(0.9, 2)
   })
 
@@ -110,149 +114,116 @@ describe('envelopeStep', () => {
   })
 
   it('counts the first frame after a pause as two frames, not the whole pause', () => {
-    expect(envelopeStep(0, 1, 5000, FIELD_ENVELOPE)).toBeCloseTo(envelopeStep(0, 1, 34, FIELD_ENVELOPE), 10)
+    expect(envelopeStep(0, 1, 5000, AURA_ENVELOPE)).toBeCloseTo(envelopeStep(0, 1, 34, AURA_ENVELOPE), 10)
   })
 
-  it('takes the field about a quarter of a second to answer her voice, and longer to let go', () => {
+  it('opens the aura faster than it lets it go', () => {
     let rising = 0
     let falling = 1
-    for (let ms = 0; ms < 260; ms += 10) {
-      rising = envelopeStep(rising, 1, 10, FIELD_ENVELOPE)
-      falling = envelopeStep(falling, 0, 10, FIELD_ENVELOPE)
+    for (let ms = 0; ms < 200; ms += 10) {
+      rising = envelopeStep(rising, 1, 10, AURA_ENVELOPE)
+      falling = envelopeStep(falling, 0, 10, AURA_ENVELOPE)
     }
-    expect(rising).toBeCloseTo(1 - Math.exp(-1), 2)
-    expect(falling).toBeGreaterThan(0.7)
+    // How far each has travelled in the same 200ms.
+    expect(rising).toBeGreaterThan(1 - falling)
   })
 })
 
-describe('the dotted field', () => {
-  it('rests at its smallest, close around the orb, and opens to three radii when she is loud', () => {
-    expect(fieldEdge(fieldSpread(0))).toBeCloseTo(1.7)
-    expect(fieldEdge(fieldSpread(0.6))).toBeCloseTo(3)
-    expect(fieldEdge(fieldSpread(1))).toBeCloseTo(3)
+describe('the aura’s amplitude', () => {
+  it('never shows more than its maximum, however loud she is', () => {
+    expect(visualAmplitude(auraLoudness(1))).toBeLessThanOrEqual(AURA_MAX)
+    expect(visualAmplitude(5)).toBe(AURA_MAX)
   })
 
-  it('opens more for quiet speech than a straight line would', () => {
-    expect(fieldSpread(0.15)).toBeGreaterThan(0.25)
-  })
-
-  it('fades out towards its edge as the static pattern’s mask did', () => {
-    expect(edgeWeight(0)).toBe(1)
-    expect(edgeWeight(16 / 38)).toBeCloseTo(0.55)
-    expect(edgeWeight(1)).toBe(0)
-    expect(edgeWeight(1.4)).toBe(0)
-  })
-
-  it('pushes nothing while she is silent, and least far from the orb', () => {
-    expect(swellOffset(1, 0)).toBe(0)
-    expect(swellOffset(1, 1)).toBeGreaterThan(swellOffset(2.5, 1))
+  it('reads the line noise under her voice as silence', () => {
+    expect(auraLoudness(0)).toBe(0)
+    expect(visualAmplitude(auraLoudness(0.01))).toBe(0)
   })
 })
 
-describe('startsRipple', () => {
-  it('starts on a syllable that rises well above the field’s envelope', () => {
-    expect(startsRipple(0.5, 0.2, 1000)).toBe(true)
+describe('the aura’s lobes at rest', () => {
+  const centres = AURA_LOBES.map((lobe) => {
+    const out: BlobPlacement = { x: 0, y: 0, radius: 0, alpha: 0 }
+    placeBlob(out, lobe, 0, 0, 0, false)
+    return out
   })
 
-  it('ignores steady speech, however loud', () => {
-    expect(startsRipple(0.5, 0.45, 1000)).toBe(false)
-  })
-
-  it('ignores the ordinary syllables of steady speech, and answers only a strong one', () => {
-    expect(startsRipple(0.4, 0.25, 1000)).toBe(false)
-    expect(startsRipple(0.55, 0.25, 1000)).toBe(true)
-  })
-
-  it('ignores a rise that is still too quiet to hear', () => {
-    expect(startsRipple(0.15, 0, 1000)).toBe(false)
-  })
-
-  it('waits a moment after the last ripple, so a run of syllables never reads as a beat', () => {
-    expect(startsRipple(0.5, 0.2, 200)).toBe(false)
-  })
-})
-
-describe('rippleOffset', () => {
-  const ripple = { bornAt: 0, strength: 1, phase: 0 }
-
-  it('pushes the dots at its front and leaves the ones far from it alone', () => {
-    const atFront = rippleOffset(1.8, 0, 500, ripple)
-    expect(atFront).toBeGreaterThan(0)
-    expect(rippleOffset(3, 0, 500, ripple)).toBeLessThan(atFront / 100)
-  })
-
-  it('travels outward', () => {
-    const near = (ageMs: number) => rippleOffset(1.4, 0, ageMs, ripple)
-    const far = (ageMs: number) => rippleOffset(2.4, 0, ageMs, ripple)
-    expect(near(250)).toBeGreaterThan(far(250))
-    expect(far(900)).toBeGreaterThan(near(900))
-  })
-
-  it('swells in rather than appearing at full strength', () => {
-    expect(rippleOffset(1, 0, 1, ripple)).toBeLessThan(rippleOffset(1.2, 0, 120, ripple))
-  })
-
-  it('is gone by the end of its life', () => {
-    expect(rippleOffset(3.1, 0, RIPPLE_LIFE_MS, ripple)).toBe(0)
-  })
-
-  it('reaches a different distance at different angles, so its front is never a circle', () => {
-    expect(rippleOffset(1.8, 0, 500, ripple)).not.toBeCloseTo(rippleOffset(1.8, Math.PI / 3, 500, ripple), 4)
-  })
-})
-
-describe('rippleStrength', () => {
-  it('keeps even a faint peak visible and caps a sharp one', () => {
-    expect(rippleStrength(0.22, 0.2)).toBe(0.4)
-    expect(rippleStrength(0.9, 0)).toBe(1)
-  })
-})
-
-describe('stepField', () => {
-  /** Runs the field at 60fps through `levels`, one loudness per frame, from `state`. */
-  function run(levels: readonly number[], from: FieldState = FIELD_AT_REST, start = 0) {
-    let state: FieldState | null = from
-    const frames: FieldState[] = []
-    for (const [i, level] of levels.entries()) {
-      state = stepField(state, start + i * FRAME_60HZ, FRAME_60HZ, level, 0)
-      if (!state) break
-      frames.push(state)
+  it('sit in different places, not stacked on one point', () => {
+    for (const [i, a] of centres.entries()) {
+      for (const b of centres.slice(i + 1)) expect(Math.hypot(a.x - b.x, a.y - b.y)).toBeGreaterThan(0.05)
     }
-    return { frames, last: state }
+  })
+
+  it('have no pair mirrored through the orb’s centre, so the aura is never symmetric', () => {
+    for (const [i, a] of centres.entries()) {
+      for (const [j, b] of centres.entries()) {
+        if (i !== j) expect(Math.hypot(a.x + b.x, a.y + b.y)).toBeGreaterThan(0.05)
+      }
+    }
+  })
+})
+
+describe('the aura at its loudest', () => {
+  it('stays inside its canvas, so no gradient is ever cut into a hard edge', () => {
+    const out: BlobPlacement = { x: 0, y: 0, radius: 0, alpha: 0 }
+    const layers = [
+      { blobs: AURA_HAZE, bulge: 0 },
+      { blobs: AURA_LOBES, bulge: 1 },
+      { blobs: AURA_NEAR, bulge: 0 },
+    ]
+    for (const { blobs, bulge } of layers) {
+      for (const blob of blobs) {
+        for (let ms = 0; ms < 30000; ms += 250) {
+          placeBlob(out, blob, ms, AURA_MAX, bulge, false)
+          expect(Math.hypot(out.x, out.y) + out.radius).toBeLessThanOrEqual(AURA_REACH)
+          expect(out.alpha).toBeLessThanOrEqual(0.3)
+        }
+      }
+    }
+  })
+})
+
+describe('a peak in her voice', () => {
+  /** Runs the aura at 60fps through `levels`, one loudness per frame, every peak landing at `pick`. */
+  function run(levels: readonly number[], pick: number, state: AuraState = createAuraState(), start = 0) {
+    for (const [i, level] of levels.entries()) stepAura(state, start + i * FRAME_60HZ, FRAME_60HZ, level, pick, false)
+    return state
   }
+  const bulging = (state: AuraState, now: number) =>
+    AURA_LOBES.filter((_, i) => lobeBulge(state, i, now) > 0).length
 
-  it('does nothing at all while she has not spoken', () => {
-    expect(stepField(FIELD_AT_REST, 1000, FRAME_60HZ, 0, 0)).toBeNull()
+  it('bulges one or two lobes, never all of them', () => {
+    for (const pick of [0, 0.13, 0.37, 0.5, 0.71, 0.94]) {
+      const state = run([0, 0, 1], pick)
+      const after = 2 * FRAME_60HZ + 60
+      expect(bulging(state, after)).toBeGreaterThanOrEqual(1)
+      expect(bulging(state, after)).toBeLessThanOrEqual(2)
+    }
   })
 
-  it('opens gradually rather than jumping to her level', () => {
-    const { frames } = run([0.5, 0.5, 0.5])
-    expect(frames[0]?.envelope).toBeLessThan(0.05)
-    expect(frames[2]?.envelope).toBeGreaterThan(frames[0]?.envelope ?? 1)
+  it('bulges a single lobe for a faint peak', () => {
+    const state = run([0, 0, 0.2], 0.3)
+    expect(bulging(state, 2 * FRAME_60HZ + 60)).toBe(1)
   })
 
-  it('decays to rest after she stops, draws that rest once, and then lets the loop stop', () => {
-    const speech = run(Array<number>(60).fill(0.5))
-    const silence = Array<number>(600).fill(0)
-    const after = run(silence, speech.last ?? FIELD_AT_REST, 60 * FRAME_60HZ)
-    const rest = after.frames.at(-1)
-    expect(rest?.envelope).toBe(0)
-    expect(rest?.ripples).toHaveLength(0)
-    // The loop stopped before the silence ran out.
-    expect(after.frames.length).toBeLessThan(silence.length)
-    expect(after.last).toBeNull()
+  it('lets steady speech, a quiet onset and a quick repeat pass without a bulge', () => {
+    expect(isPeak(0.6, 0.1, 1000)).toBe(true)
+    expect(isPeak(0.5, 0.45, 1000)).toBe(false)
+    expect(isPeak(0.15, 0, 1000)).toBe(false)
+    expect(isPeak(0.6, 0.1, 200)).toBe(false)
   })
 
-  it('never has more than three ripples alive, however many peaks she makes', () => {
-    // A sharp peak every 26 frames (433ms, just past the gap), with silence between.
-    const levels = Array.from({ length: 600 }, (_, i) => (i % 26 === 0 ? 0.9 : 0))
-    const { frames } = run(levels)
-    expect(Math.max(...frames.map((frame) => frame.ripples.length))).toBe(3)
+  it('lets the bulge go within half a second', () => {
+    const state = run([1], 0.3)
+    expect(bulging(state, 200)).toBeGreaterThan(0)
+    expect(BULGE_MS).toBeGreaterThanOrEqual(400)
+    expect(BULGE_MS).toBeLessThanOrEqual(500)
+    expect(bulging(state, BULGE_MS)).toBe(0)
   })
 
-  it('lets each ripple go at the end of its life', () => {
-    const { frames } = run([0.9, ...Array<number>(Math.ceil(RIPPLE_LIFE_MS / FRAME_60HZ) + 1).fill(0)])
-    expect(frames[0]?.ripples).toHaveLength(1)
-    expect(frames.at(-1)?.ripples).toHaveLength(0)
+  it('takes no bulge for a visitor who asked for less motion', () => {
+    const state = createAuraState()
+    stepAura(state, 0, FRAME_60HZ, 1, 0.3, true)
+    expect(bulging(state, 100)).toBe(0)
   })
 })

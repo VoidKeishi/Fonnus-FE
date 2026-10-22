@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import type { RefObject } from 'react'
 import Link from 'next/link'
-import { Button, buttonClassName, Icon } from '@/design-system'
+import { Button, buttonClassName, Icon, Pattern } from '@/design-system'
 import {
   CALL_AGAIN_LABEL,
   CONNECT_FAILED_LINE,
@@ -15,9 +15,8 @@ import {
 } from '@/data/call-demo'
 import { CallChips } from './call-chips'
 import { CallCountdown } from './call-countdown'
+import type { AuraHandOver } from './orb'
 import { useCallDemo } from './call-demo-provider'
-import { createDotField } from './dot-field'
-import type { DotField } from './dot-field'
 import { budgetLine, endingLine, spentLine, stateLabel } from './call-state'
 import type { ThreadLine } from './use-call-demo'
 import { useTurnstile } from './use-turnstile'
@@ -58,15 +57,36 @@ import { useTurnstile } from './use-turnstile'
  * changes size, not when it moves, so a thread that grows must not push the
  * slot about.
  *
- * Behind it all is Chấm nhịp, the dotted field her voice moves
- * (`dot-field.ts`): mounted here, centred on the orb's slot, and advanced by
- * the orb's own loop, which this screen reaches through `dotFieldRef`.
+ * Behind the orb is Chấm nhịp, and it holds still: the dots pattern inside the
+ * orb's slot, spilling past it and masked into a soft circle about 1.7 orb
+ * radii out, so it follows the slot in both layouts and at every width. Her
+ * voice is the aura (`aura.ts`), not the dots: a canvas in the same slot, over
+ * the dots and under every line of text, which the orb's loop draws once this
+ * screen hands it over through `handOverAuraRef`.
  *
  * One more element draws nothing: the container of the Invisible Turnstile
  * widget every call's ticket costs (ADR 0009 point 5), mounted with the dialog
  * in every shape so the widget outlives a slot swap.
  */
 
+/*
+ * The dots spill 35% of the slot past each of its sides, so the pattern's box
+ * reaches 1.7 orb radii from the centre, where its circular mask ends: full at
+ * the centre, 55% at 16/38 of the way out, gone at the edge.
+ */
+const DOTS_SPILL = { inset: '-35%', width: '170%', height: '170%' }
+const DOTS_MASK =
+  'radial-gradient(circle closest-side, var(--text-heading) 0%, color-mix(in srgb, var(--text-heading) 55%, transparent) 42.1%, transparent 100%)'
+/*
+ * The aura spills 70% of the slot past each side: 2.4 orb diameters across,
+ * centred on the orb. Its blur is 16px at the orb's base size (280px, so a
+ * 672px box) and scales with the slot, through the box's own width, as it did
+ * when it was drawn inside the scaled orb. It fades in once the orb has landed
+ * — the flight is `--duration-arc` — and under reduced motion simply appears.
+ */
+const AURA_BOX =
+  'pointer-events-none absolute -top-[70%] -left-[70%] -z-1 size-[240%] @container motion-safe:animate-[fnFadeIn_320ms_ease-out_var(--duration-arc)_both]'
+const AURA_BLUR = 'blur-[calc(100cqw*16/672)]'
 const FAST = 'transition-colors duration-[var(--duration-fast)] ease-out'
 const ROUND = `grid size-10 flex-none cursor-pointer place-items-center rounded-[50%] border-none ${FAST}`
 const IDLE = 'bg-surface-card text-text-body'
@@ -82,11 +102,11 @@ interface CallOverlayProps {
    * opened from anywhere else.
    */
   orbRef: RefObject<HTMLElement | null>
-  /** Where the dotted field is handed to the orb's loop while this screen is open. */
-  dotFieldRef: RefObject<DotField | null>
+  /** The orb's loop, which draws the aura on this screen's canvas while it is open. */
+  handOverAuraRef: RefObject<AuraHandOver | null>
 }
 
-export function CallOverlay({ spotRef, orbRef, dotFieldRef }: CallOverlayProps) {
+export function CallOverlay({ spotRef, orbRef, handOverAuraRef }: CallOverlayProps) {
   const demo = useCallDemo()
   const { returnFocusTo } = demo
   const [typed, setTyped] = useState('')
@@ -99,8 +119,7 @@ export function CallOverlay({ spotRef, orbRef, dotFieldRef }: CallOverlayProps) 
   const budgetLineId = useId()
   const threadRef = useRef<HTMLDivElement>(null)
   const turnstileRef = useRef<HTMLDivElement>(null)
-  const fieldRef = useRef<HTMLCanvasElement>(null)
-  useDotField(fieldRef, spotRef, dotFieldRef)
+  const auraRef = useRef<HTMLCanvasElement>(null)
   const challenge = useTurnstile(demo.open, turnstileRef)
   const { awaitingConsent, ended, failed, budget } = demo
   /** The server said nothing of the hour is left: no call can start until it turns. */
@@ -128,6 +147,13 @@ export function CallOverlay({ spotRef, orbRef, dotFieldRef }: CallOverlayProps) 
       target?.focus({ preventScroll: true })
     }
   }, [orbRef, returnFocusTo])
+
+  // Taken back on unmount, so the loop never draws on a canvas that is gone.
+  useEffect(() => {
+    const canvas = auraRef.current
+    if (!canvas) return
+    return handOverAuraRef.current?.(canvas)
+  }, [handOverAuraRef])
 
   // Declared after the effect above, so on open it runs second and wins over
   // the dialog's own focus. A slot that swaps out takes the focused control
@@ -204,11 +230,6 @@ export function CallOverlay({ spotRef, orbRef, dotFieldRef }: CallOverlayProps) 
       {/* Cloudflare's own markup goes in here; React renders nothing into it. */}
       <div ref={turnstileRef} aria-hidden="true" className="fixed size-0 overflow-clip" />
       <div className="fixed inset-0 isolate z-60 grid grid-rows-[auto_1fr_auto] bg-surface-page px-[clamp(16px,4vw,40px)] pt-5 pb-[clamp(20px,4vh,40px)] motion-safe:animate-[fnFadeIn_320ms_var(--ease-arc)]">
-        <canvas
-          ref={fieldRef}
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 -z-1 size-full text-text-heading"
-        />
         <div className="flex items-center justify-between gap-4">
           <div className="grid grid-cols-[auto_1fr] items-center gap-x-3 text-ui leading-(--leading-body) text-text-muted">
             <span className="size-2 rounded-[50%] bg-text-eyebrow" />
@@ -237,13 +258,26 @@ export function CallOverlay({ spotRef, orbRef, dotFieldRef }: CallOverlayProps) 
               : 'grid place-items-center content-center gap-[60px]'
           }
         >
-          {/* Wide gap: the dotted field opens around the orb without crowding the
-              label. Typed, the orb is smaller and gives its room to the thread. */}
+          {/* Wide gap: the aura opens around the orb without crowding the
+              label. Typed, the orb is smaller and gives its room to the thread.
+              The dots and then the aura sit under every layer of the screen
+              but its ground. */}
           <div
             ref={spotRef}
             aria-hidden="true"
-            className={typing ? 'size-[clamp(120px,18vh,180px)] flex-none' : 'size-[clamp(200px,32vh,320px)]'}
-          />
+            className={
+              typing ? 'relative size-[clamp(120px,18vh,180px)] flex-none' : 'relative size-[clamp(200px,32vh,320px)]'
+            }
+          >
+            <Pattern
+              name="dots"
+              className="-z-1 text-text-heading"
+              style={{ ...DOTS_SPILL, maskImage: DOTS_MASK, WebkitMaskImage: DOTS_MASK }}
+            />
+            <div className={AURA_BOX}>
+              <canvas ref={auraRef} width={160} height={160} className={`absolute inset-0 size-full ${AURA_BLUR}`} />
+            </div>
+          </div>
           {awaitingConsent && spent ? (
             <div ref={actionsRef} className="flex flex-col items-center gap-4 text-center">
               <p id={slotLineId} className={SLOT_LINE}>
@@ -395,34 +429,6 @@ function ThreadTurn({ line }: { line: ThreadLine }) {
       <p className="m-0 text-body-sm leading-[1.55] text-text-body">{line.text}</p>
     </div>
   )
-}
-
-/**
- * Mounts the dotted field on its canvas and hands it to the orb's loop. It is
- * re-laid out whenever the canvas or the orb's slot changes size; an
- * observer's first report, which `observe()` always delivers, draws the
- * resting field.
- */
-function useDotField(
-  canvasRef: RefObject<HTMLCanvasElement | null>,
-  spotRef: RefObject<HTMLElement | null>,
-  dotFieldRef: RefObject<DotField | null>,
-) {
-  useEffect(() => {
-    const canvas = canvasRef.current
-    const spot = spotRef.current
-    if (!canvas || !spot) return
-    const field = createDotField(canvas, spot)
-    if (!field) return
-    const resized = new ResizeObserver(field.layout)
-    resized.observe(canvas)
-    resized.observe(spot)
-    dotFieldRef.current = field
-    return () => {
-      resized.disconnect()
-      dotFieldRef.current = null
-    }
-  }, [canvasRef, spotRef, dotFieldRef])
 }
 
 /**

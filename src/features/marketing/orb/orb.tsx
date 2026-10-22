@@ -1,29 +1,40 @@
 import { useEffect, useRef } from 'react'
 import type { RefObject } from 'react'
 import { Icon } from '@/design-system'
-import type { DotField } from './dot-field'
+import { createAura } from './aura'
+import type { Aura } from './aura'
 import { FIELD_FRAME_MS, STILL_FRAME_MS, createOrbField } from './orb-field'
-import { ORB_ENVELOPE, envelopeStep } from './orb-motion'
+import {
+  ORB_ENVELOPE,
+  auraAtRest,
+  auraLoudness,
+  createAuraState,
+  envelopeStep,
+  stepAura,
+  visualAmplitude,
+} from './orb-motion'
 import type { OrbMode } from './orb-motion'
 
 /*
  * The orb is one button laid out at its base size (280px) and scaled into place
  * by `use-orb-placement.ts`. Everything inside is sized in % so it stays sharp
- * at every scale, and what reacts to the voice on the sphere — its scale and
- * its bloom — is a calc() off one custom property, `--amp`, which the
- * animation loop below writes. Driving them from CSS rather than from React
- * state is what keeps a 60fps envelope from re-rendering the tree.
+ * at every scale. The sphere holds still while she speaks: the one thing on it
+ * that answers her voice is a brightness of at most 3%, a calc() off the custom
+ * property `--amp`, which the animation loop below writes. Driving it from CSS
+ * rather than from React state is what keeps a 60fps envelope from
+ * re-rendering the tree.
  *
- * The orb draws nothing around itself: on the call screen her voice shows in
- * the dotted field behind it (`dot-field.ts`), which the same loop advances.
+ * On the call screen her voice shows in the aura behind the sphere (`aura.ts`),
+ * which the same loop draws. Its canvas is the call screen's, under the
+ * screen's text, and is handed to the loop for as long as the screen is open.
  */
 
-/*
- * The swell a visitor who asked for less motion sees, held still while she
- * speaks. Only a real voice moves the orb otherwise: a typed conversation has
- * no loudness, and the orb stays as still as the dotted field behind it.
+/**
+ * Hands the call screen's aura canvas to the orb's loop, which draws on it
+ * until the returned function takes it back.
  */
-const STILL_AMP = 0.45
+export type AuraHandOver = (canvas: HTMLCanvasElement) => () => void
+
 /** Below this, a fading `--amp` is written as 0 and the envelope stops. */
 const AMP_FLOOR = 0.001
 
@@ -34,11 +45,11 @@ const AMP_FLOOR = 0.001
  */
 const SPHERE =
   'bg-[linear-gradient(180deg,var(--text-accent)_0%,var(--text-eyebrow)_34%,color-mix(in_srgb,var(--text-eyebrow)_70%,var(--surface-warm))_56%,color-mix(in_srgb,var(--surface-warm)_82%,var(--text-eyebrow))_76%,color-mix(in_srgb,var(--text-on-accent)_65%,var(--surface-warm))_92%,var(--text-on-accent)_100%)] ' +
-  'shadow-[0_20px_70px_color-mix(in_srgb,var(--text-eyebrow)_32%,transparent)]'
-/* Ambient light bleeding past the sphere's edge, brightening with the voice. */
+  'shadow-[0_20px_70px_color-mix(in_srgb,var(--text-eyebrow)_32%,transparent)] ' +
+  '[filter:brightness(calc(1+var(--amp)*0.03))]'
+/* Ambient light bleeding past the sphere's edge. */
 const HALO =
-  'bg-[radial-gradient(circle,color-mix(in_srgb,var(--text-eyebrow)_30%,transparent)_0%,transparent_70%)] blur-[10px] ' +
-  'opacity-[calc(1+var(--amp)*0.9)] [transform:scale(calc(1+var(--amp)*0.1))] motion-reduce:[transform:none]'
+  'bg-[radial-gradient(circle,color-mix(in_srgb,var(--text-eyebrow)_30%,transparent)_0%,transparent_70%)] blur-[10px]'
 /* Frosted-glass sheen near the top. */
 const SHEEN =
   'bg-[radial-gradient(circle_at_50%_32%,color-mix(in_srgb,var(--text-on-accent)_12%,transparent)_0%,transparent_55%)]'
@@ -49,17 +60,18 @@ interface OrbProps {
   orbRef: RefObject<HTMLButtonElement | null>
   /** Null until placed: invisible and not yet pressable. */
   mode: OrbMode | null
-  /** True whenever she is talking; drives the envelope. */
+  /** True whenever she is talking; drives the envelopes. */
   speaking: boolean
   getAmplitude: () => number | null
-  /** The call screen's dotted field while it is mounted. */
-  dotFieldRef: RefObject<DotField | null>
+  /** Where the loop publishes its aura hand-over for the call screen. */
+  handOverAuraRef: RefObject<AuraHandOver | null>
   onClick: () => void
 }
 
-export function Orb({ orbRef, mode, speaking, getAmplitude, dotFieldRef, onClick }: OrbProps) {
+export function Orb({ orbRef, mode, speaking, getAmplitude, handOverAuraRef, onClick }: OrbProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  useOrbAnimation(orbRef, canvasRef, dotFieldRef, speaking, getAmplitude)
+  const inCall = mode === 'call'
+  useOrbAnimation(orbRef, canvasRef, handOverAuraRef, speaking, getAmplitude)
 
   return (
     <button
@@ -68,17 +80,15 @@ export function Orb({ orbRef, mode, speaking, getAmplitude, dotFieldRef, onClick
       onClick={onClick}
       aria-label="Nghe thử Fonnus"
       // In the call it sits behind the dialog as its picture; the dialog holds focus.
-      tabIndex={mode === 'call' ? -1 : undefined}
+      tabIndex={inCall ? -1 : undefined}
       className={[
         // `opacity`, `position` and `transform` are the placement's (use-orb-placement.ts).
         'fixed top-0 left-0 size-[280px] origin-top-left rounded-[50%] border-none bg-transparent p-0 opacity-0 will-change-transform [--amp:0]',
-        mode === 'call' ? 'pointer-events-none z-70' : 'z-30',
+        inCall ? 'pointer-events-none z-70' : 'z-30',
         mode === null ? 'pointer-events-none' : 'cursor-pointer',
       ].join(' ')}
     >
-      {/* Scaled straight off the amplitude rather than by a keyframe, so the
-          sphere swells on the actual syllable. */}
-      <span className="absolute inset-0 block rounded-[50%] [transform:scale(calc(1+var(--amp)*0.075))] motion-reduce:[transform:none]">
+      <span className="absolute inset-0 block rounded-[50%]">
         <span aria-hidden="true" className={`absolute -inset-[16%] rounded-[50%] ${HALO}`} />
         <span aria-hidden="true" className={`absolute inset-0 overflow-hidden rounded-[50%] ${SPHERE}`}>
           <canvas ref={canvasRef} width={144} height={144} className="absolute -top-[4%] -left-[4%] size-[108%] blur-[7px]" />
@@ -104,16 +114,18 @@ export function Orb({ orbRef, mode, speaking, getAmplitude, dotFieldRef, onClick
 
 /**
  * The page's one animation loop for the orb: the canvas field at ~30fps, the
- * `--amp` envelope every frame, and the call screen's dotted field whenever it
- * is mounted and moving. It stops while the tab is hidden, the envelope rests
- * once she is silent and `--amp` has decayed to 0, and a visitor who asked for
- * less motion gets one still frame and no loop at all — `--amp` then snaps and
- * the dotted field stays at rest.
+ * `--amp` envelope every frame, and the aura every frame while the call screen
+ * has handed its canvas over. It stops while the tab is hidden.
+ *
+ * A visitor who asked for less motion gets one still frame of the field, and
+ * an aura whose lobes hold their resting places while its opacity still
+ * follows her voice: the loop then runs only while she speaks or the aura and
+ * `--amp` are still settling, and stops once both are at rest.
  */
 function useOrbAnimation(
   orbRef: RefObject<HTMLButtonElement | null>,
   canvasRef: RefObject<HTMLCanvasElement | null>,
-  dotFieldRef: RefObject<DotField | null>,
+  handOverAuraRef: RefObject<AuraHandOver | null>,
   speaking: boolean,
   getAmplitude: () => number | null,
 ) {
@@ -130,6 +142,8 @@ function useOrbAnimation(
     const canvas = canvasRef.current
     if (!orb || !canvas) return
     const field = createOrbField(canvas)
+    let aura: Aura | null = null
+    const auraState = createAuraState()
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)')
     let raf = 0
     let lastField = -Infinity
@@ -143,21 +157,31 @@ function useOrbAnimation(
 
     const frame = (now: number) => {
       raf = 0
-      if (field && now - lastField >= FIELD_FRAME_MS) {
+      const still = reduced.matches
+      if (field && !still && now - lastField >= FIELD_FRAME_MS) {
         lastField = now
         field.draw(now)
       }
       const dt = now - lastFrame
       lastFrame = now
       const { speaking: talking, getAmplitude: loudness } = voice.current
-      const level = talking ? loudness() : null
+      const volume = talking ? loudness() : null
+      const level = volume === null ? null : auraLoudness(volume)
       if (level !== null || amp > 0) {
         const next = envelopeStep(amp, level ?? 0, dt, ORB_ENVELOPE)
         writeAmp(level === null && next < AMP_FLOOR ? 0 : next)
       }
-      const dotsMoving = dotFieldRef.current?.advance(now, level) ?? false
-      // With no field to draw, a silent orb has nothing left to do this frame.
-      if (field || talking || amp > 0 || dotsMoving) raf = requestAnimationFrame(frame)
+      // Stepped with no canvas too, so an aura handed over again starts from where her voice is.
+      stepAura(auraState, now, dt, level ?? 0, Math.random(), still)
+      const shown = aura
+      const drawsAura = shown !== null
+      if (drawsAura) shown.draw(now, visualAmplitude(auraState.envelope), auraState, still)
+      // Moving: the field always, and the aura's slow drift while it shows.
+      // Still: only what her voice has not finished settling.
+      const keepGoing = still
+        ? talking || amp > 0 || (drawsAura && !auraAtRest(auraState, now))
+        : field !== null || drawsAura || talking || amp > 0
+      if (keepGoing) raf = requestAnimationFrame(frame)
     }
 
     const stop = () => {
@@ -166,13 +190,7 @@ function useOrbAnimation(
     }
     const start = () => {
       if (raf || document.hidden) return
-      if (reduced.matches) {
-        field?.draw(STILL_FRAME_MS)
-        const { speaking: talking, getAmplitude: loudness } = voice.current
-        writeAmp(talking && loudness() !== null ? STILL_AMP : 0)
-        dotFieldRef.current?.settle()
-        return
-      }
+      if (reduced.matches) field?.draw(STILL_FRAME_MS)
       raf = requestAnimationFrame(frame)
     }
     const onVisibility = () => {
@@ -184,16 +202,28 @@ function useOrbAnimation(
       start()
     }
 
+    // Restarts the loop, so that under reduced motion, where it may have
+    // stopped, the canvas still gets its first resting frame.
+    handOverAuraRef.current = (auraCanvas) => {
+      const handed = createAura(auraCanvas)
+      aura = handed
+      start()
+      return () => {
+        if (aura === handed) aura = null
+      }
+    }
     onVoiceChange.current = start
     document.addEventListener('visibilitychange', onVisibility)
     reduced.addEventListener('change', onMotionPreference)
     start()
     return () => {
       stop()
+      aura = null
+      handOverAuraRef.current = null
       onVoiceChange.current = null
       document.removeEventListener('visibilitychange', onVisibility)
       reduced.removeEventListener('change', onMotionPreference)
       orb.style.setProperty('--amp', '0')
     }
-  }, [orbRef, canvasRef, dotFieldRef])
+  }, [orbRef, canvasRef, handOverAuraRef])
 }

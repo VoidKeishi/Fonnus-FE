@@ -531,8 +531,8 @@ the page. What the client does:
   `budget()` again at `resets_at` and turns back into its ordinary shape when the hour does. "Gọi lại" connects again, a call first,
   without a second consent. `user` is the visitor closing the screen and shows nothing.
 - **Loudness.** `getAmplitude()` is the agent's output volume while she speaks in a call, and
-  `null` otherwise, in a text session, or once the session has ended. The orb and the dotted field
-  behind it move only on a number; on `null` they rest, so a typed conversation has no voice
+  `null` otherwise, in a text session, or once the session has ended. The orb and its aura on the call
+  screen move only on a number; on `null` they rest, so a typed conversation has no voice
   animation.
 - **The agent's own cap.** When ElevenLabs ends the call at its 190 s `max_duration_seconds`
   before the client's own timer does, the disconnect arrives as an error with the context

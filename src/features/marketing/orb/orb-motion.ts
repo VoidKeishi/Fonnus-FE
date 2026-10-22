@@ -1,8 +1,8 @@
 /**
  * The orb's arithmetic, kept free of the DOM so it can be checked on its own:
  * where it sits in each pose, whether a move is a flight or a jump, how the
- * voice's loudness becomes the orb's `--amp`, and how it moves the dotted field
- * around the orb on the call screen (`dot-field.ts` draws what this computes).
+ * voice's loudness becomes the orb's `--amp`, and how it shapes the aura around
+ * the orb on the call screen (`aura.ts` draws what this computes).
  */
 
 /** The orb is laid out at this size and scaled into every pose. */
@@ -94,8 +94,8 @@ export interface Envelope {
 }
 
 /**
- * The orb's own smoothing: the sphere swells on a syllable and settles through
- * a pause. Equal to closing 45% and 10% of the gap per frame at 60fps.
+ * The sphere's own smoothing: it brightens a touch on a syllable and settles
+ * through a pause. Equal to closing 45% and 10% of the gap per frame at 60fps.
  */
 export const ORB_ENVELOPE: Envelope = { attackMs: 28, releaseMs: 160 }
 
@@ -113,149 +113,254 @@ export function envelopeStep(value: number, target: number, dtMs: number, { atta
 }
 
 /*
- * The dotted field. It answers her voice through a slower envelope than the
- * orb's, so it opens and closes like breath rather than on each syllable, and
- * every size is in orb radii, so the field keeps its proportions around a
- * 200px orb on a phone and a 320px one on a desktop.
+ * The aura: her voice on the call screen, a soft light behind the sphere that
+ * `aura.ts` draws from what this computes. Every length is in orb radii, so it
+ * keeps its proportions around a 200px orb on a phone and a 320px one on a
+ * desktop.
  */
-export const FIELD_ENVELOPE: Envelope = { attackMs: 260, releaseMs: 900 }
-/** Below this a fading field is at rest: drawn one last time, then left. */
-const FIELD_FLOOR = 0.002
-/** The loudness that opens the field fully. ASSUMED from the SDK's 0–1 output volume; tune on a live call. */
-const FIELD_LOUD = 0.6
-/**
- * Where the field's soft edge sits, silent and loud. Before it moved, the
- * mask ended at about 2.3 radii; silence is now three quarters of that and
- * loud speech 1.3 times it.
- */
-const EDGE_REST = 1.7
-const EDGE_LOUD = 3
-/** How far loud speech pushes the dots at the orb's rim; it falls off as 1/r beyond. */
-const SWELL = 0.05
-
-/** How open the field is, 0–1, eased so quiet speech already shows. */
-export function fieldSpread(envelope: number): number {
-  const level = Math.min(1, Math.max(0, envelope / FIELD_LOUD))
-  return 1 - (1 - level) * (1 - level)
-}
-
-/** Distance from the orb's centre to the field's edge, in radii. */
-export function fieldEdge(spread: number): number {
-  return EDGE_REST + (EDGE_LOUD - EDGE_REST) * spread
-}
 
 /**
- * How much of a dot shows at `t`, its distance as a share of the edge: the
- * stops of the mask the static pattern had (full, 55% at 16/38, none at the edge).
+ * How far the aura's canvas reaches from the orb's centre: 2.4 orb diameters
+ * edge to edge. Every blob stays inside it, or its gradient would be cut into
+ * a hard edge.
  */
-export function edgeWeight(t: number): number {
-  const knee = 16 / 38
-  if (t <= 0) return 1
-  if (t >= 1) return 0
-  return t < knee ? 1 - 0.45 * (t / knee) : 0.55 * (1 - (t - knee) / (1 - knee))
+export const AURA_REACH = 2.4
+
+/** Fast enough to follow a phrase, slow enough that a single syllable never flickers it. */
+export const AURA_ENVELOPE: Envelope = { attackMs: 110, releaseMs: 380 }
+/*
+ * Measured on a live call (2026-10-22): while she speaks the SDK's output
+ * volume has a median of 0.15–0.28, a 90th percentile of 0.31–0.41 and peaks
+ * of 0.37–0.45, and dips to 0–0.10 between words. The floor lets those dips
+ * read as silence, so a pause contracts the aura; the gain puts her loudest
+ * syllable at 1 and ordinary speech near 0.5.
+ */
+const AURA_NOISE_FLOOR = 0.05
+const AURA_GAIN = 2.6
+/** The aura answers her voice this much more strongly than the envelope alone… */
+const AURA_INTENSITY = 1.45
+/** …up to this. */
+export const AURA_MAX = 1.4
+/** Below this a fading envelope is at rest. */
+const AURA_FLOOR = 0.002
+/** How much of its opacity a blob keeps in silence. */
+const AURA_REST_ALPHA = 0.35
+const AURA_MIN_ALPHA = 0.02
+const AURA_MAX_ALPHA = 0.3
+
+/** Her raw output volume as the aura's loudness, 0–1. */
+export function auraLoudness(volume: number): number {
+  return Math.min(1, Math.max(0, (volume - AURA_NOISE_FLOOR) * AURA_GAIN))
 }
 
-/** The outward push of the whole field at a distance `r` (radii), before any ripple. */
-export function swellOffset(r: number, spread: number): number {
-  return (SWELL * spread) / Math.max(1, r)
+/** The envelope as the aura shows it: 1.45 times as strong, never past `AURA_MAX`. */
+export function visualAmplitude(envelope: number): number {
+  return Math.min(AURA_MAX, Math.max(0, envelope * AURA_INTENSITY))
+}
+
+/** The whole aura's size: drawn in a little in silence, past its rest when she is loud. */
+function auraScale(visual: number): number {
+  return 0.92 + 0.19 * visual
+}
+
+export type AuraTone = 'deep' | 'clay' | 'amber' | 'cream'
+
+/**
+ * One soft radial gradient of the aura. Its centre sits `offset` from the
+ * orb's, at x = cos(a)·offset and y = sin(a·k)·offset, where a wanders around
+ * `angle` on the blob's own cycle. `k` is never 1, so the centre never moves
+ * on a circle, and no two blobs share a cycle, so the aura never turns as one.
+ */
+export interface AuraBlob {
+  /** Radians. */
+  angle: number
+  k: number
+  /** How far the angle wanders either side of `angle`, radians. */
+  wander: number
+  /** One drift cycle, 6–15 s. */
+  periodMs: number
+  phase: number
+  /** Orb radii from the orb's centre, at rest. */
+  offset: number
+  /** Orb radii, at rest. */
+  radius: number
+  /** Opacity at full voice, before the response; most blobs sit near the low end. */
+  alpha: number
+  /** How strongly it answers her voice; it differs per blob, so regions swell by different amounts. */
+  response: number
+  /** The colour at its centre, then at its edge. */
+  tones: readonly [core: AuraTone, rim: AuraTone]
+}
+
+/** Layer 1: just past the sphere's rim, about 1.3 orb diameters across, off-centre so it is never a ring. */
+export const AURA_NEAR: readonly AuraBlob[] = [
+  { angle: 0.9, k: 1.05, wander: 0.6, periodMs: 13000, phase: 0.3, offset: 0.1, radius: 1.3, alpha: 0.14, response: 1, tones: ['amber', 'clay'] },
+  { angle: 3.2, k: 0.94, wander: 0.5, periodMs: 9800, phase: 2.4, offset: 0.08, radius: 1.28, alpha: 0.12, response: 0.8, tones: ['cream', 'amber'] },
+  { angle: 5, k: 1.09, wander: 0.7, periodMs: 15000, phase: 4.1, offset: 0.12, radius: 1.32, alpha: 0.1, response: 1.2, tones: ['amber', 'clay'] },
+]
+
+/** Layer 2: seven asymmetric lobes, the part of the aura that swells and bulges. */
+export const AURA_LOBES: readonly AuraBlob[] = [
+  { angle: 0.35, k: 1.08, wander: 0.32, periodMs: 7200, phase: 0.4, offset: 0.34, radius: 0.92, alpha: 0.16, response: 1.15, tones: ['clay', 'amber'] },
+  { angle: 1.2, k: 0.93, wander: 0.45, periodMs: 11800, phase: 2.1, offset: 0.42, radius: 0.86, alpha: 0.12, response: 0.7, tones: ['cream', 'amber'] },
+  { angle: 2.05, k: 1.12, wander: 0.28, periodMs: 6400, phase: 4.4, offset: 0.28, radius: 0.94, alpha: 0.18, response: 1.3, tones: ['clay', 'amber'] },
+  { angle: 2.9, k: 0.95, wander: 0.4, periodMs: 14600, phase: 1.3, offset: 0.46, radius: 0.82, alpha: 0.1, response: 0.85, tones: ['deep', 'clay'] },
+  { angle: 4.05, k: 1.06, wander: 0.36, periodMs: 9300, phase: 5.2, offset: 0.38, radius: 0.9, alpha: 0.14, response: 1, tones: ['amber', 'cream'] },
+  { angle: 4.7, k: 0.91, wander: 0.5, periodMs: 12700, phase: 3, offset: 0.34, radius: 0.95, alpha: 0.17, response: 1.2, tones: ['clay', 'amber'] },
+  { angle: 5.6, k: 1.1, wander: 0.3, periodMs: 8100, phase: 0.9, offset: 0.44, radius: 0.84, alpha: 0.11, response: 0.75, tones: ['cream', 'clay'] },
+]
+
+/**
+ * Layer 3: an extremely diffuse haze, about 2.1 orb diameters across while she
+ * speaks — less in silence, more when she is loud, always inside the canvas.
+ */
+export const AURA_HAZE: readonly AuraBlob[] = [
+  { angle: 0.6, k: 1.04, wander: 0.8, periodMs: 14000, phase: 1.7, offset: 0.08, radius: 1.8, alpha: 0.06, response: 0.6, tones: ['clay', 'clay'] },
+  { angle: 3.7, k: 0.96, wander: 0.7, periodMs: 11000, phase: 4.6, offset: 0.1, radius: 1.75, alpha: 0.05, response: 0.5, tones: ['amber', 'amber'] },
+]
+
+/** Where a blob is drawn this frame, in orb radii from the orb's centre. Reused, never allocated per frame. */
+export interface BlobPlacement {
+  x: number
+  y: number
+  radius: number
+  alpha: number
+}
+
+/** How far a full bulge pushes its lobe out, in radii, and how much it grows it. */
+const BULGE_PUSH = 0.16
+const BULGE_GROW = 0.2
+const BULGE_ALPHA = 0.05
+
+/**
+ * Places `blob` at `ms`, for a voice at `visual` and a bulge of 0–1. `still`
+ * is a visitor who asked for less motion: the blob keeps its resting place
+ * and size, and only its opacity follows her voice.
+ */
+export function placeBlob(out: BlobPlacement, blob: AuraBlob, ms: number, visual: number, bulge: number, still: boolean): void {
+  const t = still ? 0 : ms
+  const moving = still ? 0 : visual
+  const push = still ? 0 : bulge
+  const cycle = (2 * Math.PI * t) / blob.periodMs + blob.phase
+  const angle = blob.angle + blob.wander * Math.sin(cycle)
+  // A slower, unrelated breath of the offset, so a lobe's distance and its angle never repeat together.
+  const breath = 1 + 0.1 * Math.sin(0.73 * cycle + 1.3)
+  const offset = blob.offset * breath * (1 + 0.35 * blob.response * moving) + BULGE_PUSH * push
+  out.x = Math.cos(angle) * offset
+  out.y = Math.sin(angle * blob.k) * offset
+  out.radius = blob.radius * auraScale(moving) * (1 + 0.08 * blob.response * moving) * (1 + BULGE_GROW * push)
+  const alpha = blob.alpha * (AURA_REST_ALPHA + 0.5 * blob.response * visual) + BULGE_ALPHA * bulge
+  out.alpha = Math.min(AURA_MAX_ALPHA, Math.max(AURA_MIN_ALPHA, alpha))
 }
 
 /*
- * A ripple is a pressure front leaving the orb's rim: each dot it passes is
- * pushed out and let back, so the field compresses and relaxes along it. It
- * moves dots and never brightens them, and its radius wobbles with the angle,
- * so it reads as pressure moving through the dots, never as a ring drawn in them.
+ * A peak: her loudness rising clearly above the aura's own envelope. From
+ * silence any clear onset counts; while she talks steadily only a syllable
+ * well above her own level does, so ordinary speech never sets the aura
+ * beating.
  */
-export interface Ripple {
-  bornAt: number
-  /** 0.4–1, from how far the peak rose above the envelope. */
-  strength: number
-  /** Turns the wobble, so no two fronts share a shape. */
-  phase: number
-}
-
-export const RIPPLE_LIFE_MS = 1300
-const RIPPLE_MAX = 3
-/**
- * A peak counts once it rises above the slow envelope by this much plus this
- * share of the envelope: from silence any clear onset does, while she talks
- * steadily only a syllable well above her own level does, so ordinary speech
- * never sets the field beating.
- */
-const RIPPLE_RISE = 0.12
-const RIPPLE_RISE_SHARE = 0.5
+const PEAK_RISE = 0.12
+const PEAK_RISE_SHARE = 0.5
 /** …is at least this loud… */
-const RIPPLE_FLOOR = 0.2
-/** …and comes this long after the last one. */
-const RIPPLE_GAP_MS = 420
-/** Radii per second. */
-const RIPPLE_SPEED = 1.6
-/** Half-width of the front, in radii. */
-const RIPPLE_WIDTH = 0.35
-/** Largest push at the front, in radii: about 4px around a 288px orb. */
-const RIPPLE_PUSH = 0.03
-/** How far the front's radius strays from a circle. */
-const RIPPLE_WOBBLE = 0.12
+const PEAK_FLOOR = 0.2
+/** …and comes this long after the last one, never sooner than a bulge lives, so one bulge is alive at a time. */
+const PEAK_GAP_MS = 420
+/** A bulge swells in over this, then eases out until `BULGE_MS`. */
+const BULGE_RISE_MS = 70
+export const BULGE_MS = 420
+/** A peak this strong bulges a second lobe too, at this share of the first one's bulge. */
+const SECOND_LOBE_STRENGTH = 0.7
+const SECOND_LOBE_SHARE = 0.6
 
-/** Whether this frame's loudness is a peak worth a ripple. */
-export function startsRipple(loudness: number, envelope: number, msSinceLast: number): boolean {
+/** Whether this frame's loudness is a peak worth a bulge. */
+export function isPeak(loudness: number, envelope: number, msSinceLast: number): boolean {
   return (
-    loudness >= RIPPLE_FLOOR &&
-    loudness - envelope >= RIPPLE_RISE + RIPPLE_RISE_SHARE * envelope &&
-    msSinceLast >= RIPPLE_GAP_MS
+    loudness >= PEAK_FLOOR &&
+    loudness - envelope >= PEAK_RISE + PEAK_RISE_SHARE * envelope &&
+    msSinceLast >= PEAK_GAP_MS
   )
 }
 
-export function rippleStrength(loudness: number, envelope: number): number {
+/** 0.4–1, from how far the peak rose above the envelope: a faint peak still shows, a sharp one is capped. */
+export function peakStrength(loudness: number, envelope: number): number {
   return Math.min(1, Math.max(0.4, (loudness - envelope) / 0.3))
 }
 
-/**
- * The push a ripple gives a dot at distance `r` (radii) and `angle`, `ageMs`
- * after it left the rim. It swells in over its first sixth and dies out
- * before the front is much past the loud edge.
- */
-export function rippleOffset(r: number, angle: number, ageMs: number, { strength, phase }: Ripple): number {
-  const life = ageMs / RIPPLE_LIFE_MS
-  if (life <= 0 || life >= 1) return 0
-  const wobble = 1 + RIPPLE_WOBBLE * (0.6 * Math.sin(2 * angle + phase) + 0.4 * Math.sin(3 * angle + 1.7 * phase))
-  const front = (1 + (RIPPLE_SPEED * ageMs) / 1000) * wobble
-  const x = (r - front) / RIPPLE_WIDTH
-  const fade = (1 - life) * (1 - life) * Math.min(1, life * 6)
-  return RIPPLE_PUSH * strength * fade * Math.exp(-x * x)
-}
-
-export interface FieldState {
-  envelope: number
-  ripples: readonly Ripple[]
-  lastRipple: number
-}
-
-export const FIELD_AT_REST: FieldState = { envelope: 0, ripples: [], lastRipple: -Infinity }
-
-/**
- * One frame of the field. `loudness` is 0 when there is no live voice, and
- * `phase` turns a ripple started this frame. Null when the field was already
- * at rest, so there is nothing to draw and the loop may stop for it; the frame
- * that reaches rest is returned once, to be drawn as the resting field.
- */
-export function stepField(
-  state: FieldState,
-  now: number,
-  dtMs: number,
-  loudness: number,
-  phase: number,
-): FieldState | null {
-  const { envelope, ripples, lastRipple } = state
-  if (loudness === 0 && envelope === 0 && ripples.length === 0) return null
-  const ripple =
-    ripples.length < RIPPLE_MAX && startsRipple(loudness, envelope, now - lastRipple)
-      ? { bornAt: now, strength: rippleStrength(loudness, envelope), phase }
-      : null
-  const next = envelopeStep(envelope, loudness, dtMs, FIELD_ENVELOPE)
-  return {
-    envelope: loudness === 0 && next < FIELD_FLOOR ? 0 : next,
-    ripples: (ripple ? [...ripples, ripple] : ripples).filter((r) => now - r.bornAt < RIPPLE_LIFE_MS),
-    lastRipple: ripple ? now : lastRipple,
+/** A bulge of `strength`, `ageMs` after its peak: a quick swell, a smooth fall, gone by `BULGE_MS`. */
+export function bulgeAt(ageMs: number, strength: number): number {
+  if (ageMs < 0 || ageMs >= BULGE_MS) return 0
+  if (ageMs < BULGE_RISE_MS) {
+    const f = ageMs / BULGE_RISE_MS
+    return strength * f * f * (3 - 2 * f)
   }
+  const f = 1 - (ageMs - BULGE_RISE_MS) / (BULGE_MS - BULGE_RISE_MS)
+  return strength * f * f
+}
+
+/** The aura's state between frames. Mutated in place by `stepAura`, so a frame allocates nothing. */
+export interface AuraState {
+  /** Her loudness through `AURA_ENVELOPE`, 0–1. */
+  envelope: number
+  lastPeak: number
+  bulgeFrom: number
+  bulgeStrength: number
+  /** The lobes the live bulge swells, as indices into `AURA_LOBES`; -1 for none. */
+  bulgeFirst: number
+  bulgeSecond: number
+}
+
+export function createAuraState(): AuraState {
+  return { envelope: 0, lastPeak: -Infinity, bulgeFrom: -Infinity, bulgeStrength: 0, bulgeFirst: -1, bulgeSecond: -1 }
+}
+
+/** The angular distance between two angles, 0–π. */
+function angleBetween(a: number, b: number): number {
+  const d = Math.abs(a - b) % (2 * Math.PI)
+  return d > Math.PI ? 2 * Math.PI - d : d
+}
+
+/**
+ * One frame of the aura. `loudness` is `auraLoudness` of her volume, or 0 when
+ * there is none; `pick`, 0–1, is where a peak this frame lands, so a bulge
+ * swells the one or two lobes nearest a random angle — never all of them, and
+ * never a pulse around the whole aura. `still` takes no bulges at all.
+ */
+export function stepAura(state: AuraState, now: number, dtMs: number, loudness: number, pick: number, still: boolean): void {
+  if (!still && isPeak(loudness, state.envelope, now - state.lastPeak)) {
+    const at = pick * 2 * Math.PI
+    let first = -1
+    let second = -1
+    for (const [i, lobe] of AURA_LOBES.entries()) {
+      const distance = angleBetween(lobe.angle, at)
+      const firstLobe = AURA_LOBES[first]
+      const secondLobe = AURA_LOBES[second]
+      if (!firstLobe || distance < angleBetween(firstLobe.angle, at)) {
+        second = first
+        first = i
+      } else if (!secondLobe || distance < angleBetween(secondLobe.angle, at)) {
+        second = i
+      }
+    }
+    const strength = peakStrength(loudness, state.envelope)
+    state.lastPeak = now
+    state.bulgeFrom = now
+    state.bulgeStrength = strength
+    state.bulgeFirst = first
+    state.bulgeSecond = strength >= SECOND_LOBE_STRENGTH ? second : -1
+  }
+  const next = envelopeStep(state.envelope, loudness, dtMs, AURA_ENVELOPE)
+  state.envelope = loudness === 0 && next < AURA_FLOOR ? 0 : next
+}
+
+/** The bulge on lobe `index` (into `AURA_LOBES`) at `now`, 0–1. */
+export function lobeBulge(state: AuraState, index: number, now: number): number {
+  const age = now - state.bulgeFrom
+  if (index === state.bulgeFirst) return bulgeAt(age, state.bulgeStrength)
+  if (index === state.bulgeSecond) return bulgeAt(age, state.bulgeStrength * SECOND_LOBE_SHARE)
+  return 0
+}
+
+/** True once she is silent, the envelope has settled and no bulge is alive: the aura's last frame is drawn. */
+export function auraAtRest(state: AuraState, now: number): boolean {
+  return state.envelope === 0 && now - state.bulgeFrom >= BULGE_MS
 }
