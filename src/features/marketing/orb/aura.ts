@@ -10,8 +10,8 @@ import type { AuraBlob, AuraState, AuraTone, BlobPlacement } from './orb-motion'
  * across, seven asymmetric lobes, and a near glow just past the sphere's rim —
  * placed by `orb-motion.ts`, never a ring and never one shape turned as a
  * whole. The canvas is small (160×160, 2.4 orb diameters across) and blurred
- * by CSS, like the orb's own field. It belongs to the call screen, sized off
- * the orb's slot there, so it paints under the screen's text.
+ * by CSS, like the orb's own field. It sits inside the orb's button, so it
+ * scales with the orb.
  *
  * This module only draws; `orb.tsx` owns the one animation loop that calls it.
  */
