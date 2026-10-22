@@ -420,15 +420,6 @@ works (`0914378064` / `111002`).
 
 Newest first. One line per session that taught something; the rule itself goes above.
 
-- **2026-10-22 (landing page, the volumetric aura)** — The aura that shows her voice was
-  first drawn inside the orb's button, so it would scale and fly with the orb. That put it
-  in the orb's top layer, over the call screen's state line and the first bubble of a typed
-  thread, as a 12–15% amber tint on muted text. Once the aura was set to appear only after
-  the orb lands, flying with the orb bought nothing, and it moved into the orb's slot under
-  every line of text. A picture behind content belongs in the content's own stacking
-  context, under its text. Mind what makes an element a stacking context there:
-  `container-type`, `contain`, opacity and transform all do, and on the slot any of them
-  would have lifted the dots and the aura above the line below the orb.
 - **2026-10-18 (landing page, the hour's budget moves to the server)** — The consent slot
   used to know "còn 40 giây" before it was painted, because the number was in
   `localStorage`; now it comes from `GET /api/voice-demo/budget` and may land a second

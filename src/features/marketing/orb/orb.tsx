@@ -2,7 +2,6 @@ import { useEffect, useRef } from 'react'
 import type { RefObject } from 'react'
 import { Icon } from '@/design-system'
 import { createAura } from './aura'
-import type { Aura } from './aura'
 import { FIELD_FRAME_MS, STILL_FRAME_MS, createOrbField } from './orb-field'
 import {
   ORB_ENVELOPE,
@@ -25,15 +24,10 @@ import type { OrbMode } from './orb-motion'
  * re-rendering the tree.
  *
  * On the call screen her voice shows in the aura behind the sphere (`aura.ts`),
- * which the same loop draws. Its canvas is the call screen's, under the
- * screen's text, and is handed to the loop for as long as the screen is open.
+ * which the same loop draws. It fades in once the orb has landed — its fade
+ * waits out the flight, `--duration-arc` — and out at once when the orb
+ * leaves, so it never sweeps across the hero.
  */
-
-/**
- * Hands the call screen's aura canvas to the orb's loop, which draws on it
- * until the returned function takes it back.
- */
-export type AuraHandOver = (canvas: HTMLCanvasElement) => () => void
 
 /** Below this, a fading `--amp` is written as 0 and the envelope stops. */
 const AMP_FLOOR = 0.001
@@ -63,15 +57,14 @@ interface OrbProps {
   /** True whenever she is talking; drives the envelopes. */
   speaking: boolean
   getAmplitude: () => number | null
-  /** Where the loop publishes its aura hand-over for the call screen. */
-  handOverAuraRef: RefObject<AuraHandOver | null>
   onClick: () => void
 }
 
-export function Orb({ orbRef, mode, speaking, getAmplitude, handOverAuraRef, onClick }: OrbProps) {
+export function Orb({ orbRef, mode, speaking, getAmplitude, onClick }: OrbProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const auraRef = useRef<HTMLCanvasElement>(null)
   const inCall = mode === 'call'
-  useOrbAnimation(orbRef, canvasRef, handOverAuraRef, speaking, getAmplitude)
+  useOrbAnimation(orbRef, canvasRef, auraRef, inCall, speaking, getAmplitude)
 
   return (
     <button
@@ -88,6 +81,18 @@ export function Orb({ orbRef, mode, speaking, getAmplitude, handOverAuraRef, onC
         mode === null ? 'pointer-events-none' : 'cursor-pointer',
       ].join(' ')}
     >
+      <canvas
+        ref={auraRef}
+        aria-hidden="true"
+        width={160}
+        height={160}
+        className={[
+          'pointer-events-none absolute -top-[70%] -left-[70%] size-[240%] blur-[16px] transition-opacity ease-[ease-out]',
+          inCall
+            ? 'opacity-100 delay-[var(--duration-arc)] duration-[320ms] motion-reduce:delay-0'
+            : 'opacity-0 duration-0',
+        ].join(' ')}
+      />
       <span className="absolute inset-0 block rounded-[50%]">
         <span aria-hidden="true" className={`absolute -inset-[16%] rounded-[50%] ${HALO}`} />
         <span aria-hidden="true" className={`absolute inset-0 overflow-hidden rounded-[50%] ${SPHERE}`}>
@@ -114,8 +119,8 @@ export function Orb({ orbRef, mode, speaking, getAmplitude, handOverAuraRef, onC
 
 /**
  * The page's one animation loop for the orb: the canvas field at ~30fps, the
- * `--amp` envelope every frame, and the aura every frame while the call screen
- * has handed its canvas over. It stops while the tab is hidden.
+ * `--amp` envelope every frame, and on the call screen the aura every frame.
+ * It stops while the tab is hidden.
  *
  * A visitor who asked for less motion gets one still frame of the field, and
  * an aura whose lobes hold their resting places while its opacity still
@@ -125,24 +130,26 @@ export function Orb({ orbRef, mode, speaking, getAmplitude, handOverAuraRef, onC
 function useOrbAnimation(
   orbRef: RefObject<HTMLButtonElement | null>,
   canvasRef: RefObject<HTMLCanvasElement | null>,
-  handOverAuraRef: RefObject<AuraHandOver | null>,
+  auraRef: RefObject<HTMLCanvasElement | null>,
+  inCall: boolean,
   speaking: boolean,
   getAmplitude: () => number | null,
 ) {
-  const voice = useRef({ speaking, getAmplitude })
+  const voice = useRef({ inCall, speaking, getAmplitude })
   const onVoiceChange = useRef<(() => void) | null>(null)
 
   useEffect(() => {
-    voice.current = { speaking, getAmplitude }
+    voice.current = { inCall, speaking, getAmplitude }
     onVoiceChange.current?.()
-  }, [speaking, getAmplitude])
+  }, [inCall, speaking, getAmplitude])
 
   useEffect(() => {
     const orb = orbRef.current
     const canvas = canvasRef.current
-    if (!orb || !canvas) return
+    const auraCanvas = auraRef.current
+    if (!orb || !canvas || !auraCanvas) return
     const field = createOrbField(canvas)
-    let aura: Aura | null = null
+    const aura = createAura(auraCanvas)
     const auraState = createAuraState()
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)')
     let raf = 0
@@ -164,18 +171,17 @@ function useOrbAnimation(
       }
       const dt = now - lastFrame
       lastFrame = now
-      const { speaking: talking, getAmplitude: loudness } = voice.current
+      const { inCall: auraShown, speaking: talking, getAmplitude: loudness } = voice.current
       const volume = talking ? loudness() : null
       const level = volume === null ? null : auraLoudness(volume)
       if (level !== null || amp > 0) {
         const next = envelopeStep(amp, level ?? 0, dt, ORB_ENVELOPE)
         writeAmp(level === null && next < AMP_FLOOR ? 0 : next)
       }
-      // Stepped with no canvas too, so an aura handed over again starts from where her voice is.
+      // Stepped while hidden too, so an aura shown again starts from where her voice is.
       stepAura(auraState, now, dt, level ?? 0, Math.random(), still)
-      const shown = aura
-      const drawsAura = shown !== null
-      if (drawsAura) shown.draw(now, visualAmplitude(auraState.envelope), auraState, still)
+      const drawsAura = auraShown && aura !== null
+      if (drawsAura) aura.draw(now, visualAmplitude(auraState.envelope), auraState, still)
       // Moving: the field always, and the aura's slow drift while it shows.
       // Still: only what her voice has not finished settling.
       const keepGoing = still
@@ -202,28 +208,16 @@ function useOrbAnimation(
       start()
     }
 
-    // Restarts the loop, so that under reduced motion, where it may have
-    // stopped, the canvas still gets its first resting frame.
-    handOverAuraRef.current = (auraCanvas) => {
-      const handed = createAura(auraCanvas)
-      aura = handed
-      start()
-      return () => {
-        if (aura === handed) aura = null
-      }
-    }
     onVoiceChange.current = start
     document.addEventListener('visibilitychange', onVisibility)
     reduced.addEventListener('change', onMotionPreference)
     start()
     return () => {
       stop()
-      aura = null
-      handOverAuraRef.current = null
       onVoiceChange.current = null
       document.removeEventListener('visibilitychange', onVisibility)
       reduced.removeEventListener('change', onMotionPreference)
       orb.style.setProperty('--amp', '0')
     }
-  }, [orbRef, canvasRef, handOverAuraRef])
+  }, [orbRef, canvasRef, auraRef])
 }

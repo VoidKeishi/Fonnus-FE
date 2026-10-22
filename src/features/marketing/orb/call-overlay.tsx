@@ -15,7 +15,6 @@ import {
 } from '@/data/call-demo'
 import { CallChips } from './call-chips'
 import { CallCountdown } from './call-countdown'
-import type { AuraHandOver } from './orb'
 import { useCallDemo } from './call-demo-provider'
 import { budgetLine, endingLine, spentLine, stateLabel } from './call-state'
 import type { ThreadLine } from './use-call-demo'
@@ -60,9 +59,7 @@ import { useTurnstile } from './use-turnstile'
  * Behind the orb is Chấm nhịp, and it holds still: the dots pattern inside the
  * orb's slot, spilling past it and masked into a soft circle about 1.7 orb
  * radii out, so it follows the slot in both layouts and at every width. Her
- * voice is the aura (`aura.ts`), not the dots: a canvas in the same slot, over
- * the dots and under every line of text, which the orb's loop draws once this
- * screen hands it over through `handOverAuraRef`.
+ * voice is the orb's aura (`aura.ts`), not the dots.
  *
  * One more element draws nothing: the container of the Invisible Turnstile
  * widget every call's ticket costs (ADR 0009 point 5), mounted with the dialog
@@ -77,16 +74,6 @@ import { useTurnstile } from './use-turnstile'
 const DOTS_SPILL = { inset: '-35%', width: '170%', height: '170%' }
 const DOTS_MASK =
   'radial-gradient(circle closest-side, var(--text-heading) 0%, color-mix(in srgb, var(--text-heading) 55%, transparent) 42.1%, transparent 100%)'
-/*
- * The aura spills 70% of the slot past each side: 2.4 orb diameters across,
- * centred on the orb. Its blur is 16px at the orb's base size (280px, so a
- * 672px box) and scales with the slot, through the box's own width, as it did
- * when it was drawn inside the scaled orb. It fades in once the orb has landed
- * — the flight is `--duration-arc` — and under reduced motion simply appears.
- */
-const AURA_BOX =
-  'pointer-events-none absolute -top-[70%] -left-[70%] -z-1 size-[240%] @container motion-safe:animate-[fnFadeIn_320ms_ease-out_var(--duration-arc)_both]'
-const AURA_BLUR = 'blur-[calc(100cqw*16/672)]'
 const FAST = 'transition-colors duration-[var(--duration-fast)] ease-out'
 const ROUND = `grid size-10 flex-none cursor-pointer place-items-center rounded-[50%] border-none ${FAST}`
 const IDLE = 'bg-surface-card text-text-body'
@@ -102,11 +89,9 @@ interface CallOverlayProps {
    * opened from anywhere else.
    */
   orbRef: RefObject<HTMLElement | null>
-  /** The orb's loop, which draws the aura on this screen's canvas while it is open. */
-  handOverAuraRef: RefObject<AuraHandOver | null>
 }
 
-export function CallOverlay({ spotRef, orbRef, handOverAuraRef }: CallOverlayProps) {
+export function CallOverlay({ spotRef, orbRef }: CallOverlayProps) {
   const demo = useCallDemo()
   const { returnFocusTo } = demo
   const [typed, setTyped] = useState('')
@@ -119,7 +104,6 @@ export function CallOverlay({ spotRef, orbRef, handOverAuraRef }: CallOverlayPro
   const budgetLineId = useId()
   const threadRef = useRef<HTMLDivElement>(null)
   const turnstileRef = useRef<HTMLDivElement>(null)
-  const auraRef = useRef<HTMLCanvasElement>(null)
   const challenge = useTurnstile(demo.open, turnstileRef)
   const { awaitingConsent, ended, failed, budget } = demo
   /** The server said nothing of the hour is left: no call can start until it turns. */
@@ -147,13 +131,6 @@ export function CallOverlay({ spotRef, orbRef, handOverAuraRef }: CallOverlayPro
       target?.focus({ preventScroll: true })
     }
   }, [orbRef, returnFocusTo])
-
-  // Taken back on unmount, so the loop never draws on a canvas that is gone.
-  useEffect(() => {
-    const canvas = auraRef.current
-    if (!canvas) return
-    return handOverAuraRef.current?.(canvas)
-  }, [handOverAuraRef])
 
   // Declared after the effect above, so on open it runs second and wins over
   // the dialog's own focus. A slot that swaps out takes the focused control
@@ -260,8 +237,7 @@ export function CallOverlay({ spotRef, orbRef, handOverAuraRef }: CallOverlayPro
         >
           {/* Wide gap: the aura opens around the orb without crowding the
               label. Typed, the orb is smaller and gives its room to the thread.
-              The dots and then the aura sit under every layer of the screen
-              but its ground. */}
+              The dots sit under every layer of the screen but its ground. */}
           <div
             ref={spotRef}
             aria-hidden="true"
@@ -274,9 +250,6 @@ export function CallOverlay({ spotRef, orbRef, handOverAuraRef }: CallOverlayPro
               className="-z-1 text-text-heading"
               style={{ ...DOTS_SPILL, maskImage: DOTS_MASK, WebkitMaskImage: DOTS_MASK }}
             />
-            <div className={AURA_BOX}>
-              <canvas ref={auraRef} width={160} height={160} className={`absolute inset-0 size-full ${AURA_BLUR}`} />
-            </div>
           </div>
           {awaitingConsent && spent ? (
             <div ref={actionsRef} className="flex flex-col items-center gap-4 text-center">
