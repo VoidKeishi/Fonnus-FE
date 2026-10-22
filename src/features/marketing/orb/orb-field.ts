@@ -59,15 +59,21 @@ export function buildRampLut(stops: readonly RampStop[]): Uint8ClampedArray {
  * one declared exception to "no literal colour": a canvas pixel buffer takes
  * numbers, not `var()`, and no alias carries these shades. (248,227,223 equals
  * `--surface-rose`, but that alias means an error tint, so it is not borrowed.)
+ * Amber and cream are shared with the aura around the orb (`aura.ts`).
  */
+export type Rgb = readonly [r: number, g: number, b: number]
+
+export const AMBER: Rgb = [208, 138, 85]
+export const CREAM: Rgb = [239, 197, 164]
+
 const ALIAS_STOPS: readonly (readonly [at: number, alias: string])[] = [
   [0, '--text-accent'],
   [0.3, '--text-eyebrow'],
   [1, '--surface-card'],
 ]
 const LITERAL_STOPS: readonly RampStop[] = [
-  [0.52, 208, 138, 85],
-  [0.7, 239, 197, 164],
+  [0.52, ...AMBER],
+  [0.7, ...CREAM],
   [0.84, 248, 227, 223],
 ]
 
@@ -77,7 +83,7 @@ const LITERAL_STOPS: readonly RampStop[] = [
  * value is ignored, leaving `transparent`, which reads back as `rgba(…)` and is
  * rejected.
  */
-function rgbOf(ctx: CanvasRenderingContext2D, color: string): [number, number, number] | null {
+function rgbOf(ctx: CanvasRenderingContext2D, color: string): Rgb | null {
   if (!color) return null
   ctx.fillStyle = 'transparent'
   ctx.fillStyle = color
@@ -87,10 +93,14 @@ function rgbOf(ctx: CanvasRenderingContext2D, color: string): [number, number, n
   return [parseInt(hex[1], 16), parseInt(hex[2], 16), parseInt(hex[3], 16)]
 }
 
+/** An alias colour read off the document, as RGB; null when it does not resolve to an opaque colour. */
+export function aliasRgb(ctx: CanvasRenderingContext2D, alias: string): Rgb | null {
+  return rgbOf(ctx, getComputedStyle(document.documentElement).getPropertyValue(alias).trim())
+}
+
 function resolveStops(ctx: CanvasRenderingContext2D): RampStop[] {
-  const root = getComputedStyle(document.documentElement)
   const fromAliases = ALIAS_STOPS.flatMap(([at, alias]): RampStop[] => {
-    const rgb = rgbOf(ctx, root.getPropertyValue(alias).trim())
+    const rgb = aliasRgb(ctx, alias)
     return rgb ? [[at, ...rgb]] : []
   })
   return [...fromAliases, ...LITERAL_STOPS].toSorted((a, b) => a[0] - b[0])
