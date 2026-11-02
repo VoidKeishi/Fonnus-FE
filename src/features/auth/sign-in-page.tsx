@@ -1,37 +1,25 @@
 'use client'
 
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Button, Icon } from '@/design-system'
-import { api, formatPhone, isValidEmail, messageFor, normalizePhone, phoneError } from '@/api'
-import type { Me } from '@/api'
+import { Button } from '@/design-system'
+import { api, fieldMessageFor, formatPhone, isApiError, messageFor, normalizePhone, phoneError } from '@/api'
 import { useSession } from '@/session/session-provider'
 import { AuthHeading, AuthShell } from './auth-shell'
 import type { AuthBack } from './auth-shell'
-import { Field, LastUsedBadge, PhoneField } from './field'
+import { PhoneField } from './field'
 import { OtpField, OtpFooter } from './otp-field'
-import { readLastMethod, rememberMethod } from './last-method'
 import { useCountdown } from './use-countdown'
 
 /*
- * Sign-in. Two ways in, because an owner will not remember which one they used:
- * phone with an SMS code (the default) and email with the same six digits.
- * There is no password anywhere in the product.
- *
- * The one thing this door has that sign-up does not: a "Lần trước" badge on the
- * method this browser used last time. Remembering that for the owner is the
- * cheapest thing on the screen and the one they are actually looking for.
- *
- * Google sign-in is in the design and deliberately not here yet: it needs the
- * in-page chooser for mock mode and a real OAuth redirect for live mode, and a
- * button that does neither is worse than no button (PLAN.md §Roadmap).
+ * Sign-in: a mobile number and the six digits Fonnus-BE texts to it. There is
+ * no password anywhere in the product, and no other door yet — Fonnus-BE signs
+ * in by mobile number only, and a control that does nothing is worse than none
+ * (ADR 0011). Email and Google return with F1b, when the backend serves them.
  */
-type Step = 'phone' | 'phone-otp' | 'email' | 'email-otp'
-
-/** Long enough that a slow SMS still arrives before the resend link unlocks. */
-const RESEND_SECONDS = 42
+type Step = 'phone' | 'phone-otp'
 
 /** Top right on every step of this door. */
 const SWAP = (
@@ -39,6 +27,30 @@ const SWAP = (
     Vào danh sách chờ
   </Link>
 )
+
+/** The words in the "no account" sentence that lead to the waitlist. */
+const WAITLIST_PHRASE = 'danh sách chờ'
+
+/**
+ * The line under the number. A number with no account is told where to go,
+ * so "danh sách chờ" in that sentence is the way there; the sentence itself
+ * stays in `errors.ts` with every other one.
+ */
+function sendErrorLine(e: unknown): ReactNode {
+  // One box and no marks: a refusal named on the field reads as its own sentence.
+  const line = fieldMessageFor(e)
+  const at = line.indexOf(WAITLIST_PHRASE)
+  if (!isApiError(e) || e.code !== 'mobile_number_not_found' || at < 0) return line
+  return (
+    <>
+      {line.slice(0, at)}
+      <Link href="/waitlist" className="font-medium">
+        {WAITLIST_PHRASE}
+      </Link>
+      {line.slice(at + WAITLIST_PHRASE.length)}
+    </>
+  )
+}
 
 /**
  * `panel` arrives as a prop rather than an import so it can stay a server
@@ -52,18 +64,22 @@ export function SignInPage({ panel }: { panel?: ReactNode }) {
 
   const [step, setStep] = useState<Step>('phone')
   const [phone, setPhone] = useState('')
-  const [email, setEmail] = useState('')
+  /** The number the backend sent the code to, in its own normalised form. */
+  const [sentTo, setSentTo] = useState('')
+  /** The backend's last cooldown, which a resend restarts with before it answers. */
+  const [cooldown, setCooldown] = useState(0)
   const [code, setCode] = useState('')
-  const [fieldError, setFieldError] = useState<string | null>(null)
+  const [fieldError, setFieldError] = useState<ReactNode>(null)
   const [codeError, setCodeError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
-  // Read once, on the first client render: it must not change under the owner
-  // mid-flow. Safe as a lazy initialiser rather than an effect because this
-  // whole screen is a client boundary the server never renders.
-  const [lastUsed] = useState(readLastMethod)
+  const resend = useCountdown()
 
-  const resend = useCountdown(RESEND_SECONDS)
+  // An owner who is already in has no use for this door.
+  const signedIn = session.status === 'authenticated'
+  useEffect(() => {
+    if (signedIn) router.replace('/app')
+  }, [signedIn, router])
 
   const goTo = (next: Step) => {
     setCode('')
@@ -72,33 +88,26 @@ export function SignInPage({ panel }: { panel?: ReactNode }) {
     setStep(next)
   }
 
-  // The server has set the session cookie: record who is in and go to the shell.
-  const enterApp = useCallback(
-    (me: Me) => {
-      session.signIn(me)
-      router.push('/app')
-    },
-    [session, router],
-  )
-
+  const { signIn } = session
   const confirmCode = useCallback(
-    async (entered: string, method: 'phone' | 'email') => {
+    async (entered: string) => {
       setBusy(true)
       try {
-        const identity = method === 'email' ? email : normalizePhone(phone)
-        const me = await api.auth.verifyCode({ identity, code: entered })
-        rememberMethod(method)
-        enterApp(me)
+        const me = await api.auth.verifyLoginOtp({ mobile_number: sentTo, code: entered })
+        // The backend has set the session cookies: record who is in and go to
+        // the shell. `replace`, so Back from `/app` does not return here.
+        signIn(me)
+        router.replace('/app')
       } catch (e) {
-        // messageFor() knows the difference between a wrong code, an expired
-        // one, too many tries, and the server simply being down.
-        setCodeError(messageFor(e))
+        // fieldMessageFor() knows the difference between a wrong code, an
+        // expired one, a refused number, and the server simply being down.
+        setCodeError(fieldMessageFor(e))
         setCode('')
       } finally {
         setBusy(false)
       }
     },
-    [email, phone, enterApp],
+    [sentTo, signIn, router],
   )
 
   async function submitPhone() {
@@ -110,31 +119,35 @@ export function SignInPage({ panel }: { panel?: ReactNode }) {
 
     setBusy(true)
     try {
-      await api.auth.sendPhoneCode(phone)
-      resend.restart()
+      const sent = await api.auth.requestLoginOtp(normalizePhone(phone))
+      setSentTo(sent.mobile_number)
+      setCooldown(sent.resend_after_seconds)
+      resend.restart(sent.resend_after_seconds)
       goTo('phone-otp')
     } catch (e) {
-      setFieldError(messageFor(e))
+      setFieldError(sendErrorLine(e))
     } finally {
       setBusy(false)
     }
   }
 
-  async function submitEmail() {
-    if (!isValidEmail(email)) {
-      setFieldError('Email chưa đúng định dạng.')
-      return
-    }
-
-    setBusy(true)
+  /*
+   * The countdown restarts at once so the link cannot be pressed twice while
+   * the request is out, then settles on what the backend counted: its answer
+   * on success, the last cooldown on a 429. An SMS it could not deliver does
+   * not count towards its cooldown (Fonnus-BE AC-07), so the link reopens with
+   * the error. A resend that fails says so where the code goes.
+   */
+  async function resendCode() {
+    resend.restart(cooldown)
+    setCodeError(null)
     try {
-      await api.auth.sendEmailCode(email)
-      resend.restart()
-      goTo('email-otp')
+      const sent = await api.auth.requestLoginOtp(sentTo)
+      setCooldown(sent.resend_after_seconds)
+      resend.restart(sent.resend_after_seconds)
     } catch (e) {
-      setFieldError(messageFor(e))
-    } finally {
-      setBusy(false)
+      if (!isApiError(e) || e.code !== 'otp_rate_limited') resend.restart(0)
+      setCodeError(messageFor(e))
     }
   }
 
@@ -146,15 +159,25 @@ export function SignInPage({ panel }: { panel?: ReactNode }) {
     step === 'phone'
       ? null
       : {
-          label: step === 'email' ? 'Dùng số điện thoại' : 'Quay lại',
+          label: 'Quay lại',
           onClick: () => {
-            goTo(step === 'email-otp' ? 'email' : 'phone')
+            goTo('phone')
           },
         }
 
+  /*
+   * While the probe is out, a browser that signed in recently is almost
+   * certainly about to be sent on to `/app`, so the form stays out of sight
+   * rather than flash, and the slot says what is happening — the same line
+   * the app's own gate shows, since a slow probe can take seconds; every other
+   * visitor gets the form at once. The hint only picks what to draw — the
+   * redirect waits for the probe.
+   */
+  const formHidden = signedIn || (session.status === 'checking' && session.hint)
+
   return (
     <AuthShell swap={SWAP} panel={panel} {...(back ? { back } : {})}>
-      {renderStep()}
+      {formHidden ? <p className="m-0 text-body-sm text-text-muted">Đang mở phòng khám của bạn…</p> : renderStep()}
     </AuthShell>
   )
 
@@ -174,7 +197,6 @@ export function SignInPage({ panel }: { panel?: ReactNode }) {
             >
               <PhoneField
                 label="Số điện thoại"
-                badge={lastUsed === 'phone' ? <LastUsedBadge /> : null}
                 placeholder="090 123 45 67"
                 value={formatPhone(phone)}
                 onChange={(e) => {
@@ -188,26 +210,6 @@ export function SignInPage({ panel }: { panel?: ReactNode }) {
                 {busy ? 'Đang gửi…' : 'Gửi mã đăng nhập'}
               </Button>
             </form>
-
-            {/* A quiet link, not a second button: this screen has one action,
-                and a second control of equal weight is only a second way to
-                hesitate. */}
-            <div className="flex flex-col items-center gap-3.5">
-              <span className="flex w-full items-center gap-3 text-ui text-text-muted before:h-px before:flex-1 before:bg-border-hairline before:content-[''] after:h-px after:flex-1 after:bg-border-hairline after:content-['']">
-                hoặc
-              </span>
-              <button
-                type="button"
-                onClick={() => {
-                  goTo('email')
-                }}
-                className="inline-flex cursor-pointer items-center gap-2 border-none bg-transparent p-0 font-ui text-ui font-medium text-text-link hover:underline"
-              >
-                <Icon name="mail" size={15} />
-                Đăng nhập bằng email
-                {lastUsed === 'email' ? <LastUsedBadge /> : null}
-              </button>
-            </div>
           </>
         )
 
@@ -215,7 +217,7 @@ export function SignInPage({ panel }: { panel?: ReactNode }) {
         return (
           <>
             <AuthHeading title="Nhập mã 6 số">
-              Đã gửi SMS tới <Num>{formatPhone(phone)}</Num> ·{' '}
+              Đã gửi SMS tới <Num>{formatPhone(sentTo)}</Num> ·{' '}
               <InlineButton
                 onClick={() => {
                   goTo('phone')
@@ -228,87 +230,12 @@ export function SignInPage({ panel }: { panel?: ReactNode }) {
             <OtpField
               value={code}
               onChange={setCode}
-              onComplete={(entered) => void confirmCode(entered, 'phone')}
+              onComplete={(entered) => void confirmCode(entered)}
               error={codeError}
               disabled={busy}
             />
 
-            <OtpFooter
-              secondsLeft={resend.left}
-              onResend={() => {
-                resend.restart()
-                // A resend that fails silently is right here: the countdown has
-                // restarted either way, and the owner's next move is to wait.
-                void api.auth.sendPhoneCode(phone).catch(() => undefined)
-              }}
-            />
-          </>
-        )
-
-      case 'email':
-        return (
-          <>
-            <AuthHeading title="Đăng nhập bằng email">
-              Mã đăng nhập sẽ được gửi tới hộp thư của bạn.
-            </AuthHeading>
-
-            <form
-              className="flex flex-col gap-4"
-              onSubmit={(e) => {
-                e.preventDefault()
-                void submitEmail()
-              }}
-            >
-              <Field
-                label="Email"
-                type="email"
-                placeholder="lan@vietsmile.vn"
-                value={email}
-                onChange={(e) => {
-                  setEmail(e.target.value)
-                  setFieldError(null)
-                }}
-                autoComplete="email"
-                autoFocus
-                error={fieldError}
-              />
-              <Button type="submit" size="lg" fullWidth disabled={busy}>
-                {busy ? 'Đang gửi…' : 'Gửi mã tới email'}
-              </Button>
-            </form>
-          </>
-        )
-
-      case 'email-otp':
-        return (
-          <>
-            <AuthHeading title="Kiểm tra hộp thư">
-              Mã 6 số đã gửi tới <b className="font-semibold text-text-body">{email}</b> ·{' '}
-              <InlineButton
-                onClick={() => {
-                  goTo('email')
-                }}
-              >
-                Đổi email
-              </InlineButton>
-            </AuthHeading>
-
-            <OtpField
-              value={code}
-              onChange={setCode}
-              onComplete={(entered) => void confirmCode(entered, 'email')}
-              error={codeError}
-              disabled={busy}
-            />
-
-            <OtpFooter
-              secondsLeft={resend.left}
-              onResend={() => {
-                resend.restart()
-                void api.auth.sendEmailCode(email).catch(() => undefined)
-              }}
-              note="Không thấy email? Kiểm tra mục Spam."
-            />
+            <OtpFooter secondsLeft={resend.left} onResend={() => void resendCode()} />
           </>
         )
     }

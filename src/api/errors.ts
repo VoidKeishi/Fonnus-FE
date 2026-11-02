@@ -107,12 +107,25 @@ export function kindForStatus(status: number): ApiErrorKind {
  * same voice, not system messages bolted on.
  */
 
+const INVALID_PHONE = 'Số điện thoại chưa đúng. Bạn kiểm tra lại giúp mình nhé.'
+const SESSION_OVER = 'Phiên đăng nhập đã hết hạn. Bạn đăng nhập lại giúp mình nhé.'
+
+/*
+ * Keyed on a top-level `code` or on the `code` of a field error: Fonnus-BE
+ * answers a malformed number with 422 `validation_failed` and puts
+ * `invalid_mobile_number` on the field.
+ */
 const BY_CODE: Record<string, string> = {
   otp_invalid: 'Mã không đúng. Bạn kiểm tra lại giúp mình nhé.',
   otp_expired: 'Mã đã hết hạn. Bấm gửi lại để nhận mã mới.',
   otp_too_many: 'Bạn thử quá nhiều lần rồi. Đợi vài phút rồi thử lại giúp mình.',
   otp_rate_limited: 'Bạn vừa yêu cầu mã xong. Đợi một chút rồi thử lại nhé.',
-  invalid_phone: 'Số điện thoại chưa đúng. Bạn kiểm tra lại giúp mình nhé.',
+  otp_delivery_failed: 'Chưa gửi được SMS tới số này. Bạn thử lại sau một chút giúp mình nhé.',
+  mobile_number_not_found:
+    'Số này chưa có tài khoản Fonnus. Bạn vào danh sách chờ để bọn mình mở tài khoản cho phòng khám nhé.',
+  invalid_phone: INVALID_PHONE,
+  invalid_mobile_number: INVALID_PHONE,
+  session_expired: SESSION_OVER,
   invalid_email: 'Email chưa đúng. Bạn kiểm tra lại giúp mình nhé.',
   file_too_large: 'Tệp quá lớn. Mỗi tệp tối đa 20 MB.',
   unsupported_file_type: 'Định dạng tệp này chưa được hỗ trợ.',
@@ -122,7 +135,7 @@ const BY_KIND: Record<ApiErrorKind, string> = {
   network: 'Không kết nối được máy chủ. Bạn kiểm tra mạng rồi thử lại giúp mình nhé.',
   timeout: 'Máy chủ phản hồi chậm. Bạn thử lại giúp mình nhé.',
   canceled: 'Đã huỷ.',
-  unauthorized: 'Phiên đăng nhập đã hết hạn. Bạn đăng nhập lại giúp mình nhé.',
+  unauthorized: SESSION_OVER,
   forbidden: 'Tài khoản này không có quyền thực hiện thao tác đó.',
   notfound: 'Không tìm thấy thông tin này.',
   conflict: 'Thông tin này vừa được sửa ở nơi khác. Bạn tải lại trang rồi lưu lại giúp mình nhé.',
@@ -133,7 +146,13 @@ const BY_KIND: Record<ApiErrorKind, string> = {
   unknown: 'Có lỗi xảy ra. Bạn thử lại giúp mình nhé.',
 }
 
-/** The Vietnamese sentence to show for any thrown value. Safe on non-Errors. */
+/**
+ * The Vietnamese sentence to show for any thrown value. Safe on non-Errors.
+ * The top-level code wins, then the kind. A field's own code is deliberately
+ * not read here: a form that marks its boxes wants the generic line beside
+ * them, and reads a field it has already dropped as "nothing marked" by
+ * comparing against this sentence (`lead-fields.ts`).
+ */
 export function messageFor(e: unknown): string {
   if (!isApiError(e)) return BY_KIND.unknown
   // Read once into a local: `noUncheckedIndexedAccess` types a lookup in a
@@ -144,4 +163,20 @@ export function messageFor(e: unknown): string {
     if (byCode !== undefined) return byCode
   }
   return BY_KIND[e.kind]
+}
+
+/**
+ * As `messageFor`, but a refusal that names its problem on a field reads as
+ * that field's sentence. For a screen with one input and no marks — the
+ * sign-in number — where "look at the marked boxes" would point at nothing.
+ */
+export function fieldMessageFor(e: unknown): string {
+  if (isApiError(e)) {
+    const fieldCode = e.fields[0]?.code
+    if (fieldCode !== undefined) {
+      const byField = BY_CODE[fieldCode]
+      if (byField !== undefined) return byField
+    }
+  }
+  return messageFor(e)
 }

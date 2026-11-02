@@ -2,9 +2,15 @@
 
 import { useCallback, useEffect, useState } from 'react'
 
-/** Resend lock. Returns the seconds left and a reset for "gửi lại mã". */
-export function useCountdown(seconds: number) {
-  const [left, setLeft] = useState(seconds)
+/**
+ * Resend lock. Returns the seconds left and a restart for "gửi lại mã".
+ *
+ * Starts at zero and takes its length on each restart, from the backend's
+ * `resend_after_seconds`: the cooldown is the backend's, and a second number
+ * here would drift from it.
+ */
+export function useCountdown() {
+  const [left, setLeft] = useState(0)
 
   useEffect(() => {
     if (left <= 0) return
@@ -16,9 +22,9 @@ export function useCountdown(seconds: number) {
     }
   }, [left])
 
-  const restart = useCallback(() => {
-    setLeft(seconds)
-  }, [seconds])
+  const restart = useCallback((seconds: number) => {
+    setLeft(Math.max(0, Math.round(seconds)))
+  }, [])
 
   return { left, restart }
 }

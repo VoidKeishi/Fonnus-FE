@@ -69,6 +69,11 @@ marked `'use client'`.
   restored a row already deleted (`docs/ui-ux-principles.md`, Lessons log
   2026-09-05).
 - `useState(() => expensive())` when the initial value has to be computed.
+- Async state that a route decides — whether the session probe runs, keyed on
+  "is this a session route" — is reset during render when that key changes
+  (`if (key !== prevKey) { setPrevKey(key); setStatus('checking') }`), not in
+  an effect: an effect runs after paint, so one frame would show the previous
+  route's answer (`src/session/session-provider.tsx`).
 - A context provider memoizes its `value` with `useMemo`, and the functions
   inside it with `useCallback`. A new object on each render re-renders every
   consumer.

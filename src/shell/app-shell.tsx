@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
+import { formatPhone } from '@/api'
 import { Icon, Logo } from '@/design-system'
 import type { IconName } from '@/design-system'
 import { useSession } from '@/session/session-provider'
@@ -91,10 +92,17 @@ function UserBlock() {
   return (
     <div className="flex flex-col gap-2 border-t border-border-hairline pt-3">
       <div className="hidden min-w-0 flex-col px-2.5 wide:flex">
-        <span className="truncate text-ui font-medium text-text-body">
-          {me?.display_name ?? '…'}
-        </span>
-        <span className="truncate text-[12.5px] text-text-muted">{me?.clinic_name ?? ''}</span>
+        {me && me.full_name === null ? (
+          // An owner who has not given a name yet is known by the number they signed in with.
+          <span className="truncate font-num text-ui font-medium tabular-nums text-text-body">
+            {formatPhone(me.mobile_number)}
+          </span>
+        ) : (
+          <span className="truncate text-ui font-medium text-text-body">{me?.full_name ?? '…'}</span>
+        )}
+        {/* The clinic's name comes with the `tenant` group (F3). Until then the
+            line stays, empty, so the block keeps its height when it arrives. */}
+        <span className="min-h-[1lh] truncate text-[12.5px] text-text-muted" />
       </div>
       <button
         type="button"

@@ -103,11 +103,11 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       className={`h-full ${baloo.variable} ${beVietnam.variable} ${plex.variable}`}
     >
       {/*
-        SessionProvider wraps everything, including the landing page: it probes
-        `GET /me` once at boot, and a signed-in owner arriving on the landing
-        page should see the door they can already walk through rather than a
-        second sign-in prompt. It is a client component, which does not make the
-        pages inside it client components — they are passed through as children.
+        SessionProvider wraps everything so the session survives the move from
+        `/dang-nhap` to `/app`, but it probes the backend only on those routes
+        (ADR 0011 point 4): the marketing pages make no request to Fonnus-BE on
+        load. It is a client component, which does not make the pages inside it
+        client components — they are passed through as children.
       */}
       <body className="min-h-full">
         <SessionProvider>{children}</SessionProvider>

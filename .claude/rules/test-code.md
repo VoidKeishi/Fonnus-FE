@@ -18,5 +18,9 @@ paths:
 - Example data is Vietnamese and realistic: `0914378064`, `lan@vietsmile.vn`,
   a landline `02473077199`.
 - Code under `src/api/` is tested through the mock implementation or a pure
-  helper. No test makes a network request.
+  helper. No test makes a network request. The one exception is `http.ts`,
+  whose job is `fetch`: `http.test.ts` stubs the global `fetch` and restores
+  it after each test. `http.ts` keeps module state (the one refresh in flight,
+  the once-a-second sign-out), so each test there starts its own second with
+  a faked `Date`.
 - The inner loop is `pnpm test:watch`; `pnpm test` is the gate.

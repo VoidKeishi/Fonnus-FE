@@ -2,44 +2,43 @@
  * Auth, faked in the browser. Nothing leaves the tab and no credential is stored.
  *
  * This is the file that keeps the demo working: phone 0914378064, code 111002.
- * Any other six digits reaches the wrong-code state, which is how that screen
- * stays reviewable.
+ * Any other six digits reaches the wrong-code state, and a number outside
+ * `REGISTERED_PHONES` reaches "no account", which is how those screens stay
+ * reviewable.
  *
  * The "session" is a `Me` object in localStorage. That is the mock's entire
- * database — in live mode the session is an httpOnly cookie the browser holds
- * and this file is not loaded.
+ * database — in live mode the session is two httpOnly cookies the browser holds
+ * and this file is not loaded. There is no refresh here: the stored `Me` does
+ * not expire (ADR 0011 point 7).
  */
-import { isValidEmail, normalizePhone } from './phone'
-import type { AuthApi, GoogleAccount, Me, Signal } from './contracts'
+import { normalizePhone } from './phone'
+import type { AuthApi, Me, Signal } from './contracts'
 import { ApiError } from './errors'
-import { DEMO_ACCOUNT, GOOGLE_ACCOUNTS, REGISTERED_PHONES, delay, maybeFail, storage } from './mock-support'
+import { DEMO_ACCOUNT, REGISTERED_PHONES, delay, maybeFail, storage } from './mock-support'
 
 const SESSION_KEY = 'fonnus.session'
+
+/** Fixed, so a reload reads back the same owner. */
+const DEMO_USER_ID = '7f3c2a9e-1b5d-4c8e-9a2f-3d6e8b1c4f70'
+
+/** The backend's cooldown and code lifetime, as `POST /auth/login` reports them. */
+const RESEND_AFTER_SECONDS = 60
+const OTP_EXPIRES_IN_SECONDS = 120
 
 function readStored(): Me | null {
   const raw = storage.read(SESSION_KEY)
   if (!raw) return null
   try {
-    return JSON.parse(raw) as Me
+    const stored = JSON.parse(raw) as Partial<Me>
+    // A session stored before ADR 0011 has another shape; treat it as signed out.
+    return typeof stored.id === 'string' && typeof stored.mobile_number === 'string' ? (stored as Me) : null
   } catch {
     return null
   }
 }
 
-function store(me: Me): Me {
-  storage.write(SESSION_KEY, JSON.stringify(me))
-  return me
-}
-
-/** Everything the demo account knows about itself. */
-function demoMe(identity: string, method: Me['method'], displayName?: string): Me {
-  return {
-    identity,
-    method,
-    display_name: displayName || DEMO_ACCOUNT.displayName,
-    clinic_name: DEMO_ACCOUNT.clinic,
-    plan: DEMO_ACCOUNT.plan,
-  }
+function notFound(): ApiError {
+  return new ApiError({ kind: 'notfound', status: 404, code: 'mobile_number_not_found' })
 }
 
 export const authMock: AuthApi = {
@@ -48,58 +47,34 @@ export const authMock: AuthApi = {
     return readStored()
   },
 
-  async sendPhoneCode(phone, opts) {
+  async requestLoginOtp(mobile_number, opts) {
     await delay(1.4, opts?.signal)
     maybeFail('ratelimited', 'otp_rate_limited')
-    return { existing_account: REGISTERED_PHONES.has(normalizePhone(phone)) }
-  },
-
-  async sendEmailCode(email, opts) {
-    await delay(1.4, opts?.signal)
-    if (!isValidEmail(email)) {
-      throw new ApiError({ kind: 'validation', status: 422, code: 'invalid_email' })
+    const normalized = normalizePhone(mobile_number)
+    if (!REGISTERED_PHONES.has(normalized)) throw notFound()
+    return {
+      mobile_number: normalized,
+      otp_expires_in_seconds: OTP_EXPIRES_IN_SECONDS,
+      resend_after_seconds: RESEND_AFTER_SECONDS,
     }
-    maybeFail('ratelimited', 'otp_rate_limited')
   },
 
-  async verifyCode({ identity, code }, opts) {
+  async verifyLoginOtp({ mobile_number, code }, opts) {
     await delay(1.55, opts?.signal)
     maybeFail()
+    const normalized = normalizePhone(mobile_number)
+    // The backend checks the account before the code.
+    if (!REGISTERED_PHONES.has(normalized)) throw notFound()
     if (code !== DEMO_ACCOUNT.code) {
-      throw new ApiError({ kind: 'unauthorized', status: 401, code: 'otp_invalid' })
+      throw new ApiError({ kind: 'validation', status: 400, code: 'otp_invalid' })
     }
-    const method: Me['method'] = identity.includes('@') ? 'email' : 'phone'
-    return store(demoMe(identity, method))
+    const me: Me = { id: DEMO_USER_ID, mobile_number: normalized, full_name: DEMO_ACCOUNT.displayName }
+    storage.write(SESSION_KEY, JSON.stringify(me))
+    return me
   },
 
-  async updateProfile(input, opts) {
-    await delay(1.1, opts?.signal)
-    maybeFail()
-    const current = readStored() ?? demoMe(input.phone ?? '', 'phone')
-    return store({
-      ...current,
-      display_name: input.full_name?.trim() || current.display_name,
-      identity: current.identity || normalizePhone(input.phone ?? ''),
-    })
-  },
-
-  async signOut(opts) {
+  async logout(opts) {
     await delay(0.3, opts?.signal)
     storage.remove(SESSION_KEY)
-  },
-
-  googleAccounts(): readonly GoogleAccount[] {
-    return GOOGLE_ACCOUNTS
-  },
-
-  // null means "render the in-page chooser" — there is no client ID to redirect with.
-  googleAuthUrl() {
-    return null
-  },
-
-  async signInWithGoogle(account, opts) {
-    await delay(1.1, opts?.signal)
-    maybeFail()
-    return store(demoMe(account.email, 'google', account.name))
   },
 }

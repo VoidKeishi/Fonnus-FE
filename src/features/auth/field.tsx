@@ -15,16 +15,15 @@ import type { InputHTMLAttributes, ReactNode } from 'react'
  */
 export interface FieldProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'prefix'> {
   label: string
-  error?: string | null
+  /** A node rather than a string so a sentence can carry a link, as "no account" does. */
+  error?: ReactNode
   /** Tabular figures — for phone numbers and codes, never for names. */
   numeric?: boolean
   /** Sits inside the pill, before the input. */
   prefix?: ReactNode
-  /** Sits beside the label, e.g. the "Lần trước" mark on sign-in. */
-  badge?: ReactNode
 }
 
-export function Field({ label, error, numeric = false, prefix, badge, id, ...rest }: FieldProps) {
+export function Field({ label, error, numeric = false, prefix, id, ...rest }: FieldProps) {
   const autoId = useId()
   const inputId = id ?? autoId
   const errorId = `${inputId}-error`
@@ -35,7 +34,6 @@ export function Field({ label, error, numeric = false, prefix, badge, id, ...res
         <label htmlFor={inputId} className="text-[13.5px] leading-snug font-medium text-text-body">
           {label}
         </label>
-        {badge}
       </div>
 
       <div
@@ -86,14 +84,5 @@ export function PhoneField(props: Omit<FieldProps, 'prefix' | 'numeric'>) {
         </>
       }
     />
-  )
-}
-
-/** Marks the way this browser got in last time — the shortcut a returning owner wants. */
-export function LastUsedBadge() {
-  return (
-    <span className="rounded-pill bg-[var(--blush)] px-2 py-0.5 text-[11.5px] font-medium text-text-accent">
-      Lần trước
-    </span>
   )
 }

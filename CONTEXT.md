@@ -10,8 +10,8 @@ answers the phone for Vietnamese clinics. Three surfaces, one application:
    go unanswered, and the waitlist page, where a clinic leaves its details while the
    product opens in batches. This is an acquisition surface: clinics will find it by
    searching, so it is server-rendered.
-2. **Sign-up and sign-in** — a phone number and a code, or an email, or Google. No password
-   anywhere in the product.
+2. **Sign-up and sign-in** — a phone number and an SMS code. No password anywhere in the
+   product. Email and Google were in the prototype and return when Fonnus-BE serves them.
 3. **The signed-in app at `/app`** — where a clinic owner configures their receptionist
    (the **Lễ tân** tab: who the clinic is, what it knows, what it is allowed to do), sees
    the calls it has answered, and manages their phone number and account.
@@ -42,8 +42,8 @@ tuning the pipeline. Different person, different repo, same design system.
 |---|---|---|
 | Landing | `/` | Hero with a live voice demo, how it works, pricing, contact |
 | Chấm điểm hotline | `/cham-diem-hotline` | The free report: Fonnus rings each of the clinic's locations as a patient would and scores the calls. For owners, often of a chain, who are not ready for a receptionist yet |
-| Danh sách chờ | `/waitlist` | Name, phone and email of a clinic waiting its turn. Every "join" call to action on the marketing pages lands here while the product opens in batches; there is no self-serve sign-up and no sign-in entry on the marketing pages |
-| Sign-up / sign-in | `/dang-ky`, `/dang-nhap` | One flow: an existing number turns a sign-up into a sign-in |
+| Danh sách chờ | `/waitlist` | Name, phone and email of a clinic waiting its turn. Every "join" call to action on the marketing pages lands here while the product opens in batches; there is no self-serve sign-up. The marketing header's second button, "Đăng nhập", is the way back in for a clinic that already has an account |
+| Sign-up / sign-in | `/dang-ky`, `/dang-nhap` | Sign-in is a mobile number and an SMS code, against Fonnus-BE (ADR 0011). Sign-up is not open yet (`/dang-ky` is a placeholder); Fonnus-BE refuses a number with no account and the screen points at the waitlist |
 | Tổng quan | `/app` | The shape of the week: calls answered, what needs attention |
 | Cuộc gọi | `/app/cuoc-goi` | The clinic's own call history — the same read path as Fonnus-Admin with a tenant filter |
 | Lịch hẹn | `/app/lich-hen` | Appointments the receptionist took |
