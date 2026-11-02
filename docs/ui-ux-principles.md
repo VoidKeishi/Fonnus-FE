@@ -420,6 +420,19 @@ works (`0914378064` / `111002`).
 
 Newest first. One line per session that taught something; the rule itself goes above.
 
+- **2026-11-02 (sign-in, against Fonnus-BE's real contract)** — Three things from the first
+  screen wired to a backend that answers. A lock the screen draws — "Gửi lại mã sau 0:59" —
+  follows what the server counted, not what the screen asked: an SMS the backend could not
+  send does not start its cooldown, so the link reopens with the error, and only a 429 keeps
+  it shut (§9's "promise with an expiry", read the other way round). A refusal the server
+  names on a field reads as that field's sentence only on a screen with one box and nothing
+  to mark — the sign-in number — and as the generic "xem lại các ô được đánh dấu" everywhere
+  a form marks its boxes; `fieldMessageFor` and `messageFor` in `src/api/errors.ts` are the
+  two, and the review caught the first draft changing every form at once. And an input that
+  disables itself while a request runs drops focus; when it reopens — the wrong-code case —
+  it takes focus back, or the owner has to tap the boxes again (`otp-field.tsx`, a bug since
+  F1 that only a hand-check found).
+
 - **2026-10-18 (landing page, the hour's budget moves to the server)** — The consent slot
   used to know "còn 40 giây" before it was painted, because the number was in
   `localStorage`; now it comes from `GET /api/voice-demo/budget` and may land a second
