@@ -91,11 +91,13 @@ describe('withoutError', () => {
 
 describe('sendErrorFrom', () => {
   it('reads a refusal that named no field of this form as the plain failure', () => {
+    // A field code that has its own sentence (`invalid_phone`): this case only
+    // guards the form if `messageFor` keeps ignoring field codes (`errors.ts`).
     const stray = new ApiError({
       kind: 'validation',
       status: 422,
       code: 'validation_failed',
-      fields: [{ field: 'source', code: 'required' }],
+      fields: [{ field: 'source', code: 'invalid_phone' }],
     })
     expect(sendErrorFrom(stray)).toBe(messageFor(null))
     expect(sendErrorFrom(stray)).not.toBe(messageFor(stray))

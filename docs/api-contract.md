@@ -3,18 +3,22 @@
 What the web frontend expects from the backend. Written for a backend engineer who has never
 opened this repo.
 
-**Status: proposed, not implemented** — except §6, the `leads` group, and the voice demo's
-`POST /api/voice-demo/token` in §5, which this app's own route handlers implement
+**Status: proposed, not implemented** — with three exceptions. §2, the `auth` group, is
+designed and being implemented by `../Fonnus-BE`, whose `docs/api.md` is its authority since
+2026-11-02; §2 mirrors it ([ADR 0011](./adr/0011-session-is-fonnus-be-two-cookies.md)).
+§6, the `leads` group, and the voice demo's `POST /api/voice-demo/token` in §5 are
+implemented by this app's own route handlers
 ([ADR 0005](./adr/0005-leads-to-google-sheets.md),
 [ADR 0006](./adr/0006-elevenlabs-landing-voice-demo.md)). Nothing else here exists yet on
-either side. This document lives in Fonnus-FE and Fonnus-FE is its authority
-until `../Fonnus-BE` implements it. The frontend runs against in-browser mocks
+either side. This document lives in Fonnus-FE and Fonnus-FE is its authority for every
+section `../Fonnus-BE` has not yet designed. The frontend runs against in-browser mocks
 (`NEXT_PUBLIC_API_MODE=mock`, the committed default) that implement exactly these signatures,
 so the shapes below are already exercised — but outside §5's voice session and §6 no HTTP
-request has ever been made. The `voice` group of §5 is the one group with no mock: it is
-always the ElevenLabs implementation (ADR 0007). Treat everything outside §6 as a specification to agree on, not a description of a
-running system. Where a decision is genuinely open, it is marked and listed in
-[`open-questions.md`](./open-questions.md).
+request has ever been made, §2 included: the first live sign-in is still to come. The `voice`
+group of §5 is the one group with no mock: it is always the ElevenLabs implementation
+(ADR 0007). Treat everything outside §2 and §6 as a specification to agree on, not a
+description of a running system. Where a decision is genuinely open, it is marked and listed
+in [`open-questions.md`](./open-questions.md).
 
 For how the frontend is wired to swap mocks for real calls, see
 [`adr/0003-backend-boundary-and-the-api-seam.md`](./adr/0003-backend-boundary-and-the-api-seam.md).
@@ -37,8 +41,10 @@ app's own, written in full (`/api/leads…`, `/api/voice-demo/token`) and never 
 ### Authentication — read this before anything else
 
 The frontend sends `credentials: 'include'` on **every** request and stores no token
-anywhere. The session is expected to be an **httpOnly cookie** set by
-`POST /auth/otp/verify`.
+anywhere. The session is **two httpOnly cookies** set by `POST /auth/login/verify-otp`:
+`fonnus_access`, a 15-minute access token on `Path=/api/v1`, and `fonnus_refresh`, a 30-day
+sliding refresh token on `Path=/api/v1/auth` (§2). The dev rewrite keeps the `/api/v1` path,
+so both paths match on `localhost:3000`.
 
 Two consequences that cause most first-day integration failures:
 
@@ -50,7 +56,7 @@ Two consequences that cause most first-day integration failures:
    `SameSite=Lax` and no CSRF-token machinery is needed for XHR. An unrelated domain forces
    `SameSite=None; Secure`, which reopens CSRF and requires a double-submit token.
 
-This is an architectural decision worth making deliberately rather than discovering. See Q14.
+This is an architectural decision worth making deliberately rather than discovering. See Q15.
 
 ### Request and response format
 
@@ -94,9 +100,9 @@ support message can name the exact request.
 |---|---|
 | `200` / `201` / `202` / `204` | Success. `204` parses as `undefined` |
 | `400` / `422` | Field errors highlighted in the form; the save bar stays open with "Thử lại" |
-| `401` | **Signs the owner out and redirects to sign-in** — except on `GET /me` and `/auth/*`, where a 401 is a normal answer meaning "anonymous" |
-| `403` | Generic error message; no sign-out |
-| `404` | Generic error; on `GET /tenant/config` it is treated as "new tenant, seed a template" |
+| `401` | **Refresh once, retry once, then sign out** and redirect to sign-in (§2) — except on `/auth/*` and the probe's `GET /users/:id`, where a 401 is a normal answer and nothing is refreshed |
+| `403` | Generic error message; no sign-out — except on the probe's `GET /users/:id`, which drops the cookies and answers anonymous (§2) |
+| `404` | Generic error; on `GET /tenant/config` it is treated as "new tenant, seed a template"; on the probe's `GET /users/:id` as `403` above |
 | `409` | "Đã có người khác vừa sửa" + a reload prompt. Requires the concurrency answer in Q8 |
 | `429` | Retry-after message. Relevant on OTP send and TTS preview |
 | `5xx` | Retryable. GETs retry once automatically; writes never do |
@@ -105,117 +111,137 @@ support message can name the exact request.
 ### Idempotency
 
 The client retries `GET` once on a network error, timeout or 5xx. **It never automatically
-retries a write.** If the backend wants safe retries on `POST /auth/otp` or
-`PATCH /tenant/config`, propose an `Idempotency-Key` header and the frontend will send one.
+retries a write** after one of those. The one exception is the 401 of an expired access token
+(§2): the write was refused before its handler ran, so it is sent again once after the
+refresh. If the backend wants safe retries on `POST /auth/login` or `PATCH /tenant/config`,
+propose an `Idempotency-Key` header and the frontend will send one.
 
 ---
 
 ## 2. Auth
 
-The product has **no passwords anywhere**. Three ways in: phone + SMS code, email + emailed
-code, and Google OAuth. A number that already has an account silently becomes a sign-in rather
-than an error — that is deliberate, and it is the single biggest drop-off in phone-first flows.
+Since 2026-11-02 the authority for this group is Fonnus-BE's own contract,
+`../Fonnus-BE/docs/api.md` §Auth and §Users, with the full design in
+`../Fonnus-BE/docs/features/phone-login.md` §4.2 and `phone-signup.md` §4.2. This section
+mirrors it for the endpoints the frontend calls, and says what the frontend does with each
+answer ([ADR 0011](./adr/0011-session-is-fonnus-be-two-cookies.md)). When the two disagree,
+Fonnus-BE's document wins and this one is corrected.
 
-Frontend constants the backend must match or override (they are currently hardcoded):
+The product has **no passwords anywhere**. Today there is one way in: a mobile number and a
+six-digit code sent by SMS. A number with no account is refused rather than signed up; the
+sign-in screen sends that owner to the waitlist.
+
+### The session: two cookies
+
+| Cookie | Holds | Path | Lifetime |
+|---|---|---|---|
+| `fonnus_access` | A JWT the business endpoints read | `/api/v1` | 15 minutes |
+| `fonnus_refresh` | The token `POST /auth/refresh` and `POST /auth/logout` read | `/api/v1/auth` | 30 days, reset by every refresh |
+
+Both are `HttpOnly; SameSite=Lax`, `Secure` in production, and set by
+`POST /auth/login/verify-otp` and `POST /auth/refresh`. The frontend never reads either one; it
+sends `credentials: 'include'` and the browser does the rest.
+
+**Refresh once on a 401.** When a request that is not on `/auth/*` and is not the probe's
+`GET /users/:userId` answers `401 unauthorized`, `src/api/http.ts` calls `POST /auth/refresh`
+once and, if that succeeds, sends the original request again once — writes included, because
+an expired access token is refused before the handler runs. Requests that fail together share
+one refresh. If the refresh answers 401, or the retried request answers 401 again, the owner
+is signed out and sent to `/dang-nhap`. A refresh that fails for any other reason (network,
+5xx) surfaces that failure and signs nobody out.
+
+### Frontend constants
 
 | Constant | Value | Where |
 |---|---|---|
-| Code length | 6 digits | `auth/OtpField.tsx` |
-| Resend cooldown | 42 s | `auth/SignInPage.tsx` |
-| Phone format sent | national, digits only, 10 chars: `0914378064` | `api/phone.ts → normalizePhone` |
+| Code length | 6 digits | `src/features/auth/otp-field.tsx` |
+| Resend cooldown | `resend_after_seconds` from `POST /auth/login`, 60 s today; the countdown restarts from it on every send | `src/features/auth/sign-in-page.tsx` |
+| Number format sent | national, digits only, 10 chars: `0914378064` | `src/api/phone.ts → normalizePhone` |
 
 Only **mobile** prefixes are accepted client-side (`03|05|07|08|09`) — a landline cannot
-receive the SMS, so it is rejected before a code that would never arrive.
+receive the SMS, so it is rejected before a code that would never arrive. Fonnus-BE
+normalises and validates again.
 
 ---
 
-### `POST /auth/otp`
+### `POST /auth/login`
 
-Send a login code by SMS.
-
-```jsonc
-// request
-{ "phone": "0914378064" }
-
-// 200
-{ "existing_account": true }
-```
-
-`existing_account` drives the flow: `true` in sign-up turns the screen into a sign-in with a
-code instead of showing an error.
-
-> ⚠️ **This is a phone-number enumeration oracle** — anyone can learn whether a number has a
-> Fonnus account. It is called out as a deliberate product trade-off rather than an accident,
-> because removing it changes a UI flow. See Q16.
-
-Errors: `422 invalid_phone`, `429 otp_rate_limited`.
-
-### `POST /auth/otp/email`
+Sends a sign-in code by SMS to a number that has an account.
 
 ```jsonc
 // request
-{ "email": "lan@vietsmile.vn" }
+{ "mobile_number": "0914378064" }
 
-// 202 — no body
-```
-
-Deliberately does **not** disclose whether the address is registered.
-
-Errors: `422 invalid_email`, `429 otp_rate_limited`.
-
-### `POST /auth/otp/verify`
-
-Verifies a code and **sets the session cookie**.
-
-```jsonc
-// request — `identity` is the phone or email the code was sent to
-{ "identity": "0914378064", "code": "111002" }
-
-// 200 → Me (see below), plus Set-Cookie
-```
-
-Errors, each needing its own Vietnamese copy: `401 otp_invalid`, `401 otp_expired`,
-`429 otp_too_many`. See Q17 for the policy behind them.
-
-### `GET /me`
-
-The session probe. Runs once at app boot, before anything renders.
-
-```jsonc
 // 200
-{
-  "identity": "0914378064",
-  "method": "phone",
-  "display_name": "Nguyễn Lan",
-  "clinic_name": "Nha khoa Việt Smile",
-  "plan": "Gói Tiêu chuẩn"
-}
-
-// 401 — anonymous. A normal answer, NOT a session expiry.
+{ "mobile_number": "0914378064", "otp_expires_in_seconds": 120, "resend_after_seconds": 60 }
 ```
 
-`plan` is required: the sidebar renders it today from a hardcoded demo constant, which is a
-lie the moment there are two customers.
+`mobile_number` in the answer is the backend's normalised form; the code screen shows that
+one, not what was typed.
 
-### `PATCH /me`
+| Status | `code` | Frontend behaviour |
+|---|---|---|
+| `422` | `validation_failed`, field `mobile_number` code `invalid_mobile_number` | "Số điện thoại chưa đúng…" under the number |
+| `404` | `mobile_number_not_found` | "Số này chưa có tài khoản Fonnus…" under the number, with "danh sách chờ" linking to `/waitlist`. No SMS was sent |
+| `429` | `otp_rate_limited` | "Bạn vừa yêu cầu mã xong…" under the number, or at the code on a resend. The cooldown is 60 s per number, shared with sign-up |
+| `502` | `otp_delivery_failed` | "Chưa gửi được SMS tới số này…". Does not count towards the cooldown |
+
+### `POST /auth/login/verify-otp`
+
+Checks the code and opens a session: **sets both cookies.**
 
 ```jsonc
-// request — both optional
-{ "full_name": "Nguyễn Lan", "phone": "0914378064" }
+// request
+{ "mobile_number": "0914378064", "code": "111002" }
 
-// 200 → Me
+// 200, plus two Set-Cookie headers
+{ "user": { "id": "7f3c2a9e-1b5d-4c8e-9a2f-3d6e8b1c4f70", "mobile_number": "0914378064", "full_name": "Nguyễn Lan" } }
 ```
 
-### `POST /auth/signout`
+`api.auth.verifyLoginOtp` resolves the inner `user`, the same shape as `GET /users/:userId`
+(`Me` in `src/api/contracts.ts`). `full_name` is `null` until the owner has given a name; the
+sidebar then shows the formatted number.
 
-`204`, and clears the cookie. The frontend also clears its local caches.
+| Status | `code` | Frontend behaviour |
+|---|---|---|
+| `400` | `otp_invalid` | "Mã không đúng…", the boxes turn red and the code clears |
+| `400` | `otp_expired` | "Mã đã hết hạn…", the same way |
+| `404` | `mobile_number_not_found` | Checked before the code; the sentence shows at the code |
+| `422` | `validation_failed` | The generic validation line, or the number's sentence for `invalid_mobile_number` |
 
-### Google OAuth
+There is no attempt limit and no lockout yet (`open-questions.md` Q17); `otp_too_many` keeps
+its sentence in `src/api/errors.ts` for when there is.
 
-Currently a fake in-page account chooser; it cannot be real without a client ID. The live path
-is a redirect to a normal path: Fonnus-FE routes on real URLs, not fragments (ADR 0003), so the
-redirect URI is plainly `https://app.fonnus.vn/app` with nothing to smuggle through a `#`. The
-prototype's hash-routing trap, and Q18 which recorded it, no longer apply.
+### The session probe: `POST /auth/refresh`, then `GET /users/:userId`
+
+There is no `GET /me`. `api.auth.me()` restores a session in two requests, and runs only under
+`/app`, on `/dang-nhap` and on `/dang-ky` — the marketing pages make no request to Fonnus-BE.
+
+```jsonc
+// POST /auth/refresh — reads fonnus_refresh, renews both cookies
+// 200
+{ "user_id": "7f3c2a9e-1b5d-4c8e-9a2f-3d6e8b1c4f70" }
+
+// 401 — `unauthorized` (no cookie, unknown or revoked token) or `session_expired`
+// (30 days since the last refresh). Both clear the cookies. A normal answer: anonymous.
+
+// GET /users/7f3c2a9e-1b5d-4c8e-9a2f-3d6e8b1c4f70
+// 200
+{ "id": "7f3c2a9e-1b5d-4c8e-9a2f-3d6e8b1c4f70", "mobile_number": "0914378064", "full_name": "Nguyễn Lan" }
+```
+
+A 401 from refresh resolves `me()` to `null`. So do a `403 forbidden` (another user's id) or a
+`404 not_found` (the user was deleted while the cookie lived) from `GET /users/:userId`, after a
+best-effort `POST /auth/logout` to drop the orphaned cookies: there is no owner to retry for,
+and every retry would slide the dead session another 30 days. Any other failure of either
+request — network, timeout, 5xx — throws, and the app shows a retry rather than a sign-in
+screen: unreachable is not signed out. Every probe slides the 30 days, which is the session
+window Fonnus-BE designed.
+
+### `POST /auth/logout`
+
+`204`, no body, idempotent, no error codes. Revokes the refresh token and clears both cookies.
+The frontend clears its local session first and goes to `/dang-nhap` whatever the answer.
 
 ---
 

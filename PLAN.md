@@ -8,11 +8,12 @@ Status: ⬜ not started · 🔨 in progress · ✅ done, with the date.
 | Step | Status | Notes |
 |---|---|---|
 | **F0 · Scaffold** — Next.js 16 App Router, pnpm, strict TypeScript, ESLint, Tailwind v4 over the copied tokens, the three fonts through `next/font`, assets moved, docs written, `src/api/` seam with the `auth` group | ✅ 2026-09-15 | Every route in the design exists; the ones that are not built say so through `src/ui/placeholder.tsx` |
-| **F1 · Sign-in** — `/dang-nhap` with the phone and email code flows, `SessionProvider`, the demo login as the acceptance test | ✅ 2026-09-15 | Two of the three doors. Google sign-in and the whole of `/dang-ky` are F1b below |
+| **F1 · Sign-in** — `/dang-nhap` with the phone and email code flows, `SessionProvider`, the demo login as the acceptance test | ✅ 2026-09-15 | Two of the three doors. Google sign-in and the whole of `/dang-ky` are F1b below. Superseded in part by F1c |
+| **F1c · Sign-in against Fonnus-BE** — the `auth` group takes Fonnus-BE's real contract (ADR 0011): `POST /auth/login` and `/auth/login/verify-otp` with `mobile_number`, the session as two httpOnly cookies, `http.ts` refreshing once on a 401, the probe as `POST /auth/refresh` then `GET /users/:id` and run only on `/app`, `/dang-nhap`, `/dang-ky`; the email door and "Lần trước" removed from `/dang-nhap` because the backend has one door; a number with no account pointed at the waitlist; a signed-in owner on `/dang-nhap` sent on to `/app`. Then the marketing header gets its second button back: "Danh sách chờ" primary, "Đăng nhập" secondary (the product owner's decision, reversing F4f's single button) | 🔨 | Two stacked pull requests: the seam, the session and the screen; then the header. `docs/api-contract.md` §2 now mirrors `../Fonnus-BE/docs/api.md`, which is the authority for `auth` from here on. Email and Google return with F1b when Fonnus-BE serves them |
 | **F1b · Sign-up and Google** — `/dang-ky` (clinic name, the Terms line, an existing number turning a sign-up into a sign-in) and Google on both doors: the in-page chooser for mock mode, the OAuth redirect for live | ⬜ | `/dang-ky` is a placeholder today, and since F4f nothing links to it: every marketing call to action goes to `/waitlist`, so this step is also the decision to reopen self-serve sign-up. The hero no longer hands a phone number over (`sign-up-handoff.ts` was deleted with its only writer); re-add a hand-off here if the hero gets a number field back. Google needs `googleAuthUrl()` pointed at a real endpoint, so it waits on `../Fonnus-BE` |
 | **F2 · The app shell** — `/app` layout: 216px sidebar, icon rail at ≤900px, bottom tab bar on phones; the session and toast providers | 🔨 | The frame, the nav and the session gate are in place (`src/shell/`, `src/session/`); the toast provider and the readiness dot on Lễ tân are not. Everything under `/app` is client-rendered by design (CLAUDE.md) |
 | **F3 · Lễ tân** — the hub and the three tabs (Hồ sơ, Kiến thức, Kỹ năng), the shared section frame, the save stack, the try-out panel. Brings `src/features/receptionist/model.ts` and `docs/field-catalogue-mapping.md` into force | ⬜ | The largest single step: ~60 fields across 13 forms |
-| **F4 · Landing page** — the landing page at `/` and the "Chấm điểm hotline" page at `/cham-diem-hotline`, ported from `../Fonnus-Web-UI` in nine stacked pull requests: the marketing frame, the hero, the voice orb and its call demo, pricing, how it works, capabilities, FAQ with security and testimonials, the contact form against `POST /leads`, and the hotline page against `POST /leads/hotline-report` | ✅ | Server-rendered; this is the acquisition surface. The header reads no session; since F4f its one action is "Danh sách chờ" (the prototype's "Đăng nhập" and "Dùng thử miễn phí" are gone). The call demo goes through the `voice` group since F4c. A nav or footer link appears only in the pull request that lands its section |
+| **F4 · Landing page** — the landing page at `/` and the "Chấm điểm hotline" page at `/cham-diem-hotline`, ported from `../Fonnus-Web-UI` in nine stacked pull requests: the marketing frame, the hero, the voice orb and its call demo, pricing, how it works, capabilities, FAQ with security and testimonials, the contact form against `POST /leads`, and the hotline page against `POST /leads/hotline-report` | ✅ | Server-rendered; this is the acquisition surface. The header reads no session; since F1c its two actions are "Danh sách chờ" and "Đăng nhập" (the prototype's "Dùng thử miễn phí" is gone; F4f had removed "Đăng nhập" too, for a month). The call demo goes through the `voice` group since F4c. A nav or footer link appears only in the pull request that lands its section |
 | **F4b · Leads to a Google Sheet** — the contact form and the "Chấm điểm hotline" request stop waiting on `../Fonnus-BE`: this app receives them in two route handlers and appends them to a Google Sheet (ADR 0005). Four stacked pull requests: the decision, `POST /api/leads`, `POST /api/leads/hotline-report`, then both forms switched to them | ✅ 2026-09-30 | Built and gated by typecheck, lint, test and build only: no request has reached a real sheet yet. `NEXT_PUBLIC_API_LIVE_GROUPS=leads` turns both forms live at once. What remains is the owner's setup and the first live append; see Backlog |
 | **F4c · The voice demo answers** — the "Nghe thử" orb opens a real three-minute conversation with a private ElevenLabs agent, as a stand-in for the pipeline behind the `voice` seam (ADR 0006). Four stacked pull requests: the decision, the `voice` seam with today's recording as its scripted implementation, `POST /api/voice-demo/token`, then the live implementation and the call screen's new states | ✅ 2026-10-11 | Built and gated by typecheck, lint, test and build only: no live call has been made yet, and no browser has opened the new states. `@elevenlabs/client` loads on the first tap, never with the page. `NEXT_PUBLIC_API_LIVE_GROUPS=voice` plus the two server variables turn it on; what remains is the owner's setup and the first live call (Backlog), which also settles the assumptions ADR 0006 lists |
 | **F4d · The voice demo is agent-only, with a text fallback** — the recorded greeting and the scripted session are deleted; `voice` is the one group with no mock; a connection that fails is said on screen; a visitor whose browser gives no microphone talks to the same agent by typing (ADR 0007) | ✅ 2026-10-11 | Two stacked pull requests: the decision with the recording removed, `voice` always live and the failed-connection state; then the text session and the text-shaped call screen. Gated by typecheck, lint, test and build only: no text session has been run against ElevenLabs yet, which is what settles the four assumptions ADR 0007 lists. The owner enables the Text-only override (Backlog) |
@@ -32,13 +33,13 @@ Status: ⬜ not started · 🔨 in progress · ✅ done, with the date.
 
 ## Waiting on ../Fonnus-BE
 
-Fonnus-BE is an empty directory today. Every group below is faked in the browser until it is
-not; `NEXT_PUBLIC_API_LIVE_GROUPS` switches them on one at a time. The questions behind each
+Fonnus-BE exists and serves `auth` first. Every group below is faked in the browser until it
+is not; `NEXT_PUBLIC_API_LIVE_GROUPS` switches them on one at a time. The questions behind each
 row are in `docs/open-questions.md`; the shapes are in `docs/api-contract.md`.
 
 | Group | Endpoints | Unlocks | Status |
 |---|---|---|---|
-| `auth` | `POST /auth/otp`, `/auth/otp/email`, `/auth/otp/verify`, `GET /me`, `PATCH /me`, `POST /auth/signout` | A real sign-in instead of the demo account | ⬜ Declared in `src/api/contracts.ts`, mocked |
+| `auth` | `POST /auth/login`, `/auth/login/verify-otp`, `/auth/refresh`, `/auth/logout`, `GET /users/:userId` | A real sign-in instead of the demo account | 🔨 Designed and being implemented in `../Fonnus-BE` (`docs/features/phone-login.md`); declared here to that shape since F1c. Not yet exercised against a running server: `NEXT_PUBLIC_API_LIVE_GROUPS=auth` with `API_PROXY_TARGET` pointed at it is the first integration day |
 | `tenant` | `GET`/`PATCH /tenant/config`, `POST /tenant/config/reset` | F3 against real data | ⬜ Not declared yet |
 | `knowledge` | `POST`/`DELETE /tenant/knowledge-files` | Knowledge file upload in F3 | ⬜ Not declared yet |
 | `voice` | `POST /tts/preview`; the web voice gateway that replaces the ElevenLabs stand-in behind `voice.live.ts` | Hearing the receptionist speak; the landing demo through the pipeline, the gateway keeping the hour's three-minute budget per caller in its own store and answering the same `429` and `GET /budget` shapes this app's routes answer today (Q21, ADR 0009) | ⬜ Not declared yet |
@@ -199,24 +200,16 @@ ones sized S landed with the ADR on 2026-09-17.
   screen, so today it is Next.js's white English page; the copy is new and follows
   `docs/ui-ux-principles.md` §9, with a retry button. One approval on the copy, then a
   build.
-- **The session probe only where a session matters** (M): `SessionProvider` probes `GET /me`
-  on every route, the landing page included. `docs/architecture.md` §2.4 wants it limited to
-  `/app`, `/dang-nhap` and `/dang-ky`. Deferred out of F4 by the owner's call: the deeper
-  sign-in flows wait until Fonnus-BE exists. It touches the session gate, so the demo login
-  is re-checked in the same change.
-- **A signed-in owner on `/dang-nhap` goes straight to `/app`** (S): today they see the phone
-  form as if new. With this, the landing page's "Đăng nhập" is the way back into the app and
-  no "Vào ứng dụng" button is needed. Same deferral as above.
 - **A link styled as a button** (S): `<Link><Button>` puts a `<button>` inside an `<a>`, which
   is invalid HTML and gives a screen reader two controls for one. The marketing header was
   fixed by F4f (its one button is a `Link` wearing `buttonClassName`); what remains is any
   such nesting on the auth pages (`grep -rn "<Link" src/features/auth` and look for a
   `<Button>` child).
-- **`/dang-nhap` reads browser storage while rendering** (S): `sign-in-page.tsx` calls
-  `readLastMethod` inside `useState`, so after one sign-in the server renders no "Lần trước"
-  badge and the browser does, and React reports a hydration mismatch. Read it through
-  `useSyncExternalStore` with a server snapshot of `null`, as `src/session/session.ts` does.
-  Belongs with F1b, which reworks the sign-in doors.
+- **"Lần trước" comes back with the second door** (S, with F1b): the badge that marked the
+  way this browser signed in last time went with the email door in F1c, since one door
+  leaves nothing to remember. When F1b reopens email or Google, it returns — read through
+  `useSyncExternalStore` with a server snapshot of `null`, as `src/session/session.ts` does,
+  not inside `useState` as F1 did, which was a hydration mismatch.
 - **The button press snaps instead of easing** (S): `src/design-system/button.tsx` transitions
   `background-color` and `transform`, but Tailwind v4's `active:scale-[…]` sets the separate
   `scale` property, so the press shrink jumps in one frame. Add `scale` to the transitioned

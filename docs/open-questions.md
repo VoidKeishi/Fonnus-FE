@@ -237,28 +237,50 @@ credentials.
 Also: does `POST /auth/otp/verify` set the cookie directly, or return a one-time token to
 exchange?
 
-**Answer:**
+**Answer (2026-11-02, from `../Fonnus-BE/docs/api.md` and its ADR 0003):** two httpOnly
+cookies, set directly by `POST /auth/login/verify-otp` — `fonnus_access` (JWT, 15 minutes,
+`Path=/api/v1`) and `fonnus_refresh` (30 days sliding, `Path=/api/v1/auth`), both
+`SameSite=Lax`, `Secure` in production. `POST /auth/refresh` renews both. The domain
+question is still open on both sides: Fonnus-BE's CORS allowlist assumes the same-site
+subdomain posture this question recommends. Adopted here as ADR 0011.
+
+**Follow-up, not blocking:** there is no `GET /me`, so the frontend restores a session with
+`POST /auth/refresh` then `GET /users/:user_id` — two requests and one database write per
+boot. A `GET /me` answering the user behind `fonnus_access` would make it one read. Worth
+adding when convenient; nothing here waits on it.
 
 ---
 
-### Q16 · Should `POST /auth/otp` keep disclosing whether the number already has an account?
+### Q16 · Should `POST /auth/otp` keep disclosing whether the number already has an account? — ~~closed~~
 
 *Why:* It returns `{ existing_account }` today and the sign-up flow branches on it — a
 registered number silently becomes a sign-in instead of an error, which is the single biggest
 drop-off fix in phone-first flows. **It is also a phone-number enumeration oracle.** Flagging
 it as a deliberate trade-off rather than an accident, because removing it changes a UI flow.
 
-**Answer:**
+**Answer (2026-11-02):** Fonnus-BE chose separate flows instead of one endpoint with a flag.
+`POST /auth/login` refuses a number with no account with `404 mobile_number_not_found`;
+`POST /auth/register` refuses one that has an account with `409 mobile_number_taken`. The
+oracle therefore still exists, accepted deliberately on the backend side too, braked only by
+the 60-second cooldown per number. The sign-in screen shows the 404 as an invitation to the
+waitlist; the sign-up screen (F1b) will turn a 409 into a sign-in as the prototype intended.
 
 ---
 
-### Q17 · OTP policy: expiry, resend interval, attempt limit, lockout — and the error code for each
+### Q17 · OTP policy: expiry, resend interval, attempt limit, lockout — and the error code for each — ~~closed~~
 
 *Why:* The UI currently hardcodes 6 digits and a 42-second resend cooldown, and it has **no
 lockout state at all**. If there is a lockout, it needs a screen, and each failure mode needs
 its own Vietnamese sentence.
 
-**Answer:**
+**Answer (2026-11-02):** six digits; a code lives 2 minutes (`otp_expired`, 400); a new code
+can be sent 60 seconds after the last successful send for that number, whichever flow sent it
+(`otp_rate_limited`, 429); a wrong, used or unknown code is `otp_invalid` (400); an SMS that
+could not be delivered is `otp_delivery_failed` (502) and does not count towards the cooldown.
+Both numbers come back in the send response (`otp_expires_in_seconds`, `resend_after_seconds`)
+and the screen counts down from them. **No attempt limit and no lockout yet** — Fonnus-BE
+deferred both to an anti-abuse feature before the pilot, so `otp_too_many` is kept in
+`src/api/errors.ts` but never sent, and there is no lockout screen to build until then.
 
 ---
 

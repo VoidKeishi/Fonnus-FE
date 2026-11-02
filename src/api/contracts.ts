@@ -25,62 +25,46 @@ export interface Signal {
 // Auth
 // ---------------------------------------------------------------------------
 
-export type AuthMethod = 'phone' | 'email' | 'google';
-
 /**
- * The signed-in owner. `GET /me`.
- *
- * `plan` is here because the sidebar renders it; today it comes from a
- * hardcoded demo constant, which is a lie the moment there are two customers.
+ * The signed-in owner, as Fonnus-BE's `GET /users/:userId` answers it. Field
+ * names are the backend's, verbatim (ADR 0011).
  */
 export interface Me {
-  /** National-format phone, the email, or the Google address that signed in. */
-  identity: string;
-  method: AuthMethod;
-  display_name: string;
-  clinic_name?: string;
-  plan?: string;
+  id: string;
+  /** National form, digits only: `0914378064`. */
+  mobile_number: string;
+  /** `null` until the owner has given a name. */
+  full_name: string | null;
 }
 
-export interface GoogleAccount {
-  initials: string;
-  name: string;
-  email: string;
+/** What `POST /auth/login` answers. */
+export interface OtpSent {
+  /** The number the code went to, in the backend's normalised form. */
+  mobile_number: string;
+  otp_expires_in_seconds: number;
+  /** The backend's cooldown: the resend link stays locked this long. */
+  resend_after_seconds: number;
 }
 
+/**
+ * Sign-in by mobile number only (ADR 0011). `../Fonnus-BE/docs/api.md` §Auth is
+ * the authority for these shapes; `docs/api-contract.md` §2 mirrors it.
+ */
 export interface AuthApi {
-  /** `GET /me`. Resolves `null` for an anonymous visitor — a 401 here is a normal answer. */
+  /**
+   * The session probe. Live: `POST /auth/refresh` then `GET /users/:user_id`;
+   * `null` when refresh answers 401 (`unauthorized` or `session_expired`).
+   */
   me(opts?: Signal): Promise<Me | null>;
 
-  /** `POST /auth/otp`. `existing_account` turns a sign-up into a sign-in. */
-  sendPhoneCode(phone: string, opts?: Signal): Promise<{ existing_account: boolean }>;
+  /** `POST /auth/login { mobile_number }`. */
+  requestLoginOtp(mobile_number: string, opts?: Signal): Promise<OtpSent>;
 
-  /** `POST /auth/otp/email`. Deliberately discloses nothing about the address. */
-  sendEmailCode(email: string, opts?: Signal): Promise<void>;
+  /** `POST /auth/login/verify-otp { mobile_number, code }`. Sets both session cookies. */
+  verifyLoginOtp(input: { mobile_number: string; code: string }, opts?: Signal): Promise<Me>;
 
-  /** `POST /auth/otp/verify`. On success the server sets the session cookie. */
-  verifyCode(input: { identity: string; code: string }, opts?: Signal): Promise<Me>;
-
-  /** `PATCH /me`. The account already exists once a code has verified. */
-  updateProfile(input: { full_name?: string; phone?: string }, opts?: Signal): Promise<Me>;
-
-  /** `POST /auth/signout`. Clears the cookie server-side. */
-  signOut(opts?: Signal): Promise<void>;
-
-  /**
-   * The accounts the in-page Google chooser offers. Empty in live mode, where
-   * the chooser is replaced by a redirect to the OAuth endpoint.
-   */
-  googleAccounts(): readonly GoogleAccount[];
-
-  /**
-   * Live: the OAuth URL to send the browser to. Mock: `null`, meaning "render
-   * the in-page chooser instead".
-   */
-  googleAuthUrl(): string | null;
-
-  /** Completes the in-page chooser. Live throws: the redirect signs you in instead. */
-  signInWithGoogle(account: GoogleAccount, opts?: Signal): Promise<Me>;
+  /** `POST /auth/logout`, `204`, idempotent. */
+  logout(opts?: Signal): Promise<void>;
 }
 
 // ---------------------------------------------------------------------------

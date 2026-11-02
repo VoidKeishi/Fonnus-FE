@@ -30,9 +30,11 @@ export function OtpField({
   const inputRef = useRef<HTMLInputElement>(null)
   const completed = useRef(false)
 
+  // On mount, and again whenever the field reopens: a verify disables the
+  // input, which drops focus, and a wrong code must be retypable at once.
   useEffect(() => {
-    if (autoFocus) inputRef.current?.focus()
-  }, [autoFocus])
+    if (autoFocus && !disabled) inputRef.current?.focus()
+  }, [autoFocus, disabled])
 
   // Auto-submit on the sixth digit, but only once per code — otherwise a
   // re-render while verifying would fire it again.

@@ -7,19 +7,16 @@
 import { MOCK_FAILURE_RATE, MOCK_LATENCY_MS } from './env'
 import { ApiError } from './errors'
 import type { ApiErrorKind } from './errors'
-import type { GoogleAccount } from './contracts'
 
 /**
  * The one demo account. Sign in with this number and code to reach the app
- * shell. The two other numbers exist so the "already registered" branch of
- * sign-up stays reachable.
+ * shell. The two other numbers have an account too, so any of the three gets a
+ * code; every other number is "no account" (`mobile_number_not_found`).
  */
 export const DEMO_ACCOUNT = {
   phone: '0914378064',
   code: '111002',
   displayName: 'Nguyễn Lan',
-  clinic: 'Nha khoa Việt Smile',
-  plan: 'Gói Tiêu chuẩn',
 } as const
 
 export const REGISTERED_PHONES: ReadonlySet<string> = new Set([
@@ -27,12 +24,6 @@ export const REGISTERED_PHONES: ReadonlySet<string> = new Set([
   '0901234567',
   '0987654321',
 ])
-
-/** Demo accounts for the in-page Google chooser (frame 05). */
-export const GOOGLE_ACCOUNTS: readonly GoogleAccount[] = [
-  { initials: 'NL', name: 'Nguyễn Lan', email: 'lan@vietsmile.vn' },
-  { initials: 'VS', name: 'Việt Smile Clinic', email: 'info@vietsmile.vn' },
-]
 
 /**
  * Pretends the network took a moment, and honours an abort while it does.

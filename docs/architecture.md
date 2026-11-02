@@ -59,7 +59,7 @@ src/
     errors.ts                   ApiError and every Vietnamese error sentence
     mock-support.ts             delay, maybeFail, storage, the demo fixtures
     phone.ts (+test)            Vietnamese phone rules and the national digits-only wire form: the SMS-able mobile (auth, hero) and the callback number (contact form)
-    auth.mock.ts · auth.live.ts
+    auth.mock.ts · auth.live.ts   Fonnus-BE's phone sign-in, verbatim (ADR 0011): the probe is refresh then GET /users/:id; http.ts refreshes once on a 401
     leads.mock.ts · leads.live.ts  The contact form, the hotline report and the waitlist. Live posts to this app's own /api/leads… (ADR 0005)
     lead-limits.ts              The length caps and the 20-location limit, read by the forms and by server/
     voice-events.ts (+test)     The event stream every voice session shares: the latest event handed to a new listener, nothing after close. Pure, imports nothing
@@ -93,7 +93,7 @@ src/
     shell-skeleton.tsx (F2) · toast.tsx (F2) · summary.ts (Tổng quan) · bottom-stack.tsx (F3)
 
   features/                     Every product surface. One directory per tab or door
-    auth/                       auth-shell, sign-in-page, sign-in-panel, sign-up-page (F1b), field, otp-field, use-countdown, last-method
+    auth/                       auth-shell, sign-in-page, sign-in-panel, sign-up-page (F1b), field, otp-field, use-countdown
     receptionist/               F3. The Lễ tân tab — see §3
     overview/ · calls/ · appointments/ · numbers/ · account/   One per tab; F5, F6
     marketing/                  landing.tsx (the section list, then the orb) · header.tsx · nav-item-link.tsx · footer.tsx
@@ -186,16 +186,18 @@ No gate enforces these; the pm's review does.
 - `'use client'` goes on the lowest file that needs state or a hook, never on a layout or a
   page. `src/app/app/layout.tsx` is the model: a server component rendering client leaves.
 - **The `(marketing)` route group makes no request to Fonnus-BE on load and reads no
-  session.** Its header offers one action, "Danh sách chờ" (`/waitlist`), and no sign-in
-  entry: the product opens in batches and has no customers to sign in yet (the owner's
-  decision, 2026-10-14, replacing the prototype's "Đăng nhập" and "Dùng thử miễn phí").
-  `/dang-nhap` stays reachable by URL; sending an owner who is still signed in straight on
-  to `/app` is that page's job, not the landing page's (`PLAN.md` §Backlog).
+  session.** Its header offers two actions: "Danh sách chờ" (`/waitlist`, primary) and
+  "Đăng nhập" (`/dang-nhap`, secondary — in the pill on a wide screen, the last row of the
+  drawer below the `nav` breakpoint, as the prototype drew it). The sign-in entry was
+  removed on 2026-10-14 while there was nobody to sign in and put back on 2026-11-02 at the
+  product owner's request, once Fonnus-BE served a real sign-in. The header still reads no
+  session: an owner who is already signed in is sent on to `/app` by `/dang-nhap` itself.
 - `SessionProvider` is mounted in the root layout so state survives the move from
-  `/dang-nhap` to `/app`, but its probe runs only when `usePathname()` is under `/app`,
-  `/dang-nhap` or `/dang-ky`. This differs from the prototype, which probed on the landing
-  page too because everything there was client-rendered. (Today the probe still runs
-  everywhere; the conditional probe is a `PLAN.md` §Backlog item, waiting on Fonnus-BE.)
+  `/dang-nhap` to `/app`, and its probe runs only when `usePathname()` is under `/app`,
+  `/dang-nhap` or `/dang-ky` (ADR 0011 point 4). This differs from the prototype, which
+  probed on the landing page too because everything there was client-rendered; with a real
+  backend every probe is a `POST /auth/refresh`, a database write the landing page has no
+  reason to cause.
 - `ToastProvider` is in the root layout too: a "session expired" toast has to survive the
   redirect from `/app` to `/dang-nhap`, and those two routes share no other layout.
 - `ConfigProvider` is mounted in `app/app/layout.tsx`, not the root. An App Router layout

@@ -1,9 +1,9 @@
 /**
  * The session *hint* — not the session.
  *
- * The real session is an httpOnly cookie the browser holds and this app cannot
- * read. `GET /me` is the only way to know whether it is still valid, and that is
- * a round trip. This flag records "a sign-in completed in this browser recently"
+ * The real session is two httpOnly cookies the browser holds and this app cannot
+ * read. The probe (`api.auth.me()`) is the only way to know whether it is still
+ * valid, and that is a round trip. This flag records "a sign-in completed in this browser recently"
  * so the app shell can render its frame while the probe is still in flight,
  * instead of flashing the sign-in screen at an owner who is perfectly signed in.
  *

@@ -2,8 +2,9 @@
  * The fetch wrapper. Imported only by `*.live.ts` — a mock never touches it.
  *
  * Hand-written rather than a dependency, because what this app actually needs
- * from an HTTP client is about 120 lines: JSON both ways, the session cookie, a
- * timeout, one typed error, and a global 401 hook.
+ * from an HTTP client is about 150 lines: JSON both ways, the session cookies, a
+ * timeout, one typed error, one refresh on an expired access token, and a
+ * global 401 hook.
  */
 import { API_BASE_URL } from './env'
 import { ApiError, kindForStatus } from './errors'
@@ -29,11 +30,12 @@ export interface RequestOptions {
   retry?: boolean
   parse?: 'json' | 'none'
   /**
-   * A 401 is a normal answer here, not a session expiry.
+   * A 401 is a normal answer here, not an expired access token: it starts no
+   * refresh and fires no sign-out.
    *
-   * Set on `GET /me` and every `/auth/*` route. Without it the session probe's
-   * own 401 fires the global sign-out handler, which re-probes, which 401s —
-   * an infinite loop on the first page load of a signed-out visitor.
+   * Set on every `/auth/*` route and the probe's `GET /users/:id` (ADR 0011).
+   * Without it the probe's own 401 would refresh, and refresh's own 401 would
+   * refresh again; a signed-out visitor's first page load would never settle.
    */
   expect401?: boolean
   /**
@@ -114,9 +116,65 @@ async function readProblem(res: Response): Promise<ProblemBody> {
 const isTimeout = (e: unknown) => e instanceof DOMException && e.name === 'TimeoutError'
 const isAbort = (e: unknown) => e instanceof DOMException && e.name === 'AbortError'
 
+// ------------------------------------------------------------------ refresh
+
+/** The one refresh in flight. Every 401 that arrives while it runs waits on it. */
+let refreshing: Promise<boolean> | null = null
+
+/**
+ * `POST /auth/refresh`: a new access token from the refresh cookie. Resolves
+ * `false` when the backend says the session is over (401 `unauthorized` or
+ * `session_expired`); any other failure throws, because an unreachable server
+ * is not a signed-out owner.
+ *
+ * Takes no caller's signal: it is shared, and one caller unmounting must not
+ * cancel the refresh another caller is waiting on.
+ */
+function refreshSession(): Promise<boolean> {
+  refreshing ??= send('/auth/refresh', { method: 'POST', expect401: true, parse: 'none' })
+    .then(
+      () => true,
+      (e: unknown) => {
+        if (e instanceof ApiError && e.kind === 'unauthorized') return false
+        throw e
+      },
+    )
+    .finally(() => {
+      refreshing = null
+    })
+  return refreshing
+}
+
 // ------------------------------------------------------------------ request
 
+/**
+ * One request. A 401 on a request not marked `expect401` means the access
+ * token has expired (15 minutes): refresh once, then send the request again
+ * once (ADR 0011 point 3). A write is sent again too — an expired token is
+ * refused before the handler runs, so the first attempt never happened.
+ */
 export async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
+  try {
+    return await send<T>(path, opts)
+  } catch (e) {
+    // This app's own routes hold no session: a 401 from one is not an expired
+    // access token, and refreshing would send the landing page to Fonnus-BE
+    // (ADR 0011 point 4).
+    if (opts.expect401 || opts.ownOrigin || !(e instanceof ApiError) || e.kind !== 'unauthorized') throw e
+    if (!(await refreshSession())) {
+      fireUnauthorized()
+      throw e
+    }
+  }
+  try {
+    return await send<T>(path, opts)
+  } catch (e) {
+    if (e instanceof ApiError && e.kind === 'unauthorized') fireUnauthorized()
+    throw e
+  }
+}
+
+async function send<T>(path: string, opts: RequestOptions): Promise<T> {
   const { method = 'GET', body, query, timeoutMs = DEFAULT_TIMEOUT_MS, parse = 'json' } = opts
   const url = buildUrl(path, { query, ownOrigin: opts.ownOrigin })
 
@@ -151,7 +209,6 @@ export async function request<T>(path: string, opts: RequestOptions = {}): Promi
   const requestId = res.headers.get('x-request-id')
 
   if (!res.ok) {
-    if (res.status === 401 && !opts.expect401) fireUnauthorized()
     const problem = await readProblem(res)
     throw new ApiError({
       kind: kindForStatus(res.status),
