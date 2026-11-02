@@ -22,9 +22,11 @@ import { useCallDemo } from './orb/call-demo-provider'
  * HTML and the media query picks, so the server and the first client render
  * agree.
  *
- * The waitlist button is the header's one action, the same label at every
- * width, so the drawer carries destinations only. There is no sign-in entry on
- * the marketing site: Fonnus has no customers to sign in yet.
+ * Two actions, as the prototype drew them: "Đăng nhập" (secondary) beside the
+ * waitlist button on a wide screen, and below the `nav` breakpoint the pill
+ * keeps only the waitlist button, so sign-in becomes the drawer's last row.
+ * The header reads no session either way; `/dang-nhap` sends an owner who is
+ * already signed in on to the app.
  *
  * The same header sits on every marketing page. A link to the page you are on
  * keeps its wash, so the header also says where you are.
@@ -70,6 +72,21 @@ const WAITLIST_CTA = [
   'bg-action-primary font-ui text-body-sm leading-[1.2] font-semibold whitespace-nowrap text-text-on-accent no-underline',
   'cursor-pointer transition-[background-color,translate,scale] duration-200 ease-out',
   'hover:-translate-y-px hover:bg-action-primary-hover active:scale-[var(--press-scale)]',
+  'focus-visible:outline-none focus-visible:shadow-[var(--ring-focus)]',
+].join(' ')
+
+/*
+ * The sign-in button: the secondary variant at the waitlist button's own
+ * height, so the two read as one pair. Only in the pill from the `nav`
+ * breakpoint up; below it the drawer carries sign-in. `hover:text-text-body`
+ * beats the copied base.css, which turns every hovered link terracotta.
+ */
+const SIGNIN_CTA = [
+  'hidden nav:inline-flex h-11 shrink-0 items-center justify-center rounded-pill px-5',
+  'bg-action-secondary font-ui text-body-sm leading-[1.2] font-semibold whitespace-nowrap text-text-body no-underline',
+  'shadow-[inset_0_0_0_1px_var(--border-strong)]',
+  'cursor-pointer transition-[background-color,translate,scale] duration-200 ease-out',
+  'hover:-translate-y-px hover:bg-action-secondary-hover hover:text-text-body active:scale-[var(--press-scale)]',
   'focus-visible:outline-none focus-visible:shadow-[var(--ring-focus)]',
 ].join(' ')
 
@@ -230,7 +247,10 @@ export function Header() {
   )
 }
 
-/** The waitlist button at every width; the drawer toggle below the `nav` breakpoint. */
+/**
+ * The waitlist button at every width; sign-in beside it from the `nav`
+ * breakpoint up; the drawer toggle below it.
+ */
 interface ActionsProps {
   drawerOpen: boolean
   onToggleDrawer: () => void
@@ -240,6 +260,9 @@ interface ActionsProps {
 function Actions({ drawerOpen, onToggleDrawer, toggleRef }: ActionsProps) {
   return (
     <div className="ml-auto flex shrink-0 items-center gap-2">
+      <Link href="/dang-nhap" className={SIGNIN_CTA}>
+        Đăng nhập
+      </Link>
       <Link href="/waitlist" className={WAITLIST_CTA}>
         <LogoMark size={18} arcClassName="motion-safe:animate-[fnLift_3.2s_var(--ease-arc)_infinite]" />
         Danh sách chờ
@@ -416,6 +439,20 @@ function Drawer({ pathname, onPick, onDemo }: { pathname: string; onPick: () => 
           </Link>
         ),
       )}
+      {/* Sign-in is the drawer's last row, as the prototype drew it: centred,
+          outlined by a hairline, washed terracotta on hover. */}
+      <Link
+        href="/dang-nhap"
+        onClick={onPick}
+        className={[
+          'mt-1 rounded-[14px] px-3.5 py-[15px] text-center font-ui text-body-sm leading-(--leading-body) font-semibold text-text-body no-underline',
+          'shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--text-heading)_16%,transparent)]',
+          'hover:bg-[color-mix(in_srgb,var(--text-eyebrow)_8%,transparent)] hover:text-text-body',
+          FAST,
+        ].join(' ')}
+      >
+        Đăng nhập
+      </Link>
     </nav>
   )
 }
